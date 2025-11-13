@@ -282,23 +282,32 @@ function getSheets() {
     console.log('Step 4: Mapping sheets to expected keys...');
     for (var i = 0; i < allSheets.length; i++) {
       var sheet = allSheets[i];
-      var sheetName = sheet.getName().toLowerCase();
-      console.log('  Processing sheet:', sheet.getName(), '(lowercase:', sheetName + ')');
+      var sheetName = sheet.getName().toLowerCase().replace(/\s+/g, ''); // Remove spaces
+      console.log('  Processing sheet:', sheet.getName(), '(normalized:', sheetName + ')');
 
-      // Map to expected keys
-      if (sheetName.indexOf('employee') >= 0 || sheetName === 'empdetails') {
-        sheets.empdetails = sheet;
-        console.log('    ✓ Mapped to: empdetails');
-      } else if (sheetName.indexOf('salary') >= 0 || sheetName.indexOf('payroll') >= 0) {
-        sheets.salary = sheet;
-        console.log('    ✓ Mapped to: salary');
-      } else if (sheetName.indexOf('loan') >= 0) {
+      // Map to expected keys - ORDER MATTERS! Most specific first
+      // Check loans BEFORE employee to avoid conflict
+      if (sheetName.indexOf('loan') >= 0) {
         sheets.loans = sheet;
         console.log('    ✓ Mapped to: loans');
-      } else if (sheetName.indexOf('leave') >= 0) {
+      }
+      // Check for employee details/empdetails (but not loans)
+      else if (sheetName.indexOf('employeedetails') >= 0 || sheetName === 'empdetails') {
+        sheets.empdetails = sheet;
+        console.log('    ✓ Mapped to: empdetails');
+      }
+      // Check salary/payroll
+      else if (sheetName.indexOf('salary') >= 0 || sheetName.indexOf('payroll') >= 0) {
+        sheets.salary = sheet;
+        console.log('    ✓ Mapped to: salary');
+      }
+      // Check leave
+      else if (sheetName.indexOf('leave') >= 0) {
         sheets.leave = sheet;
         console.log('    ✓ Mapped to: leave');
-      } else if (sheetName.indexOf('pending') >= 0 || sheetName.indexOf('timesheet') >= 0) {
+      }
+      // Check pending/timesheets
+      else if (sheetName.indexOf('pending') >= 0 || sheetName.indexOf('timesheet') >= 0) {
         sheets.pending = sheet;
         console.log('    ✓ Mapped to: pending');
       } else {
