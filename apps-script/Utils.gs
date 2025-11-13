@@ -252,37 +252,80 @@ function formatPhoneNumber(phone) {
 
 /**
  * Get all sheets with proper error handling
- * 
+ *
  * @returns {Object} Object with sheet references
  */
 function getSheets() {
   try {
+    console.log('=== getSheets() START ===');
+
+    // Step 1: Get active spreadsheet
+    console.log('Step 1: Getting active spreadsheet...');
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    console.log('✓ Spreadsheet retrieved:', ss.getName());
+    console.log('  Spreadsheet ID:', ss.getId());
+
     var sheets = {};
-    
-    // Get all sheets
+
+    // Step 2: Get all sheets
+    console.log('Step 2: Getting all sheets...');
     var allSheets = ss.getSheets();
-    
-    // Map sheets by name (case-insensitive)
+    console.log('✓ Found', allSheets.length, 'sheets total');
+
+    // Step 3: List all sheet names
+    console.log('Step 3: Listing all sheet names:');
+    for (var i = 0; i < allSheets.length; i++) {
+      console.log('  - Sheet ' + (i + 1) + ':', allSheets[i].getName());
+    }
+
+    // Step 4: Map sheets by name (case-insensitive)
+    console.log('Step 4: Mapping sheets to expected keys...');
     for (var i = 0; i < allSheets.length; i++) {
       var sheet = allSheets[i];
       var sheetName = sheet.getName().toLowerCase();
-      
+      console.log('  Processing sheet:', sheet.getName(), '(lowercase:', sheetName + ')');
+
       // Map to expected keys
       if (sheetName.indexOf('employee') >= 0 || sheetName === 'empdetails') {
         sheets.empdetails = sheet;
-      } else if (sheetName.indexOf('salary') >= 0) {
+        console.log('    ✓ Mapped to: empdetails');
+      } else if (sheetName.indexOf('salary') >= 0 || sheetName.indexOf('payroll') >= 0) {
         sheets.salary = sheet;
+        console.log('    ✓ Mapped to: salary');
       } else if (sheetName.indexOf('loan') >= 0) {
         sheets.loans = sheet;
+        console.log('    ✓ Mapped to: loans');
       } else if (sheetName.indexOf('leave') >= 0) {
         sheets.leave = sheet;
+        console.log('    ✓ Mapped to: leave');
+      } else if (sheetName.indexOf('pending') >= 0 || sheetName.indexOf('timesheet') >= 0) {
+        sheets.pending = sheet;
+        console.log('    ✓ Mapped to: pending');
+      } else {
+        console.log('    - Not mapped (no matching key)');
       }
     }
-    
+
+    // Step 5: Summary
+    console.log('Step 5: Summary of mapped sheets:');
+    var mappedKeys = Object.keys(sheets);
+    console.log('  Mapped', mappedKeys.length, 'sheets:', mappedKeys.join(', '));
+
+    if (sheets.empdetails) {
+      console.log('  ✓ empdetails sheet found:', sheets.empdetails.getName());
+    } else {
+      console.warn('  ✗ empdetails sheet NOT found!');
+    }
+
+    console.log('=== getSheets() END ===');
     return sheets;
-    
+
   } catch (error) {
+    console.error('=== getSheets() ERROR ===');
+    console.error('Error type:', error.name);
+    console.error('Error message:', error.message);
+    console.error('Full error:', error.toString());
+    console.error('Stack trace:', error.stack);
     logError('Failed to get sheets', error);
     throw new Error('Failed to access spreadsheet: ' + error.toString());
   }
