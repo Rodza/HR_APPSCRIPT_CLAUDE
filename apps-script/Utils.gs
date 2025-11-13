@@ -257,7 +257,7 @@ function formatPhoneNumber(phone) {
  */
 function getSheets() {
   try {
-    var ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheets = {};
     
     // Get all sheets
