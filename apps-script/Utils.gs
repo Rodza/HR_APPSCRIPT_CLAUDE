@@ -1,482 +1,455 @@
 /**
- * UTILS.GS - Utility Functions
- * HR Payroll System for SA Grinding Wheels & Scorpio Abrasives
- *
- * This file contains shared utility functions used throughout the system:
- * - Sheet access and locator functions
- * - Date formatting
- * - Currency formatting
- * - UUID generation
- * - Validation helpers
- * - Logging helpers
- * - Audit trail management
+ * Utils.gs - Utility Functions for HR System
+ * 
+ * Contains helper functions for validation, formatting, logging, etc.
+ * Phase 1 focus: Core utilities for employee management
  */
+
+// ============================================================================
+// LOGGING UTILITIES
+// ============================================================================
 
 /**
- * Get all sheets in the spreadsheet with flexible name matching
- * This function provides a centralized way to access sheets regardless of their exact names
- *
- * @returns {Object} Object containing sheet references
- * @property {Sheet} salary - MASTERSALARY sheet
- * @property {Sheet} loans - EmployeeLoans sheet
- * @property {Sheet} empdetails - EMPLOYEE DETAILS sheet
- * @property {Sheet} leave - LEAVE sheet
- * @property {Sheet} pending - PendingTimesheets sheet
+ * Log function start
+ * @param {string} functionName - Name of the function
+ * @param {Object} params - Parameters passed to function
  */
-function getSheets() {
-  Logger.log('📋 Scanning spreadsheet for sheets...');
-
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const allSheets = ss.getSheets();
-  const sheetMap = {};
-
-  allSheets.forEach(sheet => {
-    const originalName = sheet.getName();
-    const name = originalName.toLowerCase().replace(/\s+/g, '').replace(/-/g, '');
-
-    // Match MASTERSALARY or salary records
-    if (name === 'mastersalary' || name === 'salaryrecords' || name === 'payroll') {
-      sheetMap.salary = sheet;
-      Logger.log('  📊 Found salary sheet: ' + originalName);
-    }
-    // Match EmployeeLoans
-    else if (name === 'employeeloans' || name === 'loantransactions' || name === 'loans') {
-      sheetMap.loans = sheet;
-      Logger.log('  📊 Found loans sheet: ' + originalName);
-    }
-    // Match EMPLOYEE DETAILS
-    else if (name === 'empdetails' || name === 'employeedetails' || name === 'employees') {
-      sheetMap.empdetails = sheet;
-      Logger.log('  📊 Found employee details sheet: ' + originalName);
-    }
-    // Match LEAVE
-    else if (name === 'leave' || name === 'leaverecords') {
-      sheetMap.leave = sheet;
-      Logger.log('  📊 Found leave sheet: ' + originalName);
-    }
-    // Match PendingTimesheets
-    else if (name === 'pendingtimesheets' || name === 'timeapproval' || name === 'pending') {
-      sheetMap.pending = sheet;
-      Logger.log('  📊 Found pending timesheets sheet: ' + originalName);
-    }
-  });
-
-  Logger.log('✅ Sheet mapping complete. Found: ' + Object.keys(sheetMap).join(', '));
-
-  return sheetMap;
+function logFunctionStart(functionName, params) {
+  console.log('→ ' + functionName + ' started', params || {});
 }
 
 /**
- * Get the currently logged-in user's email
- *
- * @returns {string} User email address
+ * Log function end
+ * @param {string} functionName - Name of the function  
+ * @param {Object} result - Result data
  */
-function getCurrentUser() {
-  return Session.getActiveUser().getEmail();
+function logFunctionEnd(functionName, result) {
+  console.log('← ' + functionName + ' completed', result || {});
 }
 
 /**
- * Format date for display
- * Example: "17 October 2025"
- *
- * @param {Date|string|number} dateValue - Date to format
- * @returns {string} Formatted date string
+ * Log success message
+ * @param {string} message - Success message
+ * @param {Object} data - Additional data
  */
-function formatDate(dateValue) {
-  try {
-    const date = parseDate(dateValue);
-    const day = date.getDate();
-    const month = date.toLocaleString('en-US', { month: 'long' });
-    const year = date.getFullYear();
-    return `${day} ${month} ${year}`;
-  } catch (error) {
-    Logger.log('⚠️ Error formatting date: ' + error.message);
-    return String(dateValue);
+function logSuccess(message, data) {
+  console.log('✓ ' + message, data || {});
+}
+
+/**
+ * Log warning message
+ * @param {string} message - Warning message
+ * @param {Object} data - Additional data
+ */
+function logWarning(message, data) {
+  console.warn('⚠ ' + message, data || {});
+}
+
+/**
+ * Log error message
+ * @param {string} message - Error message
+ * @param {Error} error - Error object
+ */
+function logError(message, error) {
+  console.error('✗ ' + message, error ? error.toString() : '');
+  
+  // Also log to Logger for Apps Script logging
+  if (typeof Logger !== 'undefined') {
+    Logger.log('ERROR: ' + message + ' - ' + (error ? error.toString() : ''));
   }
 }
 
 /**
- * Format date for short display (tables, lists)
- * Example: "2025-10-17"
- *
- * @param {Date|string|number} dateValue - Date to format
- * @returns {string} Formatted date string
+ * Log info message
+ * @param {string} message - Info message
+ * @param {Object} data - Additional data
  */
-function formatDateShort(dateValue) {
-  try {
-    const date = parseDate(dateValue);
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  } catch (error) {
-    Logger.log('⚠️ Error formatting date: ' + error.message);
-    return String(dateValue);
-  }
+function logInfo(message, data) {
+  console.info('ℹ ' + message, data || {});
 }
 
+// ============================================================================
+// VALIDATION UTILITIES
+// ============================================================================
+
 /**
- * Format currency with South African Rand symbol and comma separators
- * Example: "R1,341.42"
- *
- * @param {number} amount - Amount to format
- * @returns {string} Formatted currency string
+ * Check if value is empty
+ * Enhanced to handle all data types safely
+ * 
+ * @param {any} value - Value to check
+ * @returns {boolean} True if empty
  */
-function formatCurrency(amount) {
-  if (amount === null || amount === undefined || amount === '') {
-    return 'R0.00';
+function isEmpty(value) {
+  // Handle null and undefined
+  if (value === null || value === undefined) {
+    return true;
   }
-
-  const num = parseFloat(amount);
-  if (isNaN(num)) {
-    return 'R0.00';
+  
+  // Handle strings
+  if (typeof value === 'string') {
+    return value.trim() === '';
   }
-
-  // Round to 2 decimal places
-  const rounded = Math.round(num * 100) / 100;
-
-  // Format with comma separators
-  const formatted = rounded.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-
-  return 'R' + formatted;
-}
-
-/**
- * Generate a unique UUID
- * Used for creating unique IDs for records
- *
- * @returns {string} UUID string (8 characters)
- */
-function generateUUID() {
-  return Utilities.getUuid().substring(0, 8);
-}
-
-/**
- * Generate a full UUID (36 characters)
- * Used for loan IDs and other records requiring longer unique identifiers
- *
- * @returns {string} Full UUID string
- */
-function generateFullUUID() {
-  return Utilities.getUuid();
+  
+  // Handle numbers (0 is not empty)
+  if (typeof value === 'number') {
+    return false;
+  }
+  
+  // Handle booleans
+  if (typeof value === 'boolean') {
+    return false;
+  }
+  
+  // Handle dates
+  if (value instanceof Date) {
+    return false;
+  }
+  
+  // Handle arrays
+  if (Array.isArray(value)) {
+    return value.length === 0;
+  }
+  
+  // Handle objects
+  if (typeof value === 'object') {
+    return Object.keys(value).length === 0;
+  }
+  
+  // Default to not empty for other types
+  return false;
 }
 
 /**
  * Validate South African ID Number
- * Must be 13 digits
- *
- * @param {string} idNumber - ID number to validate
+ * 
+ * @param {string} idNumber - 13-digit SA ID number
  * @returns {boolean} True if valid
  */
-function validateSAIdNumber(idNumber) {
-  if (!idNumber) return false;
-
-  const cleaned = String(idNumber).replace(/\s/g, '');
-  return /^\d{13}$/.test(cleaned);
-}
-
-/**
- * Validate South African phone number
- * Accepts formats: 0821234567, +27821234567
- *
- * @param {string} phoneNumber - Phone number to validate
- * @returns {boolean} True if valid
- */
-function validatePhoneNumber(phoneNumber) {
-  if (!phoneNumber) return false;
-
-  const cleaned = String(phoneNumber).replace(/[\s\-\(\)]/g, '');
-  return /^(\+27|0)[0-9]{9}$/.test(cleaned);
-}
-
-/**
- * Validate email address
- *
- * @param {string} email - Email to validate
- * @returns {boolean} True if valid
- */
-function validateEmail(email) {
-  if (!email) return false;
-
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-}
-
-/**
- * Parse date from various formats
- *
- * @param {Date|string|number} dateValue - Date value to parse
- * @returns {Date} Parsed date object
- * @throws {Error} If date cannot be parsed
- */
-function parseDate(dateValue) {
-  if (dateValue instanceof Date) {
-    return dateValue;
+function isValidSAIdNumber(idNumber) {
+  // Convert to string and remove spaces
+  idNumber = String(idNumber || '').replace(/\s/g, '');
+  
+  // Must be 13 digits
+  if (!/^\d{13}$/.test(idNumber)) {
+    return false;
   }
-
-  if (typeof dateValue === 'string') {
-    const parsed = new Date(dateValue);
-    if (!isNaN(parsed.getTime())) {
-      return parsed;
+  
+  // Extract date components
+  var year = parseInt(idNumber.substring(0, 2));
+  var month = parseInt(idNumber.substring(2, 4));
+  var day = parseInt(idNumber.substring(4, 6));
+  
+  // Determine century (00-30 = 2000s, 31-99 = 1900s)
+  var fullYear = year <= 30 ? 2000 + year : 1900 + year;
+  
+  // Validate date
+  if (month < 1 || month > 12 || day < 1 || day > 31) {
+    return false;
+  }
+  
+  // Check if date is valid
+  var testDate = new Date(fullYear, month - 1, day);
+  if (testDate.getFullYear() !== fullYear || 
+      testDate.getMonth() !== month - 1 || 
+      testDate.getDate() !== day) {
+    return false;
+  }
+  
+  // Validate gender digits (4 digits, 0000-4999 = female, 5000-9999 = male)
+  var genderDigits = parseInt(idNumber.substring(6, 10));
+  if (genderDigits < 0 || genderDigits > 9999) {
+    return false;
+  }
+  
+  // Validate citizenship (0 = SA citizen, 1 = permanent resident)
+  var citizenship = parseInt(idNumber.charAt(10));
+  if (citizenship !== 0 && citizenship !== 1) {
+    return false;
+  }
+  
+  // Digit 11 is usually 8 or 9 (obsolete)
+  
+  // Validate checksum (Luhn algorithm)
+  var sum = 0;
+  var alternate = false;
+  
+  for (var i = idNumber.length - 1; i >= 0; i--) {
+    var digit = parseInt(idNumber.charAt(i));
+    
+    if (alternate) {
+      digit *= 2;
+      if (digit > 9) {
+        digit = (digit % 10) + 1;
+      }
     }
+    
+    sum += digit;
+    alternate = !alternate;
   }
+  
+  return (sum % 10) === 0;
+}
 
-  if (typeof dateValue === 'number') {
-    const parsed = new Date(dateValue);
-    if (!isNaN(parsed.getTime())) {
-      return parsed;
+/**
+ * Validate phone number (South African format)
+ * Accepts: 0123456789, 012 345 6789, +27123456789, etc.
+ * 
+ * @param {string} phone - Phone number to validate
+ * @returns {boolean} True if valid
+ */
+function isValidPhoneNumber(phone) {
+  // Convert to string and remove spaces, dashes, parentheses
+  phone = String(phone || '').replace(/[\s\-\(\)]/g, '');
+  
+  // Check for South African formats
+  // Local: 0XXXXXXXXX (10 digits starting with 0)
+  // International: +27XXXXXXXXX or 0027XXXXXXXXX
+  
+  if (phone.startsWith('+27')) {
+    phone = '0' + phone.substring(3);
+  } else if (phone.startsWith('0027')) {
+    phone = '0' + phone.substring(4);
+  } else if (phone.startsWith('27')) {
+    phone = '0' + phone.substring(2);
+  }
+  
+  // Should now be 10 digits starting with 0
+  return /^0\d{9}$/.test(phone);
+}
+
+/**
+ * Format phone number to standard format
+ * 
+ * @param {string} phone - Phone number to format
+ * @returns {string} Formatted phone number
+ */
+function formatPhoneNumber(phone) {
+  // Clean and validate
+  phone = String(phone || '').replace(/[\s\-\(\)]/g, '');
+  
+  if (!isValidPhoneNumber(phone)) {
+    return phone; // Return as-is if invalid
+  }
+  
+  // Convert to local format
+  if (phone.startsWith('+27')) {
+    phone = '0' + phone.substring(3);
+  } else if (phone.startsWith('0027')) {
+    phone = '0' + phone.substring(4);
+  } else if (phone.startsWith('27')) {
+    phone = '0' + phone.substring(2);
+  }
+  
+  // Format as 0XX XXX XXXX
+  return phone.substring(0, 3) + ' ' + 
+         phone.substring(3, 6) + ' ' + 
+         phone.substring(6);
+}
+
+// ============================================================================
+// SHEET UTILITIES
+// ============================================================================
+
+/**
+ * Get all sheets with proper error handling
+ * 
+ * @returns {Object} Object with sheet references
+ */
+function getSheets() {
+  try {
+    var ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+    var sheets = {};
+    
+    // Get all sheets
+    var allSheets = ss.getSheets();
+    
+    // Map sheets by name (case-insensitive)
+    for (var i = 0; i < allSheets.length; i++) {
+      var sheet = allSheets[i];
+      var sheetName = sheet.getName().toLowerCase();
+      
+      // Map to expected keys
+      if (sheetName.indexOf('employee') >= 0 || sheetName === 'empdetails') {
+        sheets.empdetails = sheet;
+      } else if (sheetName.indexOf('salary') >= 0) {
+        sheets.salary = sheet;
+      } else if (sheetName.indexOf('loan') >= 0) {
+        sheets.loans = sheet;
+      } else if (sheetName.indexOf('leave') >= 0) {
+        sheets.leave = sheet;
+      }
     }
+    
+    return sheets;
+    
+  } catch (error) {
+    logError('Failed to get sheets', error);
+    throw new Error('Failed to access spreadsheet: ' + error.toString());
   }
-
-  throw new Error('Invalid date format: ' + dateValue);
 }
 
 /**
- * Add audit fields to data object
- * Adds USER, TIMESTAMP on create
- * Adds MODIFIED_BY, LAST_MODIFIED on update
- *
- * @param {Object} data - Data object to enrich
- * @param {boolean} isCreate - True if creating new record, false if updating
- * @returns {Object} Enriched data object
+ * Find column index by header name (case-insensitive)
+ * 
+ * @param {Array} headers - Array of header values
+ * @param {string} columnName - Column name to find
+ * @returns {number} Column index or -1 if not found
  */
-function addAuditFields(data, isCreate = true) {
-  const user = getCurrentUser();
-  const now = new Date();
-
-  if (isCreate) {
-    data.USER = user;
-    data.TIMESTAMP = now;
-  }
-
-  data.MODIFIED_BY = user;
-  data.LAST_MODIFIED = now;
-
-  return data;
-}
-
-/**
- * Sanitize user input
- * Removes HTML tags and trims whitespace
- *
- * @param {string} input - Input string to sanitize
- * @returns {string} Sanitized string
- */
-function sanitizeInput(input) {
-  if (typeof input !== 'string') {
-    return input;
-  }
-
-  // Remove HTML tags
-  let sanitized = input.replace(/<[^>]*>/g, '');
-
-  // Trim whitespace
-  sanitized = sanitized.trim();
-
-  return sanitized;
-}
-
-/**
- * Calculate number of days between two dates
- *
- * @param {Date} startDate - Start date
- * @param {Date} endDate - End date
- * @returns {number} Number of days (inclusive)
- */
-function calculateDaysBetween(startDate, endDate) {
-  const start = parseDate(startDate);
-  const end = parseDate(endDate);
-
-  const diffMs = end.getTime() - start.getTime();
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-  return diffDays + 1; // Inclusive of both days
-}
-
-/**
- * Find column index by header name
- *
- * @param {Array} headers - Array of header strings
- * @param {string} columnName - Name of column to find
- * @returns {number} Column index (0-based) or -1 if not found
- */
-function findColumnIndex(headers, columnName) {
-  const normalizedName = columnName.toLowerCase().trim();
-
-  for (let i = 0; i < headers.length; i++) {
-    const header = String(headers[i]).toLowerCase().trim();
-    if (header === normalizedName) {
+function indexOf(headers, columnName) {
+  if (!headers || !columnName) return -1;
+  
+  columnName = columnName.toLowerCase();
+  
+  for (var i = 0; i < headers.length; i++) {
+    if (String(headers[i]).toLowerCase() === columnName) {
       return i;
     }
   }
-
+  
   return -1;
 }
 
 /**
- * Get column value from row by column name
- *
- * @param {Array} row - Data row array
- * @param {Array} headers - Header row array
- * @param {string} columnName - Column name to get
- * @returns {*} Column value or null if not found
+ * Build object from row data and headers
+ * 
+ * @param {Array} row - Row data
+ * @param {Array} headers - Header row
+ * @returns {Object} Object with header keys
  */
-function getColumnValue(row, headers, columnName) {
-  const index = findColumnIndex(headers, columnName);
-  return index >= 0 ? row[index] : null;
-}
-
-/**
- * Convert row array to object using headers
- *
- * @param {Array} row - Data row array
- * @param {Array} headers - Header row array
- * @returns {Object} Object with headers as keys
- */
-function rowToObject(row, headers) {
-  const obj = {};
-
-  for (let i = 0; i < headers.length; i++) {
-    const header = headers[i];
-    obj[header] = row[i];
+function buildObjectFromRow(row, headers) {
+  var obj = {};
+  
+  for (var i = 0; i < headers.length; i++) {
+    var header = String(headers[i]);
+    var value = row[i];
+    
+    // Handle dates
+    if (value instanceof Date) {
+      obj[header] = value;
+    }
+    // Handle numbers
+    else if (typeof value === 'number') {
+      obj[header] = value;
+    }
+    // Handle strings
+    else if (typeof value === 'string') {
+      obj[header] = value;
+    }
+    // Handle booleans
+    else if (typeof value === 'boolean') {
+      obj[header] = value;
+    }
+    // Default to empty string for null/undefined
+    else {
+      obj[header] = '';
+    }
   }
-
+  
   return obj;
 }
 
 /**
- * Convert object to row array using headers
- *
- * @param {Object} obj - Object with data
- * @param {Array} headers - Header row array
- * @returns {Array} Row array matching header order
+ * Filter array by field value
+ * 
+ * @param {Array} array - Array to filter
+ * @param {string} field - Field name
+ * @param {string} value - Value to match
+ * @returns {Array} Filtered array
  */
-function objectToRow(obj, headers) {
-  const row = [];
+function filterByField(array, field, value) {
+  return array.filter(function(item) {
+    return item[field] === value;
+  });
+}
 
-  for (let i = 0; i < headers.length; i++) {
-    const header = headers[i];
-    row.push(obj[header] !== undefined ? obj[header] : '');
+/**
+ * Filter array by search term in field
+ * 
+ * @param {Array} array - Array to filter
+ * @param {string} field - Field name
+ * @param {string} search - Search term
+ * @returns {Array} Filtered array
+ */
+function filterBySearch(array, field, search) {
+  var searchLower = search.toLowerCase();
+  
+  return array.filter(function(item) {
+    var fieldValue = String(item[field] || '').toLowerCase();
+    return fieldValue.indexOf(searchLower) >= 0;
+  });
+}
+
+// ============================================================================
+// DATE UTILITIES
+// ============================================================================
+
+/**
+ * Format date to YYYY-MM-DD
+ * 
+ * @param {Date} date - Date to format
+ * @returns {string} Formatted date string
+ */
+function formatDate(date) {
+  if (!date) return '';
+  
+  if (!(date instanceof Date)) {
+    date = new Date(date);
   }
-
-  return row;
+  
+  var year = date.getFullYear();
+  var month = ('0' + (date.getMonth() + 1)).slice(-2);
+  var day = ('0' + date.getDate()).slice(-2);
+  
+  return year + '-' + month + '-' + day;
 }
 
 /**
- * Round number to specified decimal places
- *
- * @param {number} value - Value to round
- * @param {number} decimals - Number of decimal places (default: 2)
- * @returns {number} Rounded value
+ * Get current timestamp
+ * 
+ * @returns {string} Current timestamp in readable format
  */
-function roundTo(value, decimals = 2) {
-  const multiplier = Math.pow(10, decimals);
-  return Math.round(value * multiplier) / multiplier;
+function getCurrentTimestamp() {
+  return new Date().toLocaleString('en-ZA', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  });
 }
 
+// ============================================================================
+// ID GENERATION
+// ============================================================================
+
 /**
- * Check if value is empty (null, undefined, empty string)
- *
- * @param {*} value - Value to check
- * @returns {boolean} True if empty
+ * Generate unique ID
+ * 
+ * @returns {string} 8-character unique ID
  */
-function isEmpty(value) {
-  return value === null || value === undefined || value === '';
+function generateId() {
+  return Utilities.getUuid().substring(0, 8);
 }
 
-/**
- * Get week ending date (Friday) from any date in the week
- *
- * @param {Date|string} dateValue - Date in the week
- * @returns {Date} Friday of that week
- */
-function getWeekEnding(dateValue) {
-  const date = parseDate(dateValue);
-  const dayOfWeek = date.getDay(); // 0 = Sunday, 5 = Friday
+// ============================================================================
+// EXPORT UTILITIES FOR TESTING
+// ============================================================================
 
-  // Calculate days until Friday
-  let daysUntilFriday;
-  if (dayOfWeek <= 5) {
-    daysUntilFriday = 5 - dayOfWeek;
-  } else {
-    daysUntilFriday = 7 - dayOfWeek + 5;
-  }
-
-  const friday = new Date(date);
-  friday.setDate(date.getDate() + daysUntilFriday);
-
-  return friday;
-}
-
-/**
- * Lock script execution to prevent concurrent modifications
- *
- * @param {Function} callback - Function to execute with lock
- * @param {number} timeout - Timeout in milliseconds (default: 30000)
- * @returns {*} Result of callback function
- */
-function withLock(callback, timeout = 30000) {
-  const lock = LockService.getScriptLock();
-
-  try {
-    lock.waitLock(timeout);
-    const result = callback();
-    return result;
-  } catch (error) {
-    Logger.log('❌ Lock timeout or error: ' + error.message);
-    throw error;
-  } finally {
-    lock.releaseLock();
-  }
-}
-
-/**
- * Test all utility functions
- * Call this to verify utilities are working
- */
-function testUtilities() {
-  Logger.log('\n========== TESTING UTILITIES ==========');
-
-  try {
-    // Test UUID generation
-    const uuid = generateUUID();
-    Logger.log('✅ UUID generated: ' + uuid);
-
-    // Test date formatting
-    const today = new Date();
-    const formatted = formatDate(today);
-    const shortFormatted = formatDateShort(today);
-    Logger.log('✅ Date formatted: ' + formatted);
-    Logger.log('✅ Date short: ' + shortFormatted);
-
-    // Test currency formatting
-    const currency = formatCurrency(1234.567);
-    Logger.log('✅ Currency formatted: ' + currency);
-
-    // Test ID validation
-    const validId = validateSAIdNumber('9401015800081');
-    const invalidId = validateSAIdNumber('123');
-    Logger.log('✅ ID validation: ' + validId + ' (should be true)');
-    Logger.log('✅ ID validation: ' + invalidId + ' (should be false)');
-
-    // Test phone validation
-    const validPhone = validatePhoneNumber('0821234567');
-    const invalidPhone = validatePhoneNumber('123');
-    Logger.log('✅ Phone validation: ' + validPhone + ' (should be true)');
-    Logger.log('✅ Phone validation: ' + invalidPhone + ' (should be false)');
-
-    // Test date calculation
-    const days = calculateDaysBetween(new Date('2025-10-01'), new Date('2025-10-05'));
-    Logger.log('✅ Days between: ' + days + ' (should be 5)');
-
-    // Test rounding
-    const rounded = roundTo(1.2345, 2);
-    Logger.log('✅ Rounded: ' + rounded + ' (should be 1.23)');
-
-    Logger.log('✅ ALL UTILITY TESTS PASSED');
-
-  } catch (error) {
-    Logger.log('❌ TEST FAILED: ' + error.message);
-  }
-
-  Logger.log('========== UTILITIES TEST COMPLETE ==========\n');
+// Make functions available globally for testing
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    isEmpty: isEmpty,
+    isValidSAIdNumber: isValidSAIdNumber,
+    isValidPhoneNumber: isValidPhoneNumber,
+    formatPhoneNumber: formatPhoneNumber,
+    formatDate: formatDate,
+    generateId: generateId,
+    logFunctionStart: logFunctionStart,
+    logFunctionEnd: logFunctionEnd,
+    logSuccess: logSuccess,
+    logWarning: logWarning,
+    logError: logError,
+    logInfo: logInfo
+  };
 }
