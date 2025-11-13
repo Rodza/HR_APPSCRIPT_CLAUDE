@@ -1,250 +1,343 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <base target="_top">
-    <style>
-        .filter-section {
-            background-color: #f8f9fa;
-            padding: 15px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-        }
-        .badge-permanent { background-color: #28a745; }
-        .badge-temporary { background-color: #ffc107; }
-        .badge-contract { background-color: #17a2b8; }
-        .action-buttons { display: flex; gap: 5px; }
-    </style>
-</head>
-<body>
-    <div class="card">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h5><i class="fas fa-users"></i> Employees</h5>
-            <button class="btn btn-primary btn-sm" onclick="showEmployeeForm()">
-                <i class="fas fa-plus"></i> Add Employee
-            </button>
-        </div>
-        <div class="card-body">
-            <!-- Filter Section -->
-            <div class="filter-section">
-                <div class="row">
-                    <div class="col-md-4">
-                        <input type="text" class="form-control" id="searchEmployee"
-                               placeholder="Search by name..." onkeyup="filterEmployees()">
-                    </div>
-                    <div class="col-md-3">
-                        <select class="form-select" id="filterEmployer" onchange="filterEmployees()">
-                            <option value="">All Employers</option>
-                            <option value="SA Grinding Wheels">SA Grinding Wheels</option>
-                            <option value="Scorpio Abrasives">Scorpio Abrasives</option>
-                        </select>
-                    </div>
-                    <div class="col-md-3">
-                        <select class="form-select" id="filterStatus" onchange="filterEmployees()">
-                            <option value="">All Statuses</option>
-                            <option value="Permanent">Permanent</option>
-                            <option value="Temporary">Temporary</option>
-                            <option value="Contract">Contract</option>
-                        </select>
-                    </div>
-                    <div class="col-md-2">
-                        <button class="btn btn-secondary w-100" onclick="clearFilters()">
-                            <i class="fas fa-times"></i> Clear
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Table -->
-            <div class="table-responsive">
-                <table class="table table-hover">
-                    <thead>
-                        <tr>
-                            <th>Name</th>
-                            <th>Employer</th>
-                            <th>Clock#</th>
-                            <th>Status</th>
-                            <th>Hourly Rate</th>
-                            <th>Contact</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="employeesTableBody">
-                        <tr><td colspan="7" class="text-center">Loading...</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
+<!-- Employee List View -->
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h5 class="mb-0"><i class="fas fa-users"></i> Employee Management</h5>
+    <button class="btn btn-primary btn-sm" onclick="showAddEmployeeForm()">
+      <i class="fas fa-plus"></i> Add Employee
+    </button>
+  </div>
+  <div class="card-body">
+    <!-- Search and Filter Bar -->
+    <div class="row mb-3">
+      <div class="col-md-4">
+        <input type="text" class="form-control" id="searchInput" placeholder="Search by name..." onkeyup="searchEmployees()">
+      </div>
+      <div class="col-md-3">
+        <select class="form-control" id="employerFilter" onchange="applyFilters()">
+          <option value="">All Employers</option>
+          <option value="SA Grinding Wheels">SA Grinding Wheels</option>
+          <option value="Scorpio Abrasives">Scorpio Abrasives</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <select class="form-control" id="statusFilter" onchange="applyFilters()">
+          <option value="">All Status</option>
+          <option value="Permanent">Permanent</option>
+          <option value="Temporary">Temporary</option>
+          <option value="Contract">Contract</option>
+          <option value="Terminated">Terminated</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <button class="btn btn-secondary w-100" onclick="resetFilters()">
+          <i class="fas fa-undo"></i> Reset
+        </button>
+      </div>
     </div>
 
-    <script>
-        let allEmployees = [];
-        let filteredEmployees = [];
+    <!-- Employee Count -->
+    <div class="mb-2">
+      <span id="employeeCount" class="text-muted">Loading employees...</span>
+    </div>
 
-        function loadEmployees() {
-            showLoading();
-            google.script.run
-                .withSuccessHandler(function(result) {
-                    hideLoading();
-                    if (result.success) {
-                        allEmployees = result.data;
-                        filteredEmployees = result.data;
-                        displayEmployees(result.data);
-                    } else {
-                        showError('Failed to load employees: ' + result.error);
-                    }
-                })
-                .withFailureHandler(function(error) {
-                    hideLoading();
-                    showError('Error: ' + error.message);
-                })
-                .listEmployees({});
+    <!-- Employee Table -->
+    <div class="table-responsive">
+      <table class="table table-hover">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Employer</th>
+            <th>Hourly Rate</th>
+            <th>Status</th>
+            <th>Clock #</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="employeeTableBody">
+          <tr>
+            <td colspan="6" class="text-center">
+              <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Store all employees for client-side filtering
+  var allEmployees = [];
+  var searchTimeout = null;
+
+  /**
+   * Initialize when the module loads
+   */
+  function initializeEmployeeList() {
+    console.log('Initializing Employee List');
+    loadEmployees();
+  }
+
+  /**
+   * Load employees from server
+   */
+  function loadEmployees() {
+    console.log('Loading employees...');
+    
+    var filters = {
+      employer: document.getElementById('employerFilter')?.value || '',
+      status: document.getElementById('statusFilter')?.value || '',
+      search: document.getElementById('searchInput')?.value || ''
+    };
+    
+    // Show loading state
+    var tbody = document.getElementById('employeeTableBody');
+    if (tbody) {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center"><div class="spinner-border text-primary" role="status"></div></td></tr>';
+    }
+    
+    google.script.run
+      .withSuccessHandler(function(result) {
+        console.log('Server response:', result);
+        
+        // Handle different response formats
+        var employees = [];
+        
+        if (result && result.success && Array.isArray(result.data)) {
+          // Proper format: {success: true, data: [...]}
+          employees = result.data;
+        } else if (Array.isArray(result)) {
+          // Direct array format
+          employees = result;
+        } else if (result && result.success === false) {
+          // Error response
+          displayError(result.error || 'Failed to load employees');
+          return;
+        } else {
+          // Unexpected format
+          console.error('Unexpected response format:', result);
+          displayError('Unexpected response format');
+          return;
         }
+        
+        displayEmployees(employees);
+      })
+      .withFailureHandler(function(error) {
+        console.error('Failed to load employees:', error);
+        displayError('Error loading employees: ' + (error.message || error));
+      })
+      .listEmployees(filters);
+  }
 
-        function displayEmployees(employees) {
-            const tbody = document.getElementById('employeesTableBody');
+  /**
+   * Display employees in table
+   */
+  function displayEmployees(employees) {
+    console.log('Displaying', employees.length, 'employees');
+    allEmployees = employees;
+    
+    var tbody = document.getElementById('employeeTableBody');
+    if (!tbody) {
+      console.error('Table body element not found');
+      return;
+    }
+    
+    tbody.innerHTML = '';
+    
+    if (!employees || employees.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No employees found</td></tr>';
+      updateEmployeeCount(0);
+      return;
+    }
+    
+    for (var i = 0; i < employees.length; i++) {
+      var emp = employees[i];
+      var row = document.createElement('tr');
+      
+      // Name
+      var nameCell = document.createElement('td');
+      nameCell.innerHTML = '<strong>' + escapeHtml(emp.REFNAME || emp.refname || '') + '</strong>';
+      row.appendChild(nameCell);
+      
+      // Employer
+      var employerCell = document.createElement('td');
+      employerCell.textContent = emp.EMPLOYER || emp.employer || '';
+      row.appendChild(employerCell);
+      
+      // Hourly Rate
+      var rateCell = document.createElement('td');
+      var rate = emp['HOURLY RATE'] || emp.hourlyRate || 0;
+      rateCell.textContent = 'R' + parseFloat(rate).toFixed(2);
+      row.appendChild(rateCell);
+      
+      // Status
+      var statusCell = document.createElement('td');
+      var statusBadge = document.createElement('span');
+      var status = emp['EMPLOYMENT STATUS'] || emp.employmentStatus || '';
+      statusBadge.className = 'badge ' + getStatusBadgeClass(status);
+      statusBadge.textContent = status;
+      statusCell.appendChild(statusBadge);
+      row.appendChild(statusCell);
+      
+      // Clock Number
+      var clockCell = document.createElement('td');
+      clockCell.textContent = emp.ClockInRef || emp.clockInRef || '';
+      row.appendChild(clockCell);
+      
+      // Actions
+      var actionsCell = document.createElement('td');
+      var empId = emp.id || emp.ID || '';
+      actionsCell.innerHTML = 
+        '<button class="btn btn-sm btn-info me-1" onclick="viewEmployee(\'' + empId + '\')">View</button>' +
+        '<button class="btn btn-sm btn-warning" onclick="editEmployee(\'' + empId + '\')">Edit</button>';
+      row.appendChild(actionsCell);
+      
+      tbody.appendChild(row);
+    }
+    
+    updateEmployeeCount(employees.length);
+  }
 
-            if (employees.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="7" class="text-center">No employees found</td></tr>';
-                return;
-            }
+  /**
+   * Display error message
+   */
+  function displayError(message) {
+    var tbody = document.getElementById('employeeTableBody');
+    if (tbody) {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error: ' + escapeHtml(message) + '</td></tr>';
+    }
+    updateEmployeeCount(0);
+  }
 
-            tbody.innerHTML = employees.map(emp => {
-                const statusClass = emp['EMPLOYMENT STATUS'] === 'Permanent' ? 'badge-permanent' :
-                                   emp['EMPLOYMENT STATUS'] === 'Temporary' ? 'badge-temporary' : 'badge-contract';
+  /**
+   * Update employee count display
+   */
+  function updateEmployeeCount(count) {
+    var countElement = document.getElementById('employeeCount');
+    if (countElement) {
+      if (count === 0) {
+        countElement.textContent = 'No employees';
+      } else if (count === 1) {
+        countElement.textContent = 'Showing 1 employee';
+      } else {
+        countElement.textContent = 'Showing ' + count + ' employees';
+      }
+    }
+  }
 
-                return `
-                    <tr>
-                        <td><strong>${emp.REFNAME || ''}</strong></td>
-                        <td>${emp.EMPLOYER || ''}</td>
-                        <td>${emp.ClockInRef || ''}</td>
-                        <td><span class="badge ${statusClass}">${emp['EMPLOYMENT STATUS'] || ''}</span></td>
-                        <td>${formatCurrency(emp['HOURLY RATE'] || 0)}</td>
-                        <td>${emp['CONTACT NUMBER'] || ''}</td>
-                        <td class="action-buttons">
-                            <button class="btn btn-sm btn-info" onclick="editEmployee('${emp.id}')" title="Edit">
-                                <i class="fas fa-edit"></i>
-                            </button>
-                            <button class="btn btn-sm btn-success" onclick="viewEmployee('${emp.id}')" title="View Details">
-                                <i class="fas fa-eye"></i>
-                            </button>
-                        </td>
-                    </tr>
-                `;
-            }).join('');
-        }
+  /**
+   * Search employees (client-side)
+   */
+  function searchEmployees() {
+    // Clear previous timeout
+    if (searchTimeout) {
+      clearTimeout(searchTimeout);
+    }
+    
+    // Debounce search
+    searchTimeout = setTimeout(function() {
+      applyFilters();
+    }, 300);
+  }
 
-        function filterEmployees() {
-            const searchText = document.getElementById('searchEmployee').value.toLowerCase();
-            const employer = document.getElementById('filterEmployer').value;
-            const status = document.getElementById('filterStatus').value;
+  /**
+   * Apply filters
+   */
+  function applyFilters() {
+    loadEmployees();
+  }
 
-            filteredEmployees = allEmployees.filter(emp => {
-                const matchesSearch = !searchText ||
-                    (emp.REFNAME && emp.REFNAME.toLowerCase().includes(searchText)) ||
-                    (emp.ClockInRef && emp.ClockInRef.toLowerCase().includes(searchText));
+  /**
+   * Reset all filters
+   */
+  function resetFilters() {
+    var searchInput = document.getElementById('searchInput');
+    var employerFilter = document.getElementById('employerFilter');
+    var statusFilter = document.getElementById('statusFilter');
+    
+    if (searchInput) searchInput.value = '';
+    if (employerFilter) employerFilter.value = '';
+    if (statusFilter) statusFilter.value = '';
+    
+    loadEmployees();
+  }
 
-                const matchesEmployer = !employer || emp.EMPLOYER === employer;
-                const matchesStatus = !status || emp['EMPLOYMENT STATUS'] === status;
+  /**
+   * Show add employee form
+   */
+  function showAddEmployeeForm() {
+    // This would typically load the employee form
+    // For now, show an alert
+    if (typeof loadModule === 'function') {
+      loadModule('employee-form');
+    } else {
+      alert('Add Employee form will be loaded here');
+    }
+  }
 
-                return matchesSearch && matchesEmployer && matchesStatus;
-            });
+  /**
+   * View employee details
+   */
+  function viewEmployee(id) {
+    console.log('View employee:', id);
+    // Load employee view
+    if (typeof loadModule === 'function') {
+      loadModule('employee-view', {id: id});
+    } else {
+      alert('View employee: ' + id);
+    }
+  }
 
-            displayEmployees(filteredEmployees);
-        }
+  /**
+   * Edit employee
+   */
+  function editEmployee(id) {
+    console.log('Edit employee:', id);
+    // Load employee edit form
+    if (typeof loadModule === 'function') {
+      loadModule('employee-edit', {id: id});
+    } else {
+      alert('Edit employee: ' + id);
+    }
+  }
 
-        function clearFilters() {
-            document.getElementById('searchEmployee').value = '';
-            document.getElementById('filterEmployer').value = '';
-            document.getElementById('filterStatus').value = '';
-            filterEmployees();
-        }
+  /**
+   * Get badge class for employment status
+   */
+  function getStatusBadgeClass(status) {
+    switch(status) {
+      case 'Permanent':
+        return 'bg-success';
+      case 'Temporary':
+        return 'bg-warning';
+      case 'Contract':
+        return 'bg-info';
+      case 'Terminated':
+      case 'Resigned':
+        return 'bg-danger';
+      default:
+        return 'bg-secondary';
+    }
+  }
 
-        function showEmployeeForm(employeeId) {
-            loadModule('employeeForm');
-            if (employeeId) {
-                // Store ID for loading in form
-                sessionStorage.setItem('editEmployeeId', employeeId);
-            } else {
-                sessionStorage.removeItem('editEmployeeId');
-            }
-        }
+  /**
+   * Escape HTML to prevent XSS
+   */
+  function escapeHtml(text) {
+    if (!text) return '';
+    var div = document.createElement('div');
+    div.textContent = text.toString();
+    return div.innerHTML;
+  }
 
-        function editEmployee(employeeId) {
-            showEmployeeForm(employeeId);
-        }
-
-        function viewEmployee(employeeId) {
-            showLoading();
-            google.script.run
-                .withSuccessHandler(function(result) {
-                    hideLoading();
-                    if (result.success) {
-                        showEmployeeDetails(result.data);
-                    } else {
-                        showError(result.error);
-                    }
-                })
-                .withFailureHandler(function(error) {
-                    hideLoading();
-                    showError('Error: ' + error.message);
-                })
-                .getEmployeeById(employeeId);
-        }
-
-        function showEmployeeDetails(employee) {
-            const details = `
-                <div class="modal fade" id="employeeDetailsModal" tabindex="-1">
-                    <div class="modal-dialog modal-lg">
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <h5 class="modal-title">Employee Details: ${employee.REFNAME}</h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                            </div>
-                            <div class="modal-body">
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        <p><strong>Name:</strong> ${employee['EMPLOYEE NAME']} ${employee.SURNAME}</p>
-                                        <p><strong>Employer:</strong> ${employee.EMPLOYER}</p>
-                                        <p><strong>Status:</strong> ${employee['EMPLOYMENT STATUS']}</p>
-                                        <p><strong>Clock Number:</strong> ${employee.ClockInRef}</p>
-                                        <p><strong>Hourly Rate:</strong> ${formatCurrency(employee['HOURLY RATE'])}</p>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <p><strong>ID Number:</strong> ${employee['ID NUMBER']}</p>
-                                        <p><strong>Contact:</strong> ${employee['CONTACT NUMBER']}</p>
-                                        <p><strong>Address:</strong> ${employee.ADDRESS}</p>
-                                        <p><strong>Date of Birth:</strong> ${employee['DATE OF BIRTH'] ? formatDate(employee['DATE OF BIRTH']) : 'N/A'}</p>
-                                    </div>
-                                </div>
-                                ${employee.NOTES ? '<hr><p><strong>Notes:</strong><br>' + employee.NOTES + '</p>' : ''}
-                            </div>
-                            <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                                <button type="button" class="btn btn-primary" onclick="editEmployee('${employee.id}'); bootstrap.Modal.getInstance(document.getElementById('employeeDetailsModal')).hide();">
-                                    <i class="fas fa-edit"></i> Edit
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
-
-            // Remove existing modal if any
-            const existingModal = document.getElementById('employeeDetailsModal');
-            if (existingModal) {
-                existingModal.remove();
-            }
-
-            // Add modal to body
-            document.body.insertAdjacentHTML('beforeend', details);
-
-            // Show modal
-            const modal = new bootstrap.Modal(document.getElementById('employeeDetailsModal'));
-            modal.show();
-        }
-
-        // Load employees on page load
-        loadEmployees();
-    </script>
-</body>
-</html>
+  // Initialize on load
+  // Check if we're being loaded dynamically or statically
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeEmployeeList);
+  } else {
+    // DOM is already loaded (dynamic loading)
+    initializeEmployeeList();
+  }
+</script>
