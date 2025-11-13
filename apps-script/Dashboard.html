@@ -235,17 +235,13 @@
                     <i class="fas fa-dollar-sign"></i> Payroll
                 </div>
                 <div class="menu-item" onclick="loadModule('reports', event)">
-                    <i class="fas fa-chart-bar"></i> Reports
+                    <i class="fas fa-file-alt"></i> Reports
                 </div>
             </div>
 
             <!-- Content Area -->
             <div class="col-lg-10 col-md-9 content-area" id="contentArea">
-                <!-- Content will be loaded here -->
-                <div class="text-center mt-5">
-                    <i class="fas fa-spinner fa-spin fa-3x text-secondary"></i>
-                    <p class="mt-3">Loading...</p>
-                </div>
+                <!-- Dynamic content will be loaded here -->
             </div>
         </div>
     </div>
@@ -254,63 +250,45 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
-        // Global variables
-        let currentUser = null;
-        let currentModule = 'dashboard';
-
         // ==================== INITIALIZATION ====================
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeApp();
+        });
 
-        window.onload = function() {
-            // Get current user info
-            showLoading();
-            google.script.run
-                .withSuccessHandler(function(result) {
-                    hideLoading();
-                    if (result.success) {
-                        currentUser = result.data;
-                        document.getElementById('userName').textContent = result.data.email;
-                        document.getElementById('userEmail').textContent = result.data.email;
+        function initializeApp() {
+            loadUserInfo();
+            loadModule('dashboard');
+        }
 
-                        // Load dashboard
-                        loadModule('dashboard');
-                    } else {
-                        showError('Failed to load user info: ' + result.error);
-                    }
-                })
-                .withFailureHandler(function(error) {
-                    hideLoading();
-                    showError('System error: ' + error.message);
-                })
-                .getCurrentUserInfo();
-        };
+        function loadUserInfo() {
+            // For now, just display a default user
+            document.getElementById('userName').textContent = 'Administrator';
+            document.getElementById('userEmail').textContent = 'admin@sagrindingwheels.co.za';
+        }
 
         // ==================== MODULE LOADING ====================
 
-        function loadModule(moduleName, event) {
-            showLoading();
-            currentModule = moduleName;
-
-            // Update active menu item (only if event exists)
-            document.querySelectorAll('.menu-item').forEach(item => {
-                item.classList.remove('active');
-            });
-
-            if (event && event.target) {
-                event.target.closest('.menu-item').classList.add('active');
-            } else {
-                // If no event (e.g., programmatic call), find and activate by module name
-                const menuItems = document.querySelectorAll('.menu-item');
-                menuItems.forEach(item => {
-                    if (item.textContent.toLowerCase().includes(moduleName)) {
-                        item.classList.add('active');
-                    }
-                });
+        function loadModule(module, event) {
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
             }
 
-            // Load module content
+            // Update active menu
+            const menuItems = document.querySelectorAll('.menu-item');
+            menuItems.forEach(item => item.classList.remove('active'));
+            
+            if (event && event.currentTarget) {
+                event.currentTarget.classList.add('active');
+            }
+
+            // Show loading
+            showLoading();
+
             const contentArea = document.getElementById('contentArea');
 
-            switch(moduleName) {
+            switch(module) {
                 case 'dashboard':
                     loadDashboard();
                     break;
@@ -413,12 +391,23 @@
         }
 
         function loadDashboardStats() {
-            // Load employee count
+            // Load employee count with proper error handling
             google.script.run
                 .withSuccessHandler(function(result) {
-                    if (result.success) {
+                    // FIX: Add null check before accessing properties
+                    if (result && result.success && result.data) {
                         document.getElementById('totalEmployees').textContent = result.data.length;
+                    } else if (result && Array.isArray(result)) {
+                        // Handle case where listEmployees returns array directly
+                        document.getElementById('totalEmployees').textContent = result.length;
+                    } else {
+                        document.getElementById('totalEmployees').textContent = '0';
+                        console.warn('Unexpected response format:', result);
                     }
+                })
+                .withFailureHandler(function(error) {
+                    console.error('Failed to load employee count:', error);
+                    document.getElementById('totalEmployees').textContent = 'Error';
                 })
                 .listEmployees({ activeOnly: true });
 
@@ -428,17 +417,30 @@
         function loadEmployeesModule() {
             google.script.run
                 .withSuccessHandler(function(html) {
-                    document.getElementById('contentArea').innerHTML = html;
+                    if (html) {
+                        document.getElementById('contentArea').innerHTML = html;
+                        // FIX: Initialize any scripts in the loaded HTML
+                        initializeLoadedContent();
+                    } else {
+                        showError('Failed to load Employees module');
+                    }
                     hideLoading();
                 })
-                .withFailureHandler(handleError)
+                .withFailureHandler(function(error) {
+                    handleError(error);
+                })
                 .include('EmployeeList');
         }
 
         function loadLeaveModule() {
             google.script.run
                 .withSuccessHandler(function(html) {
-                    document.getElementById('contentArea').innerHTML = html;
+                    if (html) {
+                        document.getElementById('contentArea').innerHTML = html;
+                        initializeLoadedContent();
+                    } else {
+                        showError('Failed to load Leave module');
+                    }
                     hideLoading();
                 })
                 .withFailureHandler(handleError)
@@ -448,7 +450,12 @@
         function loadLoansModule() {
             google.script.run
                 .withSuccessHandler(function(html) {
-                    document.getElementById('contentArea').innerHTML = html;
+                    if (html) {
+                        document.getElementById('contentArea').innerHTML = html;
+                        initializeLoadedContent();
+                    } else {
+                        showError('Failed to load Loans module');
+                    }
                     hideLoading();
                 })
                 .withFailureHandler(handleError)
@@ -458,7 +465,12 @@
         function loadTimesheetsModule() {
             google.script.run
                 .withSuccessHandler(function(html) {
-                    document.getElementById('contentArea').innerHTML = html;
+                    if (html) {
+                        document.getElementById('contentArea').innerHTML = html;
+                        initializeLoadedContent();
+                    } else {
+                        showError('Failed to load Timesheets module');
+                    }
                     hideLoading();
                 })
                 .withFailureHandler(handleError)
@@ -468,7 +480,12 @@
         function loadPayrollModule() {
             google.script.run
                 .withSuccessHandler(function(html) {
-                    document.getElementById('contentArea').innerHTML = html;
+                    if (html) {
+                        document.getElementById('contentArea').innerHTML = html;
+                        initializeLoadedContent();
+                    } else {
+                        showError('Failed to load Payroll module');
+                    }
                     hideLoading();
                 })
                 .withFailureHandler(handleError)
@@ -478,21 +495,53 @@
         function loadReportsModule() {
             google.script.run
                 .withSuccessHandler(function(html) {
-                    document.getElementById('contentArea').innerHTML = html;
+                    if (html) {
+                        document.getElementById('contentArea').innerHTML = html;
+                        initializeLoadedContent();
+                    } else {
+                        showError('Failed to load Reports module');
+                    }
                     hideLoading();
                 })
                 .withFailureHandler(handleError)
                 .include('ReportsMenu');
         }
 
+        // FIX: Initialize dynamically loaded content
+        function initializeLoadedContent() {
+            // Re-run any initialization scripts for dynamically loaded content
+            // This ensures MutationObserver and other scripts work properly
+            
+            // Check if there's a loadEmployees function and call it
+            if (typeof loadEmployees === 'function') {
+                try {
+                    loadEmployees();
+                } catch (e) {
+                    console.error('Error initializing employees:', e);
+                }
+            }
+
+            // Initialize any Bootstrap components
+            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl);
+            });
+        }
+
         // ==================== UTILITY FUNCTIONS ====================
 
         function showLoading() {
-            document.getElementById('loadingOverlay').classList.add('show');
+            var overlay = document.getElementById('loadingOverlay');
+            if (overlay) {
+                overlay.classList.add('show');
+            }
         }
 
         function hideLoading() {
-            document.getElementById('loadingOverlay').classList.remove('show');
+            var overlay = document.getElementById('loadingOverlay');
+            if (overlay) {
+                overlay.classList.remove('show');
+            }
         }
 
         function showSuccess(message) {
@@ -513,6 +562,11 @@
 
         function showToast(message, type) {
             const toastContainer = document.querySelector('.toast-container');
+            if (!toastContainer) {
+                console.error('Toast container not found');
+                return;
+            }
+
             const toastId = 'toast-' + Date.now();
 
             const toastHTML = `
@@ -529,17 +583,20 @@
             toastContainer.insertAdjacentHTML('beforeend', toastHTML);
 
             const toastElement = document.getElementById(toastId);
-            const toast = new bootstrap.Toast(toastElement, { delay: 5000 });
-            toast.show();
+            if (toastElement && typeof bootstrap !== 'undefined') {
+                const toast = new bootstrap.Toast(toastElement, { delay: 5000 });
+                toast.show();
 
-            toastElement.addEventListener('hidden.bs.toast', function() {
-                toastElement.remove();
-            });
+                toastElement.addEventListener('hidden.bs.toast', function() {
+                    toastElement.remove();
+                });
+            }
         }
 
         function handleError(error) {
             hideLoading();
-            showError('Error: ' + error.message);
+            const errorMessage = error.message || 'An unexpected error occurred';
+            showError('Error: ' + errorMessage);
             console.error('Error:', error);
         }
 
