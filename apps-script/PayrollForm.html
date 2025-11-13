@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <style>
+        .required-field::after { content: " *"; color: red; }
+        .form-section {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .form-section h6 {
+            margin-bottom: 15px;
+            color: #2c3e50;
+            font-weight: bold;
+        }
+        .calculation-preview {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            position: sticky;
+            top: 20px;
+        }
+        .preview-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+        }
+        .preview-item:last-child { border-bottom: none; }
+        .preview-total {
+            font-size: 1.3rem;
+            font-weight: bold;
+            padding-top: 10px;
+            margin-top: 10px;
+            border-top: 2px solid rgba(255,255,255,0.5);
+        }
+        .loan-balance-box {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5><i class="fas fa-file-invoice-dollar"></i> <span id="formTitle">Create Payslip</span></h5>
+            <button class="btn btn-secondary btn-sm" onclick="loadModule('payroll')">
+                <i class="fas fa-arrow-left"></i> Back to List
+            </button>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <!-- Main Form (Left Column) -->
+                <div class="col-lg-8">
+                    <form id="payrollForm" onsubmit="savePayslip(event)">
+                        <input type="hidden" id="recordNumber">
+
+                        <!-- Employee & Week Info -->
+                        <div class="form-section">
+                            <h6><i class="fas fa-user"></i> Employee & Period</h6>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="employeeName" class="form-label required-field">Employee</label>
+                                        <select class="form-select" id="employeeName" required onchange="onEmployeeChange()">
+                                            <option value="">Select Employee</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="weekEnding" class="form-label required-field">Week Ending</label>
+                                        <input type="date" class="form-control" id="weekEnding" required onchange="calculatePreview()">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label class="form-label">Employer</label>
+                                        <input type="text" class="form-control" id="employer" readonly>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label class="form-label">Status</label>
+                                        <input type="text" class="form-control" id="employmentStatus" readonly>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label class="form-label">Hourly Rate</label>
+                                        <input type="text" class="form-control" id="hourlyRate" readonly>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Time Worked -->
+                        <div class="form-section">
+                            <h6><i class="fas fa-clock"></i> Time Worked</h6>
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <div class="mb-3">
+                                        <label for="hours" class="form-label required-field">Hours</label>
+                                        <input type="number" class="form-control" id="hours" min="0" value="0" required onchange="calculatePreview()">
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="mb-3">
+                                        <label for="minutes" class="form-label required-field">Minutes</label>
+                                        <input type="number" class="form-control" id="minutes" min="0" max="59" value="0" required onchange="calculatePreview()">
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="mb-3">
+                                        <label for="overtimeHours" class="form-label required-field">OT Hours</label>
+                                        <input type="number" class="form-control" id="overtimeHours" min="0" value="0" required onchange="calculatePreview()">
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="mb-3">
+                                        <label for="overtimeMinutes" class="form-label required-field">OT Minutes</label>
+                                        <input type="number" class="form-control" id="overtimeMinutes" min="0" max="59" value="0" required onchange="calculatePreview()">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Additional Pay -->
+                        <div class="form-section">
+                            <h6><i class="fas fa-plus-circle"></i> Additional Pay</h6>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label for="leavePay" class="form-label">Leave Pay (R)</label>
+                                        <input type="number" class="form-control" id="leavePay" step="0.01" min="0" value="0" onchange="calculatePreview()">
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label for="bonusPay" class="form-label">Bonus Pay (R)</label>
+                                        <input type="number" class="form-control" id="bonusPay" step="0.01" min="0" value="0" onchange="calculatePreview()">
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label for="otherIncome" class="form-label">Other Income (R)</label>
+                                        <input type="number" class="form-control" id="otherIncome" step="0.01" min="0" value="0" onchange="calculatePreview()">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Deductions -->
+                        <div class="form-section">
+                            <h6><i class="fas fa-minus-circle"></i> Deductions</h6>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="otherDeductions" class="form-label">Other Deductions (R)</label>
+                                        <input type="number" class="form-control" id="otherDeductions" step="0.01" min="0" value="0" onchange="calculatePreview()">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="otherDeductionsText" class="form-label">Description</label>
+                                        <input type="text" class="form-control" id="otherDeductionsText" placeholder="e.g., Uniform">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Loan Information -->
+                        <div class="form-section">
+                            <h6><i class="fas fa-money-bill-wave"></i> Loan Information</h6>
+
+                            <!-- Current Balance Display -->
+                            <div id="loanBalanceDisplay" class="loan-balance-box" style="display: none;">
+                                <div class="row align-items-center">
+                                    <div class="col-md-6">
+                                        <strong><i class="fas fa-info-circle"></i> Current Loan Balance:</strong>
+                                    </div>
+                                    <div class="col-md-6 text-end">
+                                        <span id="currentLoanBalance" class="fs-5 fw-bold">R0.00</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="loanDeductionThisWeek" class="form-label">Loan Repayment This Week (R)</label>
+                                        <input type="number" class="form-control" id="loanDeductionThisWeek" step="0.01" min="0" value="0" onchange="calculatePreview()">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="newLoanThisWeek" class="form-label">New Loan This Week (R)</label>
+                                        <input type="number" class="form-control" id="newLoanThisWeek" step="0.01" min="0" value="0" onchange="calculatePreview()">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="loanDisbursementType" class="form-label">Loan Disbursement Type</label>
+                                <select class="form-select" id="loanDisbursementType" onchange="calculatePreview()">
+                                    <option value="Separate">Separate (Not with Salary)</option>
+                                    <option value="With Salary">With Salary</option>
+                                </select>
+                                <div class="form-text">
+                                    "With Salary" adds new loan to Paid to Account. "Separate" means loan paid separately.
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Notes -->
+                        <div class="form-section">
+                            <h6><i class="fas fa-sticky-note"></i> Notes</h6>
+                            <div class="mb-3">
+                                <textarea class="form-control" id="notes" rows="3" placeholder="Enter any additional notes..."></textarea>
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-save"></i> Save Payslip
+                            </button>
+                            <button type="button" class="btn btn-secondary" onclick="loadModule('payroll')">
+                                <i class="fas fa-times"></i> Cancel
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Calculation Preview (Right Column) -->
+                <div class="col-lg-4">
+                    <div class="calculation-preview">
+                        <h6 class="mb-3"><i class="fas fa-calculator"></i> Calculation Preview</h6>
+
+                        <div class="preview-item">
+                            <span>Standard Time:</span>
+                            <span id="previewStandardTime">R0.00</span>
+                        </div>
+
+                        <div class="preview-item">
+                            <span>Overtime (1.5x):</span>
+                            <span id="previewOvertime">R0.00</span>
+                        </div>
+
+                        <div class="preview-item">
+                            <span>Additional Pay:</span>
+                            <span id="previewAdditional">R0.00</span>
+                        </div>
+
+                        <div class="preview-item">
+                            <strong>Gross Salary:</strong>
+                            <strong id="previewGross">R0.00</strong>
+                        </div>
+
+                        <hr style="border-color: rgba(255,255,255,0.3); margin: 15px 0;">
+
+                        <div class="preview-item">
+                            <span>UIF (1%):</span>
+                            <span id="previewUIF">R0.00</span>
+                        </div>
+
+                        <div class="preview-item">
+                            <span>Other Deductions:</span>
+                            <span id="previewOtherDed">R0.00</span>
+                        </div>
+
+                        <div class="preview-item">
+                            <strong>Total Deductions:</strong>
+                            <strong id="previewTotalDed">R0.00</strong>
+                        </div>
+
+                        <hr style="border-color: rgba(255,255,255,0.3); margin: 15px 0;">
+
+                        <div class="preview-item">
+                            <strong>Net Salary:</strong>
+                            <strong id="previewNet">R0.00</strong>
+                        </div>
+
+                        <div class="preview-item">
+                            <span>Loan Deduction:</span>
+                            <span id="previewLoanDed">-R0.00</span>
+                        </div>
+
+                        <div class="preview-item">
+                            <span>New Loan:</span>
+                            <span id="previewNewLoan">+R0.00</span>
+                        </div>
+
+                        <div class="preview-total">
+                            <div style="font-size: 0.9rem; opacity: 0.9;">PAID TO ACCOUNT:</div>
+                            <div id="previewPaidToAccount">R0.00</div>
+                        </div>
+
+                        <div class="mt-3 text-center">
+                            <small style="opacity: 0.8;">
+                                <i class="fas fa-info-circle"></i> Updates automatically as you type
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let allEmployees = [];
+        let selectedEmployee = null;
+        let currentCalculation = null;
+
+        // Check if editing existing payslip
+        const editRecordNumber = sessionStorage.getItem('editPayslipRecordNumber');
+
+        if (editRecordNumber) {
+            document.getElementById('formTitle').textContent = 'Edit Payslip #' + editRecordNumber;
+            loadPayslipForEdit(editRecordNumber);
+        }
+
+        // Load employees
+        function loadEmployees() {
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    if (result.success) {
+                        allEmployees = result.data;
+                        const select = document.getElementById('employeeName');
+                        select.innerHTML = '<option value="">Select Employee</option>' +
+                            result.data
+                                .filter(emp => !emp['TERMINATION DATE'])
+                                .map(emp => `<option value="${emp.REFNAME}">${emp.REFNAME}</option>`)
+                                .join('');
+                    }
+                })
+                .listEmployees({ activeOnly: true });
+        }
+
+        function onEmployeeChange() {
+            const employeeName = document.getElementById('employeeName').value;
+            if (!employeeName) return;
+
+            selectedEmployee = allEmployees.find(emp => emp.REFNAME === employeeName);
+            if (!selectedEmployee) return;
+
+            // Update read-only fields
+            document.getElementById('employer').value = selectedEmployee.EMPLOYER;
+            document.getElementById('employmentStatus').value = selectedEmployee['EMPLOYMENT STATUS'];
+            document.getElementById('hourlyRate').value = formatCurrency(selectedEmployee['HOURLY RATE']);
+
+            // Load current loan balance
+            loadLoanBalance(selectedEmployee.id);
+
+            // Recalculate
+            calculatePreview();
+        }
+
+        function loadLoanBalance(employeeId) {
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    if (result.success) {
+                        document.getElementById('currentLoanBalance').textContent = formatCurrency(result.data);
+                        document.getElementById('loanBalanceDisplay').style.display = 'block';
+                    }
+                })
+                .getCurrentLoanBalance(employeeId);
+        }
+
+        function calculatePreview() {
+            if (!selectedEmployee) {
+                // Clear preview
+                document.getElementById('previewStandardTime').textContent = 'R0.00';
+                document.getElementById('previewOvertime').textContent = 'R0.00';
+                document.getElementById('previewAdditional').textContent = 'R0.00';
+                document.getElementById('previewGross').textContent = 'R0.00';
+                document.getElementById('previewUIF').textContent = 'R0.00';
+                document.getElementById('previewOtherDed').textContent = 'R0.00';
+                document.getElementById('previewTotalDed').textContent = 'R0.00';
+                document.getElementById('previewNet').textContent = 'R0.00';
+                document.getElementById('previewLoanDed').textContent = '-R0.00';
+                document.getElementById('previewNewLoan').textContent = '+R0.00';
+                document.getElementById('previewPaidToAccount').textContent = 'R0.00';
+                return;
+            }
+
+            const data = {
+                employeeName: selectedEmployee.REFNAME,
+                employmentStatus: selectedEmployee['EMPLOYMENT STATUS'],
+                hourlyRate: selectedEmployee['HOURLY RATE'],
+                hours: parseInt(document.getElementById('hours').value) || 0,
+                minutes: parseInt(document.getElementById('minutes').value) || 0,
+                overtimeHours: parseInt(document.getElementById('overtimeHours').value) || 0,
+                overtimeMinutes: parseInt(document.getElementById('overtimeMinutes').value) || 0,
+                leavePay: parseFloat(document.getElementById('leavePay').value) || 0,
+                bonusPay: parseFloat(document.getElementById('bonusPay').value) || 0,
+                otherIncome: parseFloat(document.getElementById('otherIncome').value) || 0,
+                otherDeductions: parseFloat(document.getElementById('otherDeductions').value) || 0,
+                loanDeductionThisWeek: parseFloat(document.getElementById('loanDeductionThisWeek').value) || 0,
+                newLoanThisWeek: parseFloat(document.getElementById('newLoanThisWeek').value) || 0,
+                loanDisbursementType: document.getElementById('loanDisbursementType').value
+            };
+
+            // Call backend to calculate
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    if (result.success) {
+                        currentCalculation = result.data;
+                        updatePreview(result.data, data);
+                    }
+                })
+                .calculatePayslip(data);
+        }
+
+        function updatePreview(calc, data) {
+            document.getElementById('previewStandardTime').textContent = formatCurrency(calc.standardTime);
+            document.getElementById('previewOvertime').textContent = formatCurrency(calc.overtime);
+            document.getElementById('previewAdditional').textContent = formatCurrency(data.leavePay + data.bonusPay + data.otherIncome);
+            document.getElementById('previewGross').textContent = formatCurrency(calc.grossSalary);
+            document.getElementById('previewUIF').textContent = formatCurrency(calc.uif);
+            document.getElementById('previewOtherDed').textContent = formatCurrency(data.otherDeductions);
+            document.getElementById('previewTotalDed').textContent = formatCurrency(calc.totalDeductions);
+            document.getElementById('previewNet').textContent = formatCurrency(calc.netSalary);
+            document.getElementById('previewLoanDed').textContent = '-' + formatCurrency(data.loanDeductionThisWeek);
+            document.getElementById('previewNewLoan').textContent = '+' + formatCurrency(data.loanDisbursementType === 'With Salary' ? data.newLoanThisWeek : 0);
+            document.getElementById('previewPaidToAccount').textContent = formatCurrency(calc.paidToAccount);
+        }
+
+        function savePayslip(event) {
+            event.preventDefault();
+
+            if (!selectedEmployee) {
+                showError('Please select an employee');
+                return;
+            }
+
+            showLoading();
+
+            const recordNumber = document.getElementById('recordNumber').value;
+            const data = {
+                employeeName: selectedEmployee.REFNAME,
+                weekEnding: document.getElementById('weekEnding').value,
+                hours: parseInt(document.getElementById('hours').value) || 0,
+                minutes: parseInt(document.getElementById('minutes').value) || 0,
+                overtimeHours: parseInt(document.getElementById('overtimeHours').value) || 0,
+                overtimeMinutes: parseInt(document.getElementById('overtimeMinutes').value) || 0,
+                leavePay: parseFloat(document.getElementById('leavePay').value) || 0,
+                bonusPay: parseFloat(document.getElementById('bonusPay').value) || 0,
+                otherIncome: parseFloat(document.getElementById('otherIncome').value) || 0,
+                otherDeductions: parseFloat(document.getElementById('otherDeductions').value) || 0,
+                otherDeductionsText: document.getElementById('otherDeductionsText').value || '',
+                loanDeductionThisWeek: parseFloat(document.getElementById('loanDeductionThisWeek').value) || 0,
+                newLoanThisWeek: parseFloat(document.getElementById('newLoanThisWeek').value) || 0,
+                loanDisbursementType: document.getElementById('loanDisbursementType').value,
+                notes: document.getElementById('notes').value || ''
+            };
+
+            if (recordNumber) {
+                // Update existing
+                google.script.run
+                    .withSuccessHandler(handleSaveSuccess)
+                    .withFailureHandler(handleSaveError)
+                    .updatePayslip(parseInt(recordNumber), data);
+            } else {
+                // Create new
+                google.script.run
+                    .withSuccessHandler(handleSaveSuccess)
+                    .withFailureHandler(handleSaveError)
+                    .createPayslip(data);
+            }
+        }
+
+        function handleSaveSuccess(result) {
+            hideLoading();
+            if (result.success) {
+                showSuccess('Payslip saved successfully! Auto-sync will update loan balance within 5 minutes.');
+                sessionStorage.removeItem('editPayslipRecordNumber');
+                setTimeout(function() {
+                    loadModule('payroll');
+                }, 2000);
+            } else {
+                showError(result.error);
+            }
+        }
+
+        function handleSaveError(error) {
+            hideLoading();
+            showError('Error: ' + error.message);
+        }
+
+        function loadPayslipForEdit(recordNumber) {
+            showLoading();
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    hideLoading();
+                    if (result.success) {
+                        populateForm(result.data);
+                    } else {
+                        showError('Failed to load payslip: ' + result.error);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    hideLoading();
+                    showError('Error: ' + error.message);
+                })
+                .getPayslip(parseInt(recordNumber));
+        }
+
+        function populateForm(payslip) {
+            document.getElementById('recordNumber').value = payslip.RECORDNUMBER;
+            document.getElementById('employeeName').value = payslip['EMPLOYEE NAME'];
+            onEmployeeChange();
+
+            document.getElementById('weekEnding').value = formatDateForInput(payslip.WEEKENDING);
+            document.getElementById('hours').value = payslip.HOURS || 0;
+            document.getElementById('minutes').value = payslip.MINUTES || 0;
+            document.getElementById('overtimeHours').value = payslip.OVERTIMEHOURS || 0;
+            document.getElementById('overtimeMinutes').value = payslip.OVERTIMEMINUTES || 0;
+            document.getElementById('leavePay').value = payslip['LEAVE PAY'] || 0;
+            document.getElementById('bonusPay').value = payslip['BONUS PAY'] || 0;
+            document.getElementById('otherIncome').value = payslip.OTHERINCOME || 0;
+            document.getElementById('otherDeductions').value = payslip['OTHER DEDUCTIONS'] || 0;
+            document.getElementById('otherDeductionsText').value = payslip['OTHER DEDUCTIONS TEXT'] || '';
+            document.getElementById('loanDeductionThisWeek').value = payslip.LoanDeductionThisWeek || 0;
+            document.getElementById('newLoanThisWeek').value = payslip.NewLoanThisWeek || 0;
+            document.getElementById('loanDisbursementType').value = payslip.LoanDisbursementType || 'Separate';
+            document.getElementById('notes').value = payslip.NOTES || '';
+
+            calculatePreview();
+        }
+
+        function formatDateForInput(dateValue) {
+            if (!dateValue) return '';
+            const d = new Date(dateValue);
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        // Load employees on page load
+        loadEmployees();
+    </script>
+</body>
+</html>

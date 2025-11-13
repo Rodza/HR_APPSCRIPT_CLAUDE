@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <style>
+        .filter-section {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .badge-disbursement { background-color: #dc3545; }
+        .badge-repayment { background-color: #28a745; }
+        .amount-positive { color: #dc3545; font-weight: bold; }
+        .amount-negative { color: #28a745; font-weight: bold; }
+        .balance-display {
+            background-color: #fff3cd;
+            padding: 10px;
+            border-radius: 5px;
+            border-left: 4px solid #ffc107;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5><i class="fas fa-money-bill-wave"></i> Loan Transactions</h5>
+            <button class="btn btn-primary btn-sm" onclick="showLoanForm()">
+                <i class="fas fa-plus"></i> Add Transaction
+            </button>
+        </div>
+        <div class="card-body">
+            <!-- Filter Section -->
+            <div class="filter-section">
+                <div class="row">
+                    <div class="col-md-5">
+                        <label>Employee</label>
+                        <select class="form-select" id="filterEmployee" onchange="filterLoans()">
+                            <option value="">All Employees</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label>Start Date</label>
+                        <input type="date" class="form-control" id="filterStartDate" onchange="filterLoans()">
+                    </div>
+                    <div class="col-md-3">
+                        <label>End Date</label>
+                        <input type="date" class="form-control" id="filterEndDate" onchange="filterLoans()">
+                    </div>
+                    <div class="col-md-1">
+                        <label>&nbsp;</label>
+                        <button class="btn btn-secondary w-100" onclick="clearFilters()">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Current Balance Display (when employee selected) -->
+            <div id="balanceDisplay" style="display: none;" class="balance-display">
+                <div class="row align-items-center">
+                    <div class="col-md-6">
+                        <h6 class="mb-0">
+                            <i class="fas fa-user"></i> <span id="selectedEmployeeName"></span>
+                        </h6>
+                    </div>
+                    <div class="col-md-6 text-end">
+                        <strong>Current Balance:</strong>
+                        <span id="currentBalance" class="fs-5"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Table -->
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Employee</th>
+                            <th>Type</th>
+                            <th>Amount</th>
+                            <th>Mode</th>
+                            <th>Balance After</th>
+                            <th>Payslip #</th>
+                            <th>Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody id="loansTableBody">
+                        <tr><td colspan="8" class="text-center">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let allEmployees = [];
+        let selectedEmployeeId = null;
+
+        function loadEmployees() {
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    if (result.success) {
+                        allEmployees = result.data;
+                        const select = document.getElementById('filterEmployee');
+                        select.innerHTML = '<option value="">All Employees</option>' +
+                            result.data.map(emp =>
+                                `<option value="${emp.id}">${emp.REFNAME}</option>`
+                            ).join('');
+                    }
+                })
+                .listEmployees({});
+        }
+
+        function loadLoans() {
+            showLoading();
+
+            const employeeId = document.getElementById('filterEmployee').value;
+            const startDate = document.getElementById('filterStartDate').value || null;
+            const endDate = document.getElementById('filterEndDate').value || null;
+
+            if (employeeId) {
+                selectedEmployeeId = employeeId;
+                // Load balance and history for specific employee
+                loadEmployeeLoanHistory(employeeId, startDate, endDate);
+            } else {
+                selectedEmployeeId = null;
+                document.getElementById('balanceDisplay').style.display = 'none';
+                // Show message that employee must be selected
+                document.getElementById('loansTableBody').innerHTML =
+                    '<tr><td colspan="8" class="text-center"><i class="fas fa-info-circle"></i> Please select an employee to view loan transactions</td></tr>';
+                hideLoading();
+            }
+        }
+
+        function loadEmployeeLoanHistory(employeeId, startDate, endDate) {
+            // Get employee name
+            const employee = allEmployees.find(emp => emp.id === employeeId);
+            const employeeName = employee ? employee.REFNAME : 'Unknown';
+
+            // Load current balance
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    if (result.success) {
+                        document.getElementById('selectedEmployeeName').textContent = employeeName;
+                        document.getElementById('currentBalance').textContent = formatCurrency(result.data);
+                        document.getElementById('balanceDisplay').style.display = 'block';
+                    }
+                })
+                .getCurrentLoanBalance(employeeId);
+
+            // Load transaction history
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    hideLoading();
+                    if (result.success) {
+                        displayLoans(result.data);
+                    } else {
+                        showError('Failed to load loan history: ' + result.error);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    hideLoading();
+                    showError('Error: ' + error.message);
+                })
+                .getLoanHistory(employeeId, startDate, endDate);
+        }
+
+        function displayLoans(loans) {
+            const tbody = document.getElementById('loansTableBody');
+
+            if (loans.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center">No loan transactions found</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = loans.map(loan => {
+                const typeClass = loan.LoanType === 'Disbursement' ? 'badge-disbursement' : 'badge-repayment';
+                const amountClass = loan.LoanAmount > 0 ? 'amount-positive' : 'amount-negative';
+
+                return `
+                    <tr>
+                        <td>${formatDate(loan.TransactionDate)}</td>
+                        <td><strong>${loan['Employee Name'] || ''}</strong></td>
+                        <td><span class="badge ${typeClass}">${loan.LoanType}</span></td>
+                        <td class="${amountClass}">${formatCurrency(loan.LoanAmount)}</td>
+                        <td><small>${loan.DisbursementMode}</small></td>
+                        <td><strong>${formatCurrency(loan.BalanceAfter)}</strong></td>
+                        <td>${loan.SalaryLink || '-'}</td>
+                        <td><small>${loan.Notes || '-'}</small></td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function filterLoans() {
+            loadLoans();
+        }
+
+        function clearFilters() {
+            document.getElementById('filterEmployee').value = '';
+            document.getElementById('filterStartDate').value = '';
+            document.getElementById('filterEndDate').value = '';
+            document.getElementById('balanceDisplay').style.display = 'none';
+            document.getElementById('loansTableBody').innerHTML =
+                '<tr><td colspan="8" class="text-center"><i class="fas fa-info-circle"></i> Please select an employee to view loan transactions</td></tr>';
+        }
+
+        function showLoanForm() {
+            loadModule('loanForm');
+        }
+
+        // Load employees on page load
+        loadEmployees();
+        // Show initial message
+        document.getElementById('loansTableBody').innerHTML =
+            '<tr><td colspan="8" class="text-center"><i class="fas fa-info-circle"></i> Please select an employee to view loan transactions</td></tr>';
+    </script>
+</body>
+</html>

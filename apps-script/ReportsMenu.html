@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <style>
+        .report-card {
+            border: 2px solid #dee2e6;
+            border-radius: 10px;
+            padding: 25px;
+            text-align: center;
+            transition: all 0.3s;
+            height: 100%;
+        }
+        .report-card:hover {
+            border-color: #007bff;
+            box-shadow: 0 4px 12px rgba(0, 123, 255, 0.2);
+            transform: translateY(-5px);
+        }
+        .report-icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+        }
+        .report-results {
+            margin-top: 30px;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="card-header">
+            <h5><i class="fas fa-chart-bar"></i> Generate Reports</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <!-- Report 1: Outstanding Loans -->
+                <div class="col-md-4 mb-4">
+                    <div class="report-card">
+                        <div class="report-icon">
+                            <i class="fas fa-money-bill-wave text-warning"></i>
+                        </div>
+                        <h5>Outstanding Loans Report</h5>
+                        <p class="text-muted">
+                            Shows all employees with current loan balances greater than zero
+                        </p>
+
+                        <div class="mb-3">
+                            <label class="form-label">As of Date:</label>
+                            <input type="date" class="form-control" id="loansReportDate">
+                        </div>
+
+                        <button class="btn btn-primary w-100" onclick="generateLoansReport()">
+                            <i class="fas fa-file-excel"></i> Generate Report
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Report 2: Individual Statement -->
+                <div class="col-md-4 mb-4">
+                    <div class="report-card">
+                        <div class="report-icon">
+                            <i class="fas fa-user-circle text-info"></i>
+                        </div>
+                        <h5>Individual Statement</h5>
+                        <p class="text-muted">
+                            Complete loan transaction history for one employee
+                        </p>
+
+                        <div class="mb-3">
+                            <label class="form-label">Employee:</label>
+                            <select class="form-select" id="statementEmployee">
+                                <option value="">Select Employee</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Start Date:</label>
+                            <input type="date" class="form-control" id="statementStartDate">
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">End Date:</label>
+                            <input type="date" class="form-control" id="statementEndDate">
+                        </div>
+
+                        <button class="btn btn-primary w-100" onclick="generateStatementReport()">
+                            <i class="fas fa-file-excel"></i> Generate Report
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Report 3: Weekly Payroll Summary -->
+                <div class="col-md-4 mb-4">
+                    <div class="report-card">
+                        <div class="report-icon">
+                            <i class="fas fa-calendar-week text-success"></i>
+                        </div>
+                        <h5>Weekly Payroll Summary</h5>
+                        <p class="text-muted">
+                            Detailed breakdown of all payslips for a specific week
+                        </p>
+
+                        <div class="mb-3">
+                            <label class="form-label">Week Ending:</label>
+                            <input type="date" class="form-control" id="weeklyReportDate">
+                        </div>
+
+                        <div class="mb-3" style="visibility: hidden;">
+                            <label class="form-label">&nbsp;</label>
+                            <input type="text" class="form-control">
+                        </div>
+
+                        <div class="mb-3" style="visibility: hidden;">
+                            <label class="form-label">&nbsp;</label>
+                            <input type="text" class="form-control">
+                        </div>
+
+                        <button class="btn btn-primary w-100" onclick="generateWeeklyReport()">
+                            <i class="fas fa-file-excel"></i> Generate Report
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Report Results -->
+            <div id="reportResults" class="report-results" style="display: none;">
+                <div class="alert alert-success">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <h5><i class="fas fa-check-circle"></i> Report Generated Successfully!</h5>
+                            <p class="mb-0" id="reportMessage"></p>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <a id="reportLink" href="#" target="_blank" class="btn btn-success btn-lg">
+                                <i class="fas fa-external-link-alt"></i> Open Report
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Help Text -->
+            <div class="alert alert-info mt-4">
+                <h6><i class="fas fa-info-circle"></i> Report Information</h6>
+                <ul class="mb-0">
+                    <li><strong>Outstanding Loans:</strong> Lists all employees with loan balances as of the specified date</li>
+                    <li><strong>Individual Statement:</strong> Shows opening balance, all transactions, and closing balance for one employee</li>
+                    <li><strong>Weekly Payroll Summary:</strong> Complete payroll register with summary totals by employer</li>
+                </ul>
+                <p class="mt-2 mb-0">
+                    <small>All reports are saved to your "Payroll Reports" folder in Google Drive and are shareable via link.</small>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Set today's date as default for all date fields
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('loansReportDate').value = today;
+        document.getElementById('weeklyReportDate').value = today;
+
+        // Load employees for Individual Statement dropdown
+        function loadEmployees() {
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    if (result.success) {
+                        const select = document.getElementById('statementEmployee');
+                        select.innerHTML = '<option value="">Select Employee</option>' +
+                            result.data.map(emp =>
+                                `<option value="${emp.id}">${emp.REFNAME}</option>`
+                            ).join('');
+                    } else {
+                        showError('Failed to load employees: ' + result.error);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    showError('Error: ' + error.message);
+                })
+                .listEmployees({});
+        }
+
+        function generateLoansReport() {
+            const asOfDate = document.getElementById('loansReportDate').value;
+
+            if (!asOfDate) {
+                showError('Please select an as-of date');
+                return;
+            }
+
+            showLoading();
+            showInfo('Generating Outstanding Loans Report... This may take a moment.');
+
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    hideLoading();
+                    if (result.success) {
+                        showReportResult(
+                            'Outstanding Loans Report',
+                            result.data.url,
+                            `As of: ${formatDate(asOfDate)} | Employees with loans: ${result.data.employeeCount} | Total Outstanding: ${formatCurrency(result.data.totalOutstanding)}`
+                        );
+                    } else {
+                        showError('Failed to generate report: ' + result.error);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    hideLoading();
+                    showError('Error: ' + error.message);
+                })
+                .generateOutstandingLoansReport(asOfDate);
+        }
+
+        function generateStatementReport() {
+            const employeeId = document.getElementById('statementEmployee').value;
+            const startDate = document.getElementById('statementStartDate').value;
+            const endDate = document.getElementById('statementEndDate').value;
+
+            if (!employeeId) {
+                showError('Please select an employee');
+                return;
+            }
+
+            if (!startDate || !endDate) {
+                showError('Please select both start and end dates');
+                return;
+            }
+
+            if (new Date(endDate) < new Date(startDate)) {
+                showError('End date must be after start date');
+                return;
+            }
+
+            showLoading();
+            showInfo('Generating Individual Statement... This may take a moment.');
+
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    hideLoading();
+                    if (result.success) {
+                        showReportResult(
+                            'Individual Statement',
+                            result.data.url,
+                            `Employee: ${result.data.employeeName} | Period: ${formatDate(startDate)} to ${formatDate(endDate)} | Transactions: ${result.data.transactionCount} | Closing Balance: ${formatCurrency(result.data.closingBalance)}`
+                        );
+                    } else {
+                        showError('Failed to generate report: ' + result.error);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    hideLoading();
+                    showError('Error: ' + error.message);
+                })
+                .generateIndividualStatementReport(employeeId, startDate, endDate);
+        }
+
+        function generateWeeklyReport() {
+            const weekEnding = document.getElementById('weeklyReportDate').value;
+
+            if (!weekEnding) {
+                showError('Please select week ending date');
+                return;
+            }
+
+            showLoading();
+            showInfo('Generating Weekly Payroll Summary... This may take a moment.');
+
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    hideLoading();
+                    if (result.success) {
+                        showReportResult(
+                            'Weekly Payroll Summary',
+                            result.data.url,
+                            `Week Ending: ${formatDate(weekEnding)} | Employees: ${result.data.totalEmployees} | Total Paid to Accounts: ${formatCurrency(result.data.totalPaidToAccounts)}`
+                        );
+                    } else {
+                        showError('Failed to generate report: ' + result.error);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    hideLoading();
+                    showError('Error: ' + error.message);
+                })
+                .generateWeeklyPayrollSummaryReport(weekEnding);
+        }
+
+        function showReportResult(reportName, url, details) {
+            document.getElementById('reportMessage').innerHTML = `
+                <strong>${reportName}</strong><br>
+                <small>${details}</small>
+            `;
+            document.getElementById('reportLink').href = url;
+            document.getElementById('reportResults').style.display = 'block';
+
+            showSuccess(reportName + ' generated successfully!');
+
+            // Scroll to results
+            document.getElementById('reportResults').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        // Load employees on page load
+        loadEmployees();
+    </script>
+</body>
+</html>

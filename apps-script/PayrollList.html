@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <style>
+        .filter-section {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .amount-cell { font-weight: bold; color: #28a745; }
+        .action-buttons { display: flex; gap: 5px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5><i class="fas fa-dollar-sign"></i> Payslips</h5>
+            <button class="btn btn-primary btn-sm" onclick="showPayrollForm()">
+                <i class="fas fa-plus"></i> Create Payslip
+            </button>
+        </div>
+        <div class="card-body">
+            <!-- Filter Section -->
+            <div class="filter-section">
+                <div class="row">
+                    <div class="col-md-3">
+                        <input type="text" class="form-control" id="searchEmployee"
+                               placeholder="Search by employee..." onkeyup="filterPayslips()">
+                    </div>
+                    <div class="col-md-2">
+                        <select class="form-select" id="filterEmployer" onchange="filterPayslips()">
+                            <option value="">All Employers</option>
+                            <option value="SA Grinding Wheels">SA Grinding Wheels</option>
+                            <option value="Scorpio Abrasives">Scorpio Abrasives</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <input type="date" class="form-control" id="filterWeekEnding"
+                               placeholder="Week ending" onchange="filterPayslips()">
+                    </div>
+                    <div class="col-md-2">
+                        <input type="date" class="form-control" id="filterStartDate"
+                               placeholder="From date" onchange="filterPayslips()">
+                    </div>
+                    <div class="col-md-2">
+                        <input type="date" class="form-control" id="filterEndDate"
+                               placeholder="To date" onchange="filterPayslips()">
+                    </div>
+                    <div class="col-md-1">
+                        <button class="btn btn-secondary w-100" onclick="clearFilters()">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Table -->
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Record #</th>
+                            <th>Date</th>
+                            <th>Employee</th>
+                            <th>Employer</th>
+                            <th>Week Ending</th>
+                            <th>Gross Pay</th>
+                            <th>Deductions</th>
+                            <th>Net Pay</th>
+                            <th>Paid to Account</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="payslipsTableBody">
+                        <tr><td colspan="10" class="text-center">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Summary Row -->
+            <div id="summaryRow" class="alert alert-info mt-3" style="display: none;">
+                <div class="row">
+                    <div class="col-md-3">
+                        <strong>Total Payslips:</strong> <span id="totalCount">0</span>
+                    </div>
+                    <div class="col-md-3">
+                        <strong>Total Gross:</strong> <span id="totalGross">R0.00</span>
+                    </div>
+                    <div class="col-md-3">
+                        <strong>Total Net:</strong> <span id="totalNet">R0.00</span>
+                    </div>
+                    <div class="col-md-3">
+                        <strong>Total Paid:</strong> <span id="totalPaid">R0.00</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let allPayslips = [];
+
+        function loadPayslips() {
+            showLoading();
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    hideLoading();
+                    if (result.success) {
+                        allPayslips = result.data;
+                        filterPayslips();
+                    } else {
+                        showError('Failed to load payslips: ' + result.error);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    hideLoading();
+                    showError('Error: ' + error.message);
+                })
+                .listPayslips({});
+        }
+
+        function displayPayslips(payslips) {
+            const tbody = document.getElementById('payslipsTableBody');
+
+            if (payslips.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="10" class="text-center">No payslips found</td></tr>';
+                document.getElementById('summaryRow').style.display = 'none';
+                return;
+            }
+
+            // Calculate totals
+            let totalGross = 0, totalDeductions = 0, totalNet = 0, totalPaid = 0;
+
+            tbody.innerHTML = payslips.map(p => {
+                totalGross += p.GROSSSALARY || 0;
+                totalDeductions += p.TOTALDEDUCTIONS || 0;
+                totalNet += p.NETTSALARY || 0;
+                totalPaid += p.PaidToAccount || 0;
+
+                return `
+                    <tr>
+                        <td><strong>#${p.RECORDNUMBER}</strong></td>
+                        <td><small>${formatDate(p.TIMESTAMP)}</small></td>
+                        <td><strong>${p['EMPLOYEE NAME'] || ''}</strong></td>
+                        <td>${p.EMPLOYER || ''}</td>
+                        <td>${formatDate(p.WEEKENDING)}</td>
+                        <td>${formatCurrency(p.GROSSSALARY || 0)}</td>
+                        <td>${formatCurrency(p.TOTALDEDUCTIONS || 0)}</td>
+                        <td>${formatCurrency(p.NETTSALARY || 0)}</td>
+                        <td class="amount-cell">${formatCurrency(p.PaidToAccount || 0)}</td>
+                        <td class="action-buttons">
+                            <button class="btn btn-sm btn-info" onclick="editPayslip(${p.RECORDNUMBER})" title="Edit">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn btn-sm btn-success" onclick="viewPayslip(${p.RECORDNUMBER})" title="View">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            ${p.FILELINK ? `
+                                <a href="${p.FILELINK}" target="_blank" class="btn btn-sm btn-primary" title="View PDF">
+                                    <i class="fas fa-file-pdf"></i>
+                                </a>
+                            ` : `
+                                <button class="btn btn-sm btn-warning" onclick="generatePDF(${p.RECORDNUMBER})" title="Generate PDF">
+                                    <i class="fas fa-file-pdf"></i>
+                                </button>
+                            `}
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            // Update summary
+            document.getElementById('totalCount').textContent = payslips.length;
+            document.getElementById('totalGross').textContent = formatCurrency(totalGross);
+            document.getElementById('totalNet').textContent = formatCurrency(totalNet);
+            document.getElementById('totalPaid').textContent = formatCurrency(totalPaid);
+            document.getElementById('summaryRow').style.display = 'block';
+        }
+
+        function filterPayslips() {
+            const searchText = document.getElementById('searchEmployee').value.toLowerCase();
+            const employer = document.getElementById('filterEmployer').value;
+            const weekEnding = document.getElementById('filterWeekEnding').value;
+            const startDate = document.getElementById('filterStartDate').value;
+            const endDate = document.getElementById('filterEndDate').value;
+
+            let filtered = allPayslips.filter(p => {
+                const matchesSearch = !searchText ||
+                    (p['EMPLOYEE NAME'] && p['EMPLOYEE NAME'].toLowerCase().includes(searchText));
+
+                const matchesEmployer = !employer || p.EMPLOYER === employer;
+
+                let matchesWeekEnding = true;
+                if (weekEnding) {
+                    const pDate = new Date(p.WEEKENDING);
+                    const filterDate = new Date(weekEnding);
+                    matchesWeekEnding = pDate.getTime() === filterDate.getTime();
+                }
+
+                let matchesDateRange = true;
+                if (startDate || endDate) {
+                    const pDate = new Date(p.WEEKENDING);
+                    if (startDate) {
+                        matchesDateRange = matchesDateRange && pDate >= new Date(startDate);
+                    }
+                    if (endDate) {
+                        matchesDateRange = matchesDateRange && pDate <= new Date(endDate);
+                    }
+                }
+
+                return matchesSearch && matchesEmployer && matchesWeekEnding && matchesDateRange;
+            });
+
+            displayPayslips(filtered);
+        }
+
+        function clearFilters() {
+            document.getElementById('searchEmployee').value = '';
+            document.getElementById('filterEmployer').value = '';
+            document.getElementById('filterWeekEnding').value = '';
+            document.getElementById('filterStartDate').value = '';
+            document.getElementById('filterEndDate').value = '';
+            filterPayslips();
+        }
+
+        function showPayrollForm(recordNumber) {
+            loadModule('payrollForm');
+            if (recordNumber) {
+                sessionStorage.setItem('editPayslipRecordNumber', recordNumber);
+            } else {
+                sessionStorage.removeItem('editPayslipRecordNumber');
+            }
+        }
+
+        function editPayslip(recordNumber) {
+            showPayrollForm(recordNumber);
+        }
+
+        function viewPayslip(recordNumber) {
+            showLoading();
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    hideLoading();
+                    if (result.success) {
+                        showPayslipDetails(result.data);
+                    } else {
+                        showError(result.error);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    hideLoading();
+                    showError('Error: ' + error.message);
+                })
+                .getPayslip(recordNumber);
+        }
+
+        function showPayslipDetails(payslip) {
+            const details = `
+                <div class="modal fade" id="payslipModal" tabindex="-1">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Payslip #${payslip.RECORDNUMBER} - ${payslip['EMPLOYEE NAME']}</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <p><strong>Week Ending:</strong> ${formatDate(payslip.WEEKENDING)}</p>
+                                        <p><strong>Employer:</strong> ${payslip.EMPLOYER}</p>
+                                        <p><strong>Status:</strong> ${payslip['EMPLOYMENT STATUS']}</p>
+                                        <p><strong>Hourly Rate:</strong> ${formatCurrency(payslip.HOURLYRATE)}</p>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <p><strong>Hours:</strong> ${payslip.HOURS}h ${payslip.MINUTES}m</p>
+                                        <p><strong>Overtime:</strong> ${payslip.OVERTIMEHOURS}h ${payslip.OVERTIMEMINUTES}m</p>
+                                        <p><strong>Standard Time:</strong> ${formatCurrency(payslip.STANDARDTIME)}</p>
+                                        <p><strong>Overtime:</strong> ${formatCurrency(payslip.OVERTIME)}</p>
+                                    </div>
+                                </div>
+                                <hr>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <h6>Earnings</h6>
+                                        <p><strong>Gross Salary:</strong> ${formatCurrency(payslip.GROSSSALARY)}</p>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <h6>Deductions</h6>
+                                        <p><strong>UIF:</strong> ${formatCurrency(payslip.UIF || 0)}</p>
+                                        <p><strong>Other:</strong> ${formatCurrency(payslip['OTHER DEDUCTIONS'] || 0)}</p>
+                                        <p><strong>Loan:</strong> ${formatCurrency(payslip.LoanDeductionThisWeek || 0)}</p>
+                                        <p><strong>Total:</strong> ${formatCurrency(payslip.TOTALDEDUCTIONS)}</p>
+                                    </div>
+                                </div>
+                                <hr>
+                                <div class="alert alert-success">
+                                    <h5>Net Salary: ${formatCurrency(payslip.NETTSALARY)}</h5>
+                                    <h4>Paid to Account: ${formatCurrency(payslip.PaidToAccount)}</h4>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                <button type="button" class="btn btn-primary" onclick="editPayslip(${payslip.RECORDNUMBER}); bootstrap.Modal.getInstance(document.getElementById('payslipModal')).hide();">
+                                    <i class="fas fa-edit"></i> Edit
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            const existing = document.getElementById('payslipModal');
+            if (existing) existing.remove();
+
+            document.body.insertAdjacentHTML('beforeend', details);
+            const modal = new bootstrap.Modal(document.getElementById('payslipModal'));
+            modal.show();
+        }
+
+        function generatePDF(recordNumber) {
+            showLoading();
+            showInfo('Generating PDF... This may take a moment.');
+
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    hideLoading();
+                    if (result.success) {
+                        showSuccess('PDF generated successfully!');
+                        loadPayslips(); // Reload to show PDF link
+                    } else {
+                        showError('Failed to generate PDF: ' + result.error);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    hideLoading();
+                    showError('Error: ' + error.message);
+                })
+                .generatePayslipPDF(recordNumber);
+        }
+
+        // Load payslips on page load
+        loadPayslips();
+    </script>
+</body>
+</html>

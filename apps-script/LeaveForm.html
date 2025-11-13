@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <style>
+        .required-field::after {
+            content: " *";
+            color: red;
+        }
+        .info-box {
+            background-color: #e3f2fd;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5><i class="fas fa-calendar-plus"></i> Record Leave</h5>
+            <button class="btn btn-secondary btn-sm" onclick="loadModule('leave')">
+                <i class="fas fa-arrow-left"></i> Back to List
+            </button>
+        </div>
+        <div class="card-body">
+            <div class="info-box">
+                <i class="fas fa-info-circle"></i>
+                <strong>Note:</strong> This is for record keeping only. Leave pay must be entered manually in the payslip if applicable.
+            </div>
+
+            <form id="leaveForm" onsubmit="saveLeave(event)">
+                <div class="mb-3">
+                    <label for="employeeName" class="form-label required-field">Employee</label>
+                    <select class="form-select" id="employeeName" required>
+                        <option value="">Select Employee</option>
+                    </select>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="startDate" class="form-label required-field">Start Date</label>
+                            <input type="date" class="form-control" id="startDate"
+                                   required onchange="calculateTotalDays()">
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="returnDate" class="form-label required-field">Return Date</label>
+                            <input type="date" class="form-control" id="returnDate"
+                                   required onchange="calculateTotalDays()">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Total Days</label>
+                    <input type="text" class="form-control" id="totalDays" readonly
+                           style="background-color: #e9ecef; font-weight: bold;">
+                    <div class="form-text">Auto-calculated (inclusive of start and return dates)</div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="reason" class="form-label required-field">Reason</label>
+                    <select class="form-select" id="reason" required>
+                        <option value="">Select Reason</option>
+                        <option value="AWOL">AWOL</option>
+                        <option value="Sick Leave">Sick Leave</option>
+                        <option value="Annual Leave">Annual Leave</option>
+                        <option value="Unpaid Leave">Unpaid Leave</option>
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label for="notes" class="form-label">Notes</label>
+                    <textarea class="form-control" id="notes" rows="3"
+                              placeholder="Enter any additional details..."></textarea>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Save Leave
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="loadModule('leave')">
+                        <i class="fas fa-times"></i> Cancel
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Load employees for dropdown
+        function loadEmployees() {
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    if (result.success) {
+                        const select = document.getElementById('employeeName');
+                        select.innerHTML = '<option value="">Select Employee</option>' +
+                            result.data
+                                .filter(emp => !emp['TERMINATION DATE']) // Only active employees
+                                .map(emp => `<option value="${emp.REFNAME}">${emp.REFNAME}</option>`)
+                                .join('');
+                    } else {
+                        showError('Failed to load employees: ' + result.error);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    showError('Error: ' + error.message);
+                })
+                .listEmployees({ activeOnly: true });
+        }
+
+        function calculateTotalDays() {
+            const startDate = document.getElementById('startDate').value;
+            const returnDate = document.getElementById('returnDate').value;
+
+            if (startDate && returnDate) {
+                const start = new Date(startDate);
+                const end = new Date(returnDate);
+
+                if (end < start) {
+                    document.getElementById('totalDays').value = 'Invalid: Return date must be after start date';
+                    document.getElementById('totalDays').style.color = 'red';
+                    return;
+                }
+
+                // Calculate days (inclusive)
+                const diffTime = Math.abs(end - start);
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+                document.getElementById('totalDays').value = diffDays + ' days';
+                document.getElementById('totalDays').style.color = '#28a745';
+            } else {
+                document.getElementById('totalDays').value = '';
+            }
+        }
+
+        function saveLeave(event) {
+            event.preventDefault();
+            showLoading();
+
+            const data = {
+                employeeName: document.getElementById('employeeName').value,
+                startDate: document.getElementById('startDate').value,
+                returnDate: document.getElementById('returnDate').value,
+                reason: document.getElementById('reason').value,
+                notes: document.getElementById('notes').value.trim() || null
+            };
+
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    hideLoading();
+                    if (result.success) {
+                        showSuccess('Leave record saved successfully');
+                        setTimeout(function() {
+                            loadModule('leave');
+                        }, 1500);
+                    } else {
+                        showError(result.error);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    hideLoading();
+                    showError('Error: ' + error.message);
+                })
+                .addLeave(data);
+        }
+
+        // Load employees on page load
+        loadEmployees();
+    </script>
+</body>
+</html>

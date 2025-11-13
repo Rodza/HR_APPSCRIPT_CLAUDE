@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <style>
+        .required-field::after {
+            content: " *";
+            color: red;
+        }
+        .form-section {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .form-section h6 {
+            margin-bottom: 15px;
+            color: #2c3e50;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5><i class="fas fa-user-edit"></i> <span id="formTitle">Add Employee</span></h5>
+            <button class="btn btn-secondary btn-sm" onclick="loadModule('employees')">
+                <i class="fas fa-arrow-left"></i> Back to List
+            </button>
+        </div>
+        <div class="card-body">
+            <form id="employeeForm" onsubmit="saveEmployee(event)">
+                <input type="hidden" id="employeeId">
+
+                <!-- Personal Information -->
+                <div class="form-section">
+                    <h6><i class="fas fa-user"></i> Personal Information</h6>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="employeeName" class="form-label required-field">First Name</label>
+                                <input type="text" class="form-control" id="employeeName" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="surname" class="form-label required-field">Surname</label>
+                                <input type="text" class="form-control" id="surname" required>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="idNumber" class="form-label required-field">ID Number</label>
+                                <input type="text" class="form-control" id="idNumber"
+                                       maxlength="13" pattern="[0-9]{13}"
+                                       title="SA ID must be 13 digits" required>
+                                <div class="form-text">13-digit SA ID number</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="dateOfBirth" class="form-label">Date of Birth</label>
+                                <input type="date" class="form-control" id="dateOfBirth">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="contactNumber" class="form-label required-field">Contact Number</label>
+                                <input type="tel" class="form-control" id="contactNumber"
+                                       pattern="0[0-9]{9}" title="SA phone format: 0xxxxxxxxx" required>
+                                <div class="form-text">Format: 0xxxxxxxxx</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="alternativeContact" class="form-label">Alternative Contact</label>
+                                <input type="tel" class="form-control" id="alternativeContact"
+                                       pattern="0[0-9]{9}">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="altContactName" class="form-label">Alternative Contact Name</label>
+                        <input type="text" class="form-control" id="altContactName">
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="address" class="form-label required-field">Address</label>
+                        <textarea class="form-control" id="address" rows="2" required></textarea>
+                    </div>
+                </div>
+
+                <!-- Employment Information -->
+                <div class="form-section">
+                    <h6><i class="fas fa-briefcase"></i> Employment Information</h6>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="employer" class="form-label required-field">Employer</label>
+                                <select class="form-select" id="employer" required>
+                                    <option value="">Select Employer</option>
+                                    <option value="SA Grinding Wheels">SA Grinding Wheels</option>
+                                    <option value="Scorpio Abrasives">Scorpio Abrasives</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="employmentStatus" class="form-label required-field">Employment Status</label>
+                                <select class="form-select" id="employmentStatus" required>
+                                    <option value="">Select Status</option>
+                                    <option value="Permanent">Permanent</option>
+                                    <option value="Temporary">Temporary</option>
+                                    <option value="Contract">Contract</option>
+                                </select>
+                                <div class="form-text">Permanent employees pay UIF (1%)</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="hourlyRate" class="form-label required-field">Hourly Rate (R)</label>
+                                <input type="number" class="form-control" id="hourlyRate"
+                                       step="0.01" min="0" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="clockInRef" class="form-label required-field">Clock Number</label>
+                                <input type="text" class="form-control" id="clockInRef" required>
+                                <div class="form-text">Must be unique</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="employmentDate" class="form-label">Employment Date</label>
+                                <input type="date" class="form-control" id="employmentDate">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="incomeTaxNumber" class="form-label">Income Tax Number</label>
+                                <input type="text" class="form-control" id="incomeTaxNumber">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="terminationDate" class="form-label">Termination Date</label>
+                                <input type="date" class="form-control" id="terminationDate">
+                                <div class="form-text">Leave blank if still employed</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Additional Information -->
+                <div class="form-section">
+                    <h6><i class="fas fa-info-circle"></i> Additional Information</h6>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="overalSize" class="form-label">Overall Size</label>
+                                <input type="number" class="form-control" id="overalSize" min="0">
+                                <div class="form-text">For uniform ordering</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="shoeSize" class="form-label">Shoe Size</label>
+                                <input type="number" class="form-control" id="shoeSize" min="0">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="notes" class="form-label">Notes</label>
+                        <textarea class="form-control" id="notes" rows="3"></textarea>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Save Employee
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="loadModule('employees')">
+                        <i class="fas fa-times"></i> Cancel
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Check if editing existing employee
+        const editEmployeeId = sessionStorage.getItem('editEmployeeId');
+
+        if (editEmployeeId) {
+            document.getElementById('formTitle').textContent = 'Edit Employee';
+            loadEmployeeForEdit(editEmployeeId);
+        }
+
+        function loadEmployeeForEdit(employeeId) {
+            showLoading();
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    hideLoading();
+                    if (result.success) {
+                        populateForm(result.data);
+                    } else {
+                        showError('Failed to load employee: ' + result.error);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    hideLoading();
+                    showError('Error: ' + error.message);
+                })
+                .getEmployeeById(employeeId);
+        }
+
+        function populateForm(employee) {
+            document.getElementById('employeeId').value = employee.id || '';
+            document.getElementById('employeeName').value = employee['EMPLOYEE NAME'] || '';
+            document.getElementById('surname').value = employee.SURNAME || '';
+            document.getElementById('idNumber').value = employee['ID NUMBER'] || '';
+            document.getElementById('dateOfBirth').value = employee['DATE OF BIRTH'] ?
+                formatDateForInput(employee['DATE OF BIRTH']) : '';
+            document.getElementById('contactNumber').value = employee['CONTACT NUMBER'] || '';
+            document.getElementById('alternativeContact').value = employee['ALTERNATIVE CONTACT'] || '';
+            document.getElementById('altContactName').value = employee['ALT CONTACT NAME'] || '';
+            document.getElementById('address').value = employee.ADDRESS || '';
+            document.getElementById('employer').value = employee.EMPLOYER || '';
+            document.getElementById('employmentStatus').value = employee['EMPLOYMENT STATUS'] || '';
+            document.getElementById('hourlyRate').value = employee['HOURLY RATE'] || '';
+            document.getElementById('clockInRef').value = employee.ClockInRef || '';
+            document.getElementById('employmentDate').value = employee['EMPLOYMENT DATE'] ?
+                formatDateForInput(employee['EMPLOYMENT DATE']) : '';
+            document.getElementById('incomeTaxNumber').value = employee['INCOME TAX NUMBER'] || '';
+            document.getElementById('terminationDate').value = employee['TERMINATION DATE'] ?
+                formatDateForInput(employee['TERMINATION DATE']) : '';
+            document.getElementById('overalSize').value = employee.OveralSize || '';
+            document.getElementById('shoeSize').value = employee.ShoeSize || '';
+            document.getElementById('notes').value = employee.NOTES || '';
+        }
+
+        function saveEmployee(event) {
+            event.preventDefault();
+            showLoading();
+
+            const employeeId = document.getElementById('employeeId').value;
+            const data = {
+                employeeName: document.getElementById('employeeName').value.trim(),
+                surname: document.getElementById('surname').value.trim(),
+                idNumber: document.getElementById('idNumber').value.trim(),
+                dateOfBirth: document.getElementById('dateOfBirth').value || null,
+                contactNumber: document.getElementById('contactNumber').value.trim(),
+                alternativeContact: document.getElementById('alternativeContact').value.trim() || null,
+                altContactName: document.getElementById('altContactName').value.trim() || null,
+                address: document.getElementById('address').value.trim(),
+                employer: document.getElementById('employer').value,
+                employmentStatus: document.getElementById('employmentStatus').value,
+                hourlyRate: parseFloat(document.getElementById('hourlyRate').value),
+                clockInRef: document.getElementById('clockInRef').value.trim(),
+                employmentDate: document.getElementById('employmentDate').value || null,
+                incomeTaxNumber: document.getElementById('incomeTaxNumber').value.trim() || null,
+                terminationDate: document.getElementById('terminationDate').value || null,
+                overalSize: document.getElementById('overalSize').value ?
+                    parseInt(document.getElementById('overalSize').value) : null,
+                shoeSize: document.getElementById('shoeSize').value ?
+                    parseInt(document.getElementById('shoeSize').value) : null,
+                notes: document.getElementById('notes').value.trim() || null
+            };
+
+            if (employeeId) {
+                // Update existing employee
+                data.id = employeeId;
+                google.script.run
+                    .withSuccessHandler(handleSaveSuccess)
+                    .withFailureHandler(handleSaveError)
+                    .updateEmployee(employeeId, data);
+            } else {
+                // Create new employee
+                google.script.run
+                    .withSuccessHandler(handleSaveSuccess)
+                    .withFailureHandler(handleSaveError)
+                    .addEmployee(data);
+            }
+        }
+
+        function handleSaveSuccess(result) {
+            hideLoading();
+            if (result.success) {
+                showSuccess('Employee saved successfully');
+                sessionStorage.removeItem('editEmployeeId');
+                setTimeout(function() {
+                    loadModule('employees');
+                }, 1500);
+            } else {
+                showError(result.error);
+            }
+        }
+
+        function handleSaveError(error) {
+            hideLoading();
+            showError('Error saving employee: ' + error.message);
+        }
+
+        function formatDateForInput(dateValue) {
+            if (!dateValue) return '';
+            const d = new Date(dateValue);
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+    </script>
+</body>
+</html>

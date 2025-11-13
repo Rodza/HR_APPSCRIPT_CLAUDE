@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <style>
+        .upload-area {
+            border: 3px dashed #dee2e6;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            background-color: #f8f9fa;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .upload-area:hover {
+            border-color: #007bff;
+            background-color: #e7f3ff;
+        }
+        .upload-area.dragover {
+            border-color: #28a745;
+            background-color: #d4edda;
+        }
+        .import-results {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5><i class="fas fa-file-upload"></i> Import Timesheets from Excel</h5>
+            <button class="btn btn-secondary btn-sm" onclick="loadModule('timesheets')">
+                <i class="fas fa-list"></i> View Pending Timesheets
+            </button>
+        </div>
+        <div class="card-body">
+            <!-- Instructions -->
+            <div class="alert alert-info">
+                <h6><i class="fas fa-info-circle"></i> Excel Format Required:</h6>
+                <p class="mb-0">
+                    <strong>Columns:</strong> Employee Name, Week Ending, Standard Hours, Standard Minutes, Overtime Hours, Overtime Minutes, Notes
+                </p>
+                <p class="mb-0">
+                    <strong>Example:</strong> Archie Patrick, 2025-10-17, 39, 30, 0, 0, On time all week
+                </p>
+            </div>
+
+            <!-- Upload Area -->
+            <div class="upload-area" id="uploadArea" onclick="document.getElementById('excelFile').click()">
+                <i class="fas fa-cloud-upload-alt fa-3x text-secondary mb-3"></i>
+                <h5>Click to Upload or Drag & Drop</h5>
+                <p class="text-muted">Excel files (.xlsx, .xls) only</p>
+                <input type="file" id="excelFile" accept=".xlsx,.xls" style="display: none;" onchange="handleFileSelect(event)">
+            </div>
+
+            <!-- Preview/Results -->
+            <div id="importResults" class="import-results" style="display: none;">
+                <div class="alert alert-success">
+                    <h6><i class="fas fa-check-circle"></i> Import Complete!</h6>
+                    <p class="mb-0">
+                        <strong>Total Records:</strong> <span id="totalRecords">0</span><br>
+                        <strong>Successfully Imported:</strong> <span id="successCount">0</span><br>
+                        <strong>Errors:</strong> <span id="errorCount">0</span>
+                    </p>
+                </div>
+
+                <div id="errorList" style="display: none;">
+                    <div class="alert alert-warning">
+                        <h6><i class="fas fa-exclamation-triangle"></i> Import Errors:</h6>
+                        <ul id="errorItems"></ul>
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button class="btn btn-primary" onclick="loadModule('timesheets')">
+                        <i class="fas fa-arrow-right"></i> Go to Pending Timesheets
+                    </button>
+                    <button class="btn btn-secondary" onclick="resetImport()">
+                        <i class="fas fa-redo"></i> Import Another File
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Drag and drop handlers
+        const uploadArea = document.getElementById('uploadArea');
+
+        uploadArea.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', function(e) {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                handleFile(file);
+            }
+        }
+
+        function handleFile(file) {
+            // Validate file type
+            const validTypes = ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                               'application/vnd.ms-excel'];
+
+            if (!validTypes.includes(file.type) && !file.name.match(/\.(xlsx|xls)$/i)) {
+                showError('Please select a valid Excel file (.xlsx or .xls)');
+                return;
+            }
+
+            // Show loading
+            showLoading();
+            uploadArea.innerHTML = '<i class="fas fa-spinner fa-spin fa-3x text-primary mb-3"></i><h5>Processing...</h5>';
+
+            // Read file
+            const reader = new FileReader();
+
+            reader.onload = function(e) {
+                const fileData = e.target.result;
+                const blob = Utilities.newBlob(fileData, file.type, file.name);
+
+                // Send to server for processing
+                google.script.run
+                    .withSuccessHandler(handleImportSuccess)
+                    .withFailureHandler(handleImportError)
+                    .importTimesheetExcel(blob);
+            };
+
+            reader.readAsDataURL(file);
+        }
+
+        function handleImportSuccess(result) {
+            hideLoading();
+
+            if (result.success) {
+                const data = result.data;
+
+                document.getElementById('totalRecords').textContent = data.totalRecords;
+                document.getElementById('successCount').textContent = data.successCount;
+                document.getElementById('errorCount').textContent = data.errorCount;
+
+                // Show errors if any
+                if (data.errorCount > 0 && data.errors && data.errors.length > 0) {
+                    const errorList = document.getElementById('errorItems');
+                    errorList.innerHTML = data.errors.map(err =>
+                        `<li>${err}</li>`
+                    ).join('');
+                    document.getElementById('errorList').style.display = 'block';
+                }
+
+                document.getElementById('importResults').style.display = 'block';
+                uploadArea.style.display = 'none';
+
+                showSuccess('Import completed: ' + data.successCount + ' records imported');
+            } else {
+                showError('Import failed: ' + result.error);
+                resetImport();
+            }
+        }
+
+        function handleImportError(error) {
+            hideLoading();
+            showError('Error importing file: ' + error.message);
+            resetImport();
+        }
+
+        function resetImport() {
+            document.getElementById('importResults').style.display = 'none';
+            document.getElementById('errorList').style.display = 'none';
+            uploadArea.style.display = 'block';
+            uploadArea.innerHTML = `
+                <i class="fas fa-cloud-upload-alt fa-3x text-secondary mb-3"></i>
+                <h5>Click to Upload or Drag & Drop</h5>
+                <p class="text-muted">Excel files (.xlsx, .xls) only</p>
+            `;
+            document.getElementById('excelFile').value = '';
+        }
+    </script>
+</body>
+</html>

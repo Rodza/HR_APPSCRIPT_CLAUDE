@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <style>
+        .required-field::after {
+            content: " *";
+            color: red;
+        }
+        .info-box {
+            background-color: #e3f2fd;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .balance-box {
+            background-color: #fff3cd;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 4px solid #ffc107;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5><i class="fas fa-money-bill"></i> Add Loan Transaction</h5>
+            <button class="btn btn-secondary btn-sm" onclick="loadModule('loans')">
+                <i class="fas fa-arrow-left"></i> Back to List
+            </button>
+        </div>
+        <div class="card-body">
+            <div class="info-box">
+                <i class="fas fa-info-circle"></i>
+                <strong>Note:</strong> For payroll-linked transactions, the system will auto-sync when you create/edit payslips.
+                Use this form for manual loan entries only (separate disbursements or adjustments).
+            </div>
+
+            <form id="loanForm" onsubmit="saveLoan(event)">
+                <div class="mb-3">
+                    <label for="employeeName" class="form-label required-field">Employee</label>
+                    <select class="form-select" id="employeeName" required onchange="loadCurrentBalance()">
+                        <option value="">Select Employee</option>
+                    </select>
+                </div>
+
+                <!-- Current Balance Display -->
+                <div id="balanceBox" class="balance-box" style="display: none;">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <strong>Current Loan Balance:</strong>
+                        </div>
+                        <div class="col-md-6 text-end">
+                            <span id="currentBalance" class="fs-5 fw-bold"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="loanType" class="form-label required-field">Transaction Type</label>
+                            <select class="form-select" id="loanType" required onchange="updateAmountField()">
+                                <option value="">Select Type</option>
+                                <option value="Disbursement">Disbursement (New Loan)</option>
+                                <option value="Repayment">Repayment</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="transactionDate" class="form-label required-field">Transaction Date</label>
+                            <input type="date" class="form-control" id="transactionDate" required>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="loanAmount" class="form-label required-field">Amount (R)</label>
+                            <input type="number" class="form-control" id="loanAmount"
+                                   step="0.01" min="0.01" required>
+                            <div class="form-text" id="amountHelp">Enter positive amount</div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="disbursementMode" class="form-label required-field">Disbursement Mode</label>
+                            <select class="form-select" id="disbursementMode" required>
+                                <option value="Manual Entry">Manual Entry</option>
+                                <option value="Separate">Separate (Not with Salary)</option>
+                                <option value="With Salary">With Salary</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="notes" class="form-label">Notes</label>
+                    <textarea class="form-control" id="notes" rows="3"
+                              placeholder="Enter transaction details..."></textarea>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Save Transaction
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="loadModule('loans')">
+                        <i class="fas fa-times"></i> Cancel
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let allEmployees = [];
+        let selectedEmployeeId = null;
+
+        // Load employees for dropdown
+        function loadEmployees() {
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    if (result.success) {
+                        allEmployees = result.data;
+                        const select = document.getElementById('employeeName');
+                        select.innerHTML = '<option value="">Select Employee</option>' +
+                            result.data
+                                .filter(emp => !emp['TERMINATION DATE']) // Only active employees
+                                .map(emp => `<option value="${emp.id}">${emp.REFNAME}</option>`)
+                                .join('');
+                    } else {
+                        showError('Failed to load employees: ' + result.error);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    showError('Error: ' + error.message);
+                })
+                .listEmployees({ activeOnly: true });
+        }
+
+        function loadCurrentBalance() {
+            const select = document.getElementById('employeeName');
+            selectedEmployeeId = select.value;
+
+            if (!selectedEmployeeId) {
+                document.getElementById('balanceBox').style.display = 'none';
+                return;
+            }
+
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    if (result.success) {
+                        document.getElementById('currentBalance').textContent = formatCurrency(result.data);
+                        document.getElementById('balanceBox').style.display = 'block';
+                    }
+                })
+                .getCurrentLoanBalance(selectedEmployeeId);
+        }
+
+        function updateAmountField() {
+            const loanType = document.getElementById('loanType').value;
+            const amountHelp = document.getElementById('amountHelp');
+
+            if (loanType === 'Disbursement') {
+                amountHelp.textContent = 'Enter positive amount (will be added to balance)';
+                amountHelp.style.color = '#dc3545';
+            } else if (loanType === 'Repayment') {
+                amountHelp.textContent = 'Enter positive amount (will be deducted from balance)';
+                amountHelp.style.color = '#28a745';
+            } else {
+                amountHelp.textContent = 'Enter positive amount';
+                amountHelp.style.color = '#6c757d';
+            }
+        }
+
+        function saveLoan(event) {
+            event.preventDefault();
+            showLoading();
+
+            const loanType = document.getElementById('loanType').value;
+            let loanAmount = parseFloat(document.getElementById('loanAmount').value);
+
+            // Convert to negative for repayments
+            if (loanType === 'Repayment') {
+                loanAmount = -Math.abs(loanAmount);
+            } else {
+                loanAmount = Math.abs(loanAmount);
+            }
+
+            const data = {
+                employeeId: selectedEmployeeId,
+                transactionDate: document.getElementById('transactionDate').value,
+                loanAmount: loanAmount,
+                loanType: loanType,
+                disbursementMode: document.getElementById('disbursementMode').value,
+                notes: document.getElementById('notes').value.trim() || null
+            };
+
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    hideLoading();
+                    if (result.success) {
+                        showSuccess('Loan transaction saved successfully');
+                        setTimeout(function() {
+                            loadModule('loans');
+                        }, 1500);
+                    } else {
+                        showError(result.error);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    hideLoading();
+                    showError('Error: ' + error.message);
+                })
+                .addLoanTransaction(data);
+        }
+
+        // Set today's date as default
+        document.getElementById('transactionDate').valueAsDate = new Date();
+
+        // Load employees on page load
+        loadEmployees();
+    </script>
+</body>
+</html>

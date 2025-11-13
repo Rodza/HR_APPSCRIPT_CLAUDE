@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <style>
+        .filter-section {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .badge-pending { background-color: #ffc107; color: #000; }
+        .badge-approved { background-color: #28a745; }
+        .badge-rejected { background-color: #dc3545; }
+        .editable-cell {
+            padding: 5px;
+            border: 1px solid transparent;
+            border-radius: 3px;
+        }
+        .editable-cell:focus {
+            border-color: #007bff;
+            outline: none;
+        }
+        .action-buttons { display: flex; gap: 5px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5><i class="fas fa-clock"></i> Pending Timesheets</h5>
+            <div>
+                <button class="btn btn-success btn-sm" onclick="loadModule('timesheetImport')">
+                    <i class="fas fa-file-upload"></i> Import New Timesheets
+                </button>
+            </div>
+        </div>
+        <div class="card-body">
+            <!-- Filter Section -->
+            <div class="filter-section">
+                <div class="row">
+                    <div class="col-md-4">
+                        <select class="form-select" id="filterStatus" onchange="filterTimesheets()">
+                            <option value="Pending">Pending Only</option>
+                            <option value="">All Statuses</option>
+                            <option value="Approved">Approved</option>
+                            <option value="Rejected">Rejected</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <input type="text" class="form-control" id="searchEmployee"
+                               placeholder="Search by employee..." onkeyup="filterTimesheets()">
+                    </div>
+                    <div class="col-md-4">
+                        <input type="date" class="form-control" id="filterWeekEnding"
+                               placeholder="Week ending" onchange="filterTimesheets()">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Table -->
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Employee</th>
+                            <th>Week Ending</th>
+                            <th>Hours</th>
+                            <th>Minutes</th>
+                            <th>OT Hours</th>
+                            <th>OT Minutes</th>
+                            <th>Notes</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="timesheetsTableBody">
+                        <tr><td colspan="9" class="text-center">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div class="modal fade" id="editModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Timesheet</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="editTimesheetId">
+
+                    <div class="mb-3">
+                        <label class="form-label">Employee</label>
+                        <input type="text" class="form-control" id="editEmployee" readonly>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Hours</label>
+                                <input type="number" class="form-control" id="editHours" min="0">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Minutes</label>
+                                <input type="number" class="form-control" id="editMinutes" min="0" max="59">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">OT Hours</label>
+                                <input type="number" class="form-control" id="editOTHours" min="0">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">OT Minutes</label>
+                                <input type="number" class="form-control" id="editOTMinutes" min="0" max="59">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Notes</label>
+                        <textarea class="form-control" id="editNotes" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="saveEdit()">Save Changes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let allTimesheets = [];
+        let editModal;
+
+        function loadTimesheets() {
+            showLoading();
+
+            const filters = {
+                status: document.getElementById('filterStatus').value || undefined
+            };
+
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    hideLoading();
+                    if (result.success) {
+                        allTimesheets = result.data;
+                        filterTimesheets();
+                    } else {
+                        showError('Failed to load timesheets: ' + result.error);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    hideLoading();
+                    showError('Error: ' + error.message);
+                })
+                .listPendingTimesheets(filters);
+        }
+
+        function displayTimesheets(timesheets) {
+            const tbody = document.getElementById('timesheetsTableBody');
+
+            if (timesheets.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" class="text-center">No timesheets found</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = timesheets.map(ts => {
+                const statusClass = ts.STATUS === 'Pending' ? 'badge-pending' :
+                                   ts.STATUS === 'Approved' ? 'badge-approved' : 'badge-rejected';
+
+                const isPending = ts.STATUS === 'Pending';
+
+                return `
+                    <tr>
+                        <td><strong>${ts['EMPLOYEE NAME'] || ''}</strong></td>
+                        <td>${formatDate(ts.WEEKENDING)}</td>
+                        <td>${ts.HOURS || 0}</td>
+                        <td>${ts.MINUTES || 0}</td>
+                        <td>${ts.OVERTIMEHOURS || 0}</td>
+                        <td>${ts.OVERTIMEMINUTES || 0}</td>
+                        <td><small>${ts.NOTES || '-'}</small></td>
+                        <td><span class="badge ${statusClass}">${ts.STATUS}</span></td>
+                        <td class="action-buttons">
+                            ${isPending ? `
+                                <button class="btn btn-sm btn-info" onclick="editTimesheet('${ts.ID}')" title="Edit">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-sm btn-success" onclick="approveTimesheet('${ts.ID}')" title="Approve">
+                                    <i class="fas fa-check"></i>
+                                </button>
+                                <button class="btn btn-sm btn-danger" onclick="rejectTimesheet('${ts.ID}')" title="Reject">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            ` : '-'}
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function filterTimesheets() {
+            const searchText = document.getElementById('searchEmployee').value.toLowerCase();
+            const weekEnding = document.getElementById('filterWeekEnding').value;
+
+            let filtered = allTimesheets.filter(ts => {
+                const matchesSearch = !searchText ||
+                    (ts['EMPLOYEE NAME'] && ts['EMPLOYEE NAME'].toLowerCase().includes(searchText));
+
+                let matchesDate = true;
+                if (weekEnding) {
+                    const tsDate = new Date(ts.WEEKENDING);
+                    const filterDate = new Date(weekEnding);
+                    matchesDate = tsDate.getTime() === filterDate.getTime();
+                }
+
+                return matchesSearch && matchesDate;
+            });
+
+            displayTimesheets(filtered);
+        }
+
+        function editTimesheet(timesheetId) {
+            const timesheet = allTimesheets.find(ts => ts.ID === timesheetId);
+            if (!timesheet) return;
+
+            document.getElementById('editTimesheetId').value = timesheetId;
+            document.getElementById('editEmployee').value = timesheet['EMPLOYEE NAME'];
+            document.getElementById('editHours').value = timesheet.HOURS || 0;
+            document.getElementById('editMinutes').value = timesheet.MINUTES || 0;
+            document.getElementById('editOTHours').value = timesheet.OVERTIMEHOURS || 0;
+            document.getElementById('editOTMinutes').value = timesheet.OVERTIMEMINUTES || 0;
+            document.getElementById('editNotes').value = timesheet.NOTES || '';
+
+            if (!editModal) {
+                editModal = new bootstrap.Modal(document.getElementById('editModal'));
+            }
+            editModal.show();
+        }
+
+        function saveEdit() {
+            showLoading();
+
+            const timesheetId = document.getElementById('editTimesheetId').value;
+            const data = {
+                hours: parseInt(document.getElementById('editHours').value),
+                minutes: parseInt(document.getElementById('editMinutes').value),
+                overtimeHours: parseInt(document.getElementById('editOTHours').value),
+                overtimeMinutes: parseInt(document.getElementById('editOTMinutes').value),
+                notes: document.getElementById('editNotes').value
+            };
+
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    hideLoading();
+                    if (result.success) {
+                        showSuccess('Timesheet updated successfully');
+                        editModal.hide();
+                        loadTimesheets();
+                    } else {
+                        showError(result.error);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    hideLoading();
+                    showError('Error: ' + error.message);
+                })
+                .updatePendingTimesheet(timesheetId, data);
+        }
+
+        function approveTimesheet(timesheetId) {
+            if (!confirm('Approve this timesheet? This will create a payslip.')) return;
+
+            showLoading();
+
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    hideLoading();
+                    if (result.success) {
+                        showSuccess('Timesheet approved! Payslip #' + result.data.payslipRecordNumber + ' created.');
+                        loadTimesheets();
+                    } else {
+                        showError(result.error);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    hideLoading();
+                    showError('Error: ' + error.message);
+                })
+                .approveTimesheet(timesheetId);
+        }
+
+        function rejectTimesheet(timesheetId) {
+            const reason = prompt('Enter rejection reason (optional):');
+            if (reason === null) return; // User cancelled
+
+            showLoading();
+
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    hideLoading();
+                    if (result.success) {
+                        showSuccess('Timesheet rejected');
+                        loadTimesheets();
+                    } else {
+                        showError(result.error);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    hideLoading();
+                    showError('Error: ' + error.message);
+                })
+                .rejectTimesheet(timesheetId, reason);
+        }
+
+        // Load timesheets on page load
+        document.getElementById('filterStatus').value = 'Pending'; // Default to pending only
+        loadTimesheets();
+    </script>
+</body>
+</html>
