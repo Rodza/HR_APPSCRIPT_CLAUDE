@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <style>
+        .filter-section {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .badge-permanent { background-color: #28a745; }
+        .badge-temporary { background-color: #ffc107; }
+        .badge-contract { background-color: #17a2b8; }
+        .action-buttons { display: flex; gap: 5px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5><i class="fas fa-users"></i> Employees</h5>
+            <button class="btn btn-primary btn-sm" onclick="showEmployeeForm()">
+                <i class="fas fa-plus"></i> Add Employee
+            </button>
+        </div>
+        <div class="card-body">
+            <!-- Filter Section -->
+            <div class="filter-section">
+                <div class="row">
+                    <div class="col-md-4">
+                        <input type="text" class="form-control" id="searchEmployee"
+                               placeholder="Search by name..." onkeyup="filterEmployees()">
+                    </div>
+                    <div class="col-md-3">
+                        <select class="form-select" id="filterEmployer" onchange="filterEmployees()">
+                            <option value="">All Employers</option>
+                            <option value="SA Grinding Wheels">SA Grinding Wheels</option>
+                            <option value="Scorpio Abrasives">Scorpio Abrasives</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <select class="form-select" id="filterStatus" onchange="filterEmployees()">
+                            <option value="">All Statuses</option>
+                            <option value="Permanent">Permanent</option>
+                            <option value="Temporary">Temporary</option>
+                            <option value="Contract">Contract</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <button class="btn btn-secondary w-100" onclick="clearFilters()">
+                            <i class="fas fa-times"></i> Clear
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Table -->
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Employer</th>
+                            <th>Clock#</th>
+                            <th>Status</th>
+                            <th>Hourly Rate</th>
+                            <th>Contact</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="employeesTableBody">
+                        <tr><td colspan="7" class="text-center">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let allEmployees = [];
+        let filteredEmployees = [];
+
+        function loadEmployees() {
+            showLoading();
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    hideLoading();
+                    if (result.success) {
+                        allEmployees = result.data;
+                        filteredEmployees = result.data;
+                        displayEmployees(result.data);
+                    } else {
+                        showError('Failed to load employees: ' + result.error);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    hideLoading();
+                    showError('Error: ' + error.message);
+                })
+                .listEmployees({});
+        }
+
+        function displayEmployees(employees) {
+            const tbody = document.getElementById('employeesTableBody');
+
+            if (employees.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center">No employees found</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = employees.map(emp => {
+                const statusClass = emp['EMPLOYMENT STATUS'] === 'Permanent' ? 'badge-permanent' :
+                                   emp['EMPLOYMENT STATUS'] === 'Temporary' ? 'badge-temporary' : 'badge-contract';
+
+                return `
+                    <tr>
+                        <td><strong>${emp.REFNAME || ''}</strong></td>
+                        <td>${emp.EMPLOYER || ''}</td>
+                        <td>${emp.ClockInRef || ''}</td>
+                        <td><span class="badge ${statusClass}">${emp['EMPLOYMENT STATUS'] || ''}</span></td>
+                        <td>${formatCurrency(emp['HOURLY RATE'] || 0)}</td>
+                        <td>${emp['CONTACT NUMBER'] || ''}</td>
+                        <td class="action-buttons">
+                            <button class="btn btn-sm btn-info" onclick="editEmployee('${emp.id}')" title="Edit">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn btn-sm btn-success" onclick="viewEmployee('${emp.id}')" title="View Details">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function filterEmployees() {
+            const searchText = document.getElementById('searchEmployee').value.toLowerCase();
+            const employer = document.getElementById('filterEmployer').value;
+            const status = document.getElementById('filterStatus').value;
+
+            filteredEmployees = allEmployees.filter(emp => {
+                const matchesSearch = !searchText ||
+                    (emp.REFNAME && emp.REFNAME.toLowerCase().includes(searchText)) ||
+                    (emp.ClockInRef && emp.ClockInRef.toLowerCase().includes(searchText));
+
+                const matchesEmployer = !employer || emp.EMPLOYER === employer;
+                const matchesStatus = !status || emp['EMPLOYMENT STATUS'] === status;
+
+                return matchesSearch && matchesEmployer && matchesStatus;
+            });
+
+            displayEmployees(filteredEmployees);
+        }
+
+        function clearFilters() {
+            document.getElementById('searchEmployee').value = '';
+            document.getElementById('filterEmployer').value = '';
+            document.getElementById('filterStatus').value = '';
+            filterEmployees();
+        }
+
+        function showEmployeeForm(employeeId) {
+            loadModule('employeeForm');
+            if (employeeId) {
+                // Store ID for loading in form
+                sessionStorage.setItem('editEmployeeId', employeeId);
+            } else {
+                sessionStorage.removeItem('editEmployeeId');
+            }
+        }
+
+        function editEmployee(employeeId) {
+            showEmployeeForm(employeeId);
+        }
+
+        function viewEmployee(employeeId) {
+            showLoading();
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    hideLoading();
+                    if (result.success) {
+                        showEmployeeDetails(result.data);
+                    } else {
+                        showError(result.error);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    hideLoading();
+                    showError('Error: ' + error.message);
+                })
+                .getEmployeeById(employeeId);
+        }
+
+        function showEmployeeDetails(employee) {
+            const details = `
+                <div class="modal fade" id="employeeDetailsModal" tabindex="-1">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Employee Details: ${employee.REFNAME}</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <p><strong>Name:</strong> ${employee['EMPLOYEE NAME']} ${employee.SURNAME}</p>
+                                        <p><strong>Employer:</strong> ${employee.EMPLOYER}</p>
+                                        <p><strong>Status:</strong> ${employee['EMPLOYMENT STATUS']}</p>
+                                        <p><strong>Clock Number:</strong> ${employee.ClockInRef}</p>
+                                        <p><strong>Hourly Rate:</strong> ${formatCurrency(employee['HOURLY RATE'])}</p>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <p><strong>ID Number:</strong> ${employee['ID NUMBER']}</p>
+                                        <p><strong>Contact:</strong> ${employee['CONTACT NUMBER']}</p>
+                                        <p><strong>Address:</strong> ${employee.ADDRESS}</p>
+                                        <p><strong>Date of Birth:</strong> ${employee['DATE OF BIRTH'] ? formatDate(employee['DATE OF BIRTH']) : 'N/A'}</p>
+                                    </div>
+                                </div>
+                                ${employee.NOTES ? '<hr><p><strong>Notes:</strong><br>' + employee.NOTES + '</p>' : ''}
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                <button type="button" class="btn btn-primary" onclick="editEmployee('${employee.id}'); bootstrap.Modal.getInstance(document.getElementById('employeeDetailsModal')).hide();">
+                                    <i class="fas fa-edit"></i> Edit
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Remove existing modal if any
+            const existingModal = document.getElementById('employeeDetailsModal');
+            if (existingModal) {
+                existingModal.remove();
+            }
+
+            // Add modal to body
+            document.body.insertAdjacentHTML('beforeend', details);
+
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('employeeDetailsModal'));
+            modal.show();
+        }
+
+        // Load employees on page load
+        loadEmployees();
+    </script>
+</body>
+</html>

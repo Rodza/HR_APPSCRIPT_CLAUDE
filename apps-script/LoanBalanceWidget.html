@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <style>
+        .loan-balance-widget {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .balance-amount {
+            font-size: 2rem;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .balance-label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+        .refresh-btn {
+            background-color: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 5px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
+        .refresh-btn:hover {
+            background-color: rgba(255, 255, 255, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="loan-balance-widget">
+        <div class="d-flex justify-content-between align-items-start">
+            <div>
+                <div class="balance-label">
+                    <i class="fas fa-money-bill-wave"></i> Current Loan Balance
+                </div>
+                <div class="balance-amount" id="widgetBalance">
+                    <i class="fas fa-spinner fa-spin"></i>
+                </div>
+            </div>
+            <button class="refresh-btn" onclick="refreshBalance()">
+                <i class="fas fa-sync-alt"></i> Refresh
+            </button>
+        </div>
+        <div class="mt-3">
+            <small id="lastUpdated"></small>
+        </div>
+    </div>
+
+    <script>
+        let widgetEmployeeId = null;
+
+        function initLoanBalanceWidget(employeeId) {
+            widgetEmployeeId = employeeId;
+            loadBalance();
+        }
+
+        function loadBalance() {
+            if (!widgetEmployeeId) {
+                document.getElementById('widgetBalance').innerHTML = 'No employee selected';
+                return;
+            }
+
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    if (result.success) {
+                        const balance = result.data;
+                        document.getElementById('widgetBalance').textContent = formatCurrency(balance);
+
+                        // Update last updated time
+                        const now = new Date();
+                        document.getElementById('lastUpdated').textContent =
+                            'Last updated: ' + now.toLocaleTimeString();
+
+                        // Change color based on balance
+                        const widget = document.querySelector('.loan-balance-widget');
+                        if (balance > 0) {
+                            widget.style.background = 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)';
+                        } else {
+                            widget.style.background = 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)';
+                        }
+                    } else {
+                        document.getElementById('widgetBalance').textContent = 'Error loading balance';
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    document.getElementById('widgetBalance').textContent = 'Error: ' + error.message;
+                })
+                .getCurrentLoanBalance(widgetEmployeeId);
+        }
+
+        function refreshBalance() {
+            document.getElementById('widgetBalance').innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            loadBalance();
+        }
+
+        // Format currency helper
+        function formatCurrency(amount) {
+            return 'R' + parseFloat(amount).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <style>
+        .filter-section {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .badge-awol { background-color: #dc3545; }
+        .badge-sick { background-color: #ffc107; color: #000; }
+        .badge-annual { background-color: #28a745; }
+        .badge-unpaid { background-color: #6c757d; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5><i class="fas fa-calendar-alt"></i> Leave Records</h5>
+            <button class="btn btn-primary btn-sm" onclick="showLeaveForm()">
+                <i class="fas fa-plus"></i> Add Leave
+            </button>
+        </div>
+        <div class="card-body">
+            <!-- Filter Section -->
+            <div class="filter-section">
+                <div class="row">
+                    <div class="col-md-4">
+                        <input type="text" class="form-control" id="searchEmployee"
+                               placeholder="Search by employee name..." onkeyup="filterLeave()">
+                    </div>
+                    <div class="col-md-3">
+                        <select class="form-select" id="filterReason" onchange="filterLeave()">
+                            <option value="">All Reasons</option>
+                            <option value="AWOL">AWOL</option>
+                            <option value="Sick Leave">Sick Leave</option>
+                            <option value="Annual Leave">Annual Leave</option>
+                            <option value="Unpaid Leave">Unpaid Leave</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <input type="date" class="form-control" id="filterStartDate"
+                               placeholder="From date" onchange="filterLeave()">
+                    </div>
+                    <div class="col-md-2">
+                        <input type="date" class="form-control" id="filterEndDate"
+                               placeholder="To date" onchange="filterLeave()">
+                    </div>
+                    <div class="col-md-1">
+                        <button class="btn btn-secondary w-100" onclick="clearFilters()">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Table -->
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Date Recorded</th>
+                            <th>Employee</th>
+                            <th>Start Date</th>
+                            <th>Return Date</th>
+                            <th>Total Days</th>
+                            <th>Reason</th>
+                            <th>Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody id="leaveTableBody">
+                        <tr><td colspan="7" class="text-center">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let allLeaveRecords = [];
+        let filteredLeaveRecords = [];
+
+        function loadLeave() {
+            showLoading();
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    hideLoading();
+                    if (result.success) {
+                        allLeaveRecords = result.data;
+                        filteredLeaveRecords = result.data;
+                        displayLeave(result.data);
+                    } else {
+                        showError('Failed to load leave records: ' + result.error);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    hideLoading();
+                    showError('Error: ' + error.message);
+                })
+                .listLeave({});
+        }
+
+        function displayLeave(records) {
+            const tbody = document.getElementById('leaveTableBody');
+
+            if (records.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center">No leave records found</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = records.map(leave => {
+                const reasonClass = leave.REASON === 'AWOL' ? 'badge-awol' :
+                                   leave.REASON === 'Sick Leave' ? 'badge-sick' :
+                                   leave.REASON === 'Annual Leave' ? 'badge-annual' : 'badge-unpaid';
+
+                return `
+                    <tr>
+                        <td>${formatDate(leave.TIMESTAMP)}</td>
+                        <td><strong>${leave['EMPLOYEE NAME'] || ''}</strong></td>
+                        <td>${formatDate(leave['STARTDATE.LEAVE'])}</td>
+                        <td>${formatDate(leave['RETURNDATE.LEAVE'])}</td>
+                        <td><span class="badge bg-secondary">${leave['TOTALDAYS.LEAVE'] || 0} days</span></td>
+                        <td><span class="badge ${reasonClass}">${leave.REASON || ''}</span></td>
+                        <td>${leave.NOTES || '-'}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function filterLeave() {
+            const searchText = document.getElementById('searchEmployee').value.toLowerCase();
+            const reason = document.getElementById('filterReason').value;
+            const startDate = document.getElementById('filterStartDate').value;
+            const endDate = document.getElementById('filterEndDate').value;
+
+            filteredLeaveRecords = allLeaveRecords.filter(leave => {
+                const matchesSearch = !searchText ||
+                    (leave['EMPLOYEE NAME'] && leave['EMPLOYEE NAME'].toLowerCase().includes(searchText));
+
+                const matchesReason = !reason || leave.REASON === reason;
+
+                let matchesDateRange = true;
+                if (startDate || endDate) {
+                    const leaveStart = new Date(leave['STARTDATE.LEAVE']);
+                    if (startDate) {
+                        const filterStart = new Date(startDate);
+                        matchesDateRange = matchesDateRange && leaveStart >= filterStart;
+                    }
+                    if (endDate) {
+                        const filterEnd = new Date(endDate);
+                        matchesDateRange = matchesDateRange && leaveStart <= filterEnd;
+                    }
+                }
+
+                return matchesSearch && matchesReason && matchesDateRange;
+            });
+
+            displayLeave(filteredLeaveRecords);
+        }
+
+        function clearFilters() {
+            document.getElementById('searchEmployee').value = '';
+            document.getElementById('filterReason').value = '';
+            document.getElementById('filterStartDate').value = '';
+            document.getElementById('filterEndDate').value = '';
+            filterLeave();
+        }
+
+        function showLeaveForm() {
+            loadModule('leaveForm');
+        }
+
+        // Load leave records on page load
+        loadLeave();
+    </script>
+</body>
+</html>
