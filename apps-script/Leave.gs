@@ -6,9 +6,24 @@
  * Leave Pay is entered manually in MASTERSALARY if applicable.
  *
  * Sheet: LEAVE
- * Columns: TIMESTAMP, EMPLOYEE NAME, STARTDATE.LEAVE, RETURNDATE.LEAVE,
+ * Columns: TIMESTAMP, EMPLOYEE NAME, STARTDATE.LEAVE, WEEK.DAY, RETURNDATE.LEAVE,
  *          TOTALDAYS.LEAVE, REASON, NOTES, USER, IMAGE
+ *
+ * WEEK.DAY - Automatically calculated from STARTDATE.LEAVE (e.g., "Monday", "Tuesday")
  */
+
+// ==================== HELPER FUNCTIONS ====================
+
+/**
+ * Get day of week name from a date
+ *
+ * @param {Date} date - Date object
+ * @returns {string} Day name (e.g., "Monday", "Tuesday")
+ */
+function getDayOfWeek(date) {
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  return days[date.getDay()];
+}
 
 // ==================== ADD LEAVE RECORD ====================
 
@@ -57,8 +72,12 @@ function addLeave(data) {
     // Calculate total days (inclusive)
     const totalDays = calculateDaysBetween(startDate, returnDate) + 1;
 
+    // Calculate day of week from start date
+    const weekDay = getDayOfWeek(startDate);
+
     Logger.log('📅 Leave period: ' + formatDate(startDate) + ' to ' + formatDate(returnDate));
     Logger.log('📊 Total days: ' + totalDays);
+    Logger.log('📅 Start day: ' + weekDay);
 
     // Prepare row data
     const timestamp = new Date();
@@ -68,6 +87,7 @@ function addLeave(data) {
       timestamp,                          // TIMESTAMP
       data.employeeName,                  // EMPLOYEE NAME
       startDate,                          // STARTDATE.LEAVE
+      weekDay,                            // WEEK.DAY (automatically calculated)
       returnDate,                         // RETURNDATE.LEAVE
       totalDays,                          // TOTALDAYS.LEAVE
       data.reason,                        // REASON
