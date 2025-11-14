@@ -6,8 +6,8 @@
  * Leave Pay is entered manually in MASTERSALARY if applicable.
  *
  * Sheet: LEAVE
- * Columns: TIMESTAMP, EMPLOYEE NAME, STARTDATE.LEAVE, WEEK.DAY, RETURNDATE.LEAVE,
- *          TOTALDAYS.LEAVE, REASON, NOTES, USER, IMAGE
+ * Columns: TIMESTAMP, EMPLOYEE NAME, STARTDATE.LEAVE, RETURNDATE.LEAVE,
+ *          TOTALDAYS.LEAVE, REASON, NOTES, USER, IMAGE, WEEK.DAY
  *
  * WEEK.DAY - Automatically calculated from STARTDATE.LEAVE (e.g., "Monday", "Tuesday")
  */
@@ -87,13 +87,13 @@ function addLeave(data) {
       timestamp,                          // TIMESTAMP
       data.employeeName,                  // EMPLOYEE NAME
       startDate,                          // STARTDATE.LEAVE
-      weekDay,                            // WEEK.DAY (automatically calculated)
       returnDate,                         // RETURNDATE.LEAVE
       totalDays,                          // TOTALDAYS.LEAVE
       data.reason,                        // REASON
       data.notes || '',                   // NOTES
       user,                               // USER
-      data.imageUrl || ''                 // IMAGE
+      data.imageUrl || '',                // IMAGE
+      weekDay                             // WEEK.DAY (automatically calculated)
     ];
 
     // Append to sheet
