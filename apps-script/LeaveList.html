@@ -79,9 +79,12 @@
     </div>
 
     <script>
-        // Use window properties to avoid re-declaration errors when module reloads
-        window.allLeaveRecords = [];
-        window.filteredLeaveRecords = [];
+        // Initialize data arrays - safe for re-execution
+        if (!window.leaveModuleData) {
+            window.leaveModuleData = {};
+        }
+        window.leaveModuleData.allRecords = [];
+        window.leaveModuleData.filteredRecords = [];
 
         function loadLeave() {
             showLoading();
@@ -89,8 +92,8 @@
                 .withSuccessHandler(function(result) {
                     hideLoading();
                     if (result.success) {
-                        window.allLeaveRecords = result.data;
-                        window.filteredLeaveRecords = result.data;
+                        window.leaveModuleData.allRecords = result.data;
+                        window.leaveModuleData.filteredRecords = result.data;
                         displayLeave(result.data);
                     } else {
                         showError('Failed to load leave records: ' + result.error);
@@ -136,7 +139,7 @@
             const startDate = document.getElementById('filterStartDate').value;
             const endDate = document.getElementById('filterEndDate').value;
 
-            window.filteredLeaveRecords = window.allLeaveRecords.filter(leave => {
+            window.leaveModuleData.filteredRecords = window.leaveModuleData.allRecords.filter(leave => {
                 const matchesSearch = !searchText ||
                     (leave['EMPLOYEE NAME'] && leave['EMPLOYEE NAME'].toLowerCase().includes(searchText));
 
@@ -158,7 +161,7 @@
                 return matchesSearch && matchesReason && matchesDateRange;
             });
 
-            displayLeave(window.filteredLeaveRecords);
+            displayLeave(window.leaveModuleData.filteredRecords);
         }
 
         function clearFilters() {
