@@ -200,13 +200,17 @@
             google.script.run
                 .withSuccessHandler(function(result) {
                     hideLoading();
+                    if (!result) {
+                        showError('No response from server. Please check the console for errors.');
+                        return;
+                    }
                     if (result.success) {
                         showSuccess('Loan transaction saved successfully');
                         setTimeout(function() {
                             loadModule('loans');
                         }, 1500);
                     } else {
-                        showError(result.error);
+                        showError(result.error || 'Unknown error occurred');
                     }
                 })
                 .withFailureHandler(function(error) {
