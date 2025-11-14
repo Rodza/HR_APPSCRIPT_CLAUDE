@@ -542,7 +542,7 @@ function createEmployee(employeeData) {
 
     // Step 1: Validate required fields
     console.log('Step 1: Validating required fields...');
-    var requiredFields = EMPLOYEE_REQUIRED_FIELDS;
+    var requiredFields = getConfig('EMPLOYEE_REQUIRED_FIELDS');
     var missingFields = [];
 
     for (var i = 0; i < requiredFields.length; i++) {
