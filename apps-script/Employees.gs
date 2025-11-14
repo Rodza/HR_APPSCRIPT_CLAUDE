@@ -25,6 +25,25 @@ function formatResponse(success, data, error) {
 }
 
 // ============================================================================
+// TEST FUNCTION - Simple response test
+// ============================================================================
+
+/**
+ * Test function to verify response format works from web app
+ * @returns {Object} Simple test response
+ */
+function testSimpleResponse() {
+  console.log('testSimpleResponse called');
+  var result = {
+    success: true,
+    data: [{name: 'Test Employee', id: '123'}],
+    error: null
+  };
+  console.log('Returning:', JSON.stringify(result));
+  return result;
+}
+
+// ============================================================================
 // LIST EMPLOYEES
 // ============================================================================
 
@@ -35,9 +54,8 @@ function formatResponse(success, data, error) {
  */
 function listEmployees(filters) {
   try {
-    console.log('=== listEmployees() START ===');
-    console.log('Filters received:', JSON.stringify(filters));
-    logFunctionStart('listEmployees', filters);
+    console.log('=== listEmployees() START (from web app) ===');
+    console.log('Filters received:', filters);
 
     // Step 1: Get sheets
     console.log('Step 1: Getting sheets...');
@@ -136,11 +154,19 @@ function listEmployees(filters) {
 
     console.log('✓ Final count:', employees.length, '/', originalCount, 'employees');
 
-    logSuccess('Found ' + employees.length + ' employees');
-    logFunctionEnd('listEmployees', {count: employees.length});
+    // Don't use logging functions before return - they might interfere
+    // logSuccess('Found ' + employees.length + ' employees');
+    // logFunctionEnd('listEmployees', {count: employees.length});
 
     console.log('=== listEmployees() END - SUCCESS ===');
-    return formatResponse(true, employees, null);
+    console.log('Preparing response...');
+
+    var response = formatResponse(true, employees, null);
+    console.log('Response created:', response ? 'OK' : 'NULL');
+    console.log('Response.success:', response.success);
+    console.log('Response.data length:', response.data ? response.data.length : 'NULL');
+
+    return response;
 
   } catch (error) {
     console.error('=== listEmployees() ERROR ===');
@@ -149,8 +175,12 @@ function listEmployees(filters) {
     console.error('Full error:', error.toString());
     console.error('Stack trace:', error.stack);
 
-    logError('Failed to list employees', error);
-    return formatResponse(false, [], error.toString());
+    // Don't use logError before return
+    // logError('Failed to list employees', error);
+
+    var errorResponse = formatResponse(false, [], error.toString());
+    console.log('Error response created:', errorResponse ? 'OK' : 'NULL');
+    return errorResponse;
   }
 }
 
