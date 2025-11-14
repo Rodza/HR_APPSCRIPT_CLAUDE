@@ -314,6 +314,9 @@
                 case 'leave':
                     loadLeaveModule();
                     break;
+                case 'leaveForm':
+                    loadLeaveFormModule();
+                    break;
                 case 'loans':
                     loadLoansModule();
                     break;
@@ -549,6 +552,22 @@
                 })
                 .withFailureHandler(handleError)
                 .include('LeaveList');
+        }
+
+        function loadLeaveFormModule() {
+            google.script.run
+                .withSuccessHandler(function(html) {
+                    if (html) {
+                        const contentArea = document.getElementById('contentArea');
+                        contentArea.innerHTML = html;
+                        executeModuleScripts(contentArea);
+                    } else {
+                        showError('Failed to load Leave Form module');
+                    }
+                    hideLoading();
+                })
+                .withFailureHandler(handleError)
+                .include('LeaveForm');
         }
 
         function loadLoansModule() {
