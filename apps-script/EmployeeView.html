@@ -1,0 +1,275 @@
+<!-- Employee View (Read-only) -->
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h5 class="mb-0"><i class="fas fa-user"></i> Employee Details</h5>
+    <div>
+      <button class="btn btn-warning btn-sm me-2" onclick="editCurrentEmployee()">
+        <i class="fas fa-edit"></i> Edit
+      </button>
+      <button class="btn btn-secondary btn-sm" onclick="loadModule('employees')">
+        <i class="fas fa-arrow-left"></i> Back to List
+      </button>
+    </div>
+  </div>
+  <div class="card-body">
+    <div id="employeeViewContent">
+      <div class="text-center">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  var currentEmployeeId = null;
+
+  /**
+   * Initialize employee view with ID from sessionStorage
+   */
+  function initializeEmployeeView() {
+    currentEmployeeId = sessionStorage.getItem('viewEmployeeId');
+
+    if (!currentEmployeeId) {
+      displayError('No employee ID provided');
+      return;
+    }
+
+    loadEmployeeDetails(currentEmployeeId);
+  }
+
+  /**
+   * Load employee details from server
+   */
+  function loadEmployeeDetails(employeeId) {
+    google.script.run
+      .withSuccessHandler(function(result) {
+        if (result && result.success) {
+          displayEmployeeDetails(result.data);
+        } else if (result) {
+          displayError(result.error || 'Failed to load employee');
+        } else {
+          displayError('Unexpected response format');
+        }
+      })
+      .withFailureHandler(function(error) {
+        displayError('Error loading employee: ' + (error.message || error));
+      })
+      .getEmployeeById(employeeId);
+  }
+
+  /**
+   * Display employee details in a formatted layout
+   */
+  function displayEmployeeDetails(employee) {
+    var content = document.getElementById('employeeViewContent');
+    if (!content) return;
+
+    var html = `
+      <!-- Personal Information -->
+      <div class="row mb-4">
+        <div class="col-12">
+          <h6 class="border-bottom pb-2"><i class="fas fa-user"></i> Personal Information</h6>
+        </div>
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label class="text-muted small">Full Name</label>
+            <div class="fw-bold">${escapeHtml(employee.REFNAME || '')}</div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label class="text-muted small">ID Number</label>
+            <div class="fw-bold">${escapeHtml(employee['ID NUMBER'] || '')}</div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label class="text-muted small">Date of Birth</label>
+            <div>${formatDate(employee['DATE OF BIRTH']) || 'N/A'}</div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label class="text-muted small">Contact Number</label>
+            <div>${escapeHtml(employee['CONTACT NUMBER'] || '')}</div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label class="text-muted small">Alternative Contact</label>
+            <div>${escapeHtml(employee['ALTERNATIVE CONTACT'] || 'N/A')}</div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label class="text-muted small">Alternative Contact Name</label>
+            <div>${escapeHtml(employee['ALT CONTACT NAME'] || 'N/A')}</div>
+          </div>
+        </div>
+        <div class="col-12">
+          <div class="mb-3">
+            <label class="text-muted small">Address</label>
+            <div>${escapeHtml(employee.ADDRESS || 'N/A')}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Employment Information -->
+      <div class="row mb-4">
+        <div class="col-12">
+          <h6 class="border-bottom pb-2"><i class="fas fa-briefcase"></i> Employment Information</h6>
+        </div>
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label class="text-muted small">Employer</label>
+            <div class="fw-bold">${escapeHtml(employee.EMPLOYER || '')}</div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label class="text-muted small">Employment Status</label>
+            <div>
+              <span class="badge ${getStatusBadgeClass(employee['EMPLOYMENT STATUS'] || '')}">
+                ${escapeHtml(employee['EMPLOYMENT STATUS'] || '')}
+              </span>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label class="text-muted small">Hourly Rate</label>
+            <div class="fw-bold">R${parseFloat(employee['HOURLY RATE'] || 0).toFixed(2)}</div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label class="text-muted small">Clock Number</label>
+            <div class="fw-bold">${escapeHtml(employee.ClockInRef || '')}</div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label class="text-muted small">Employment Date</label>
+            <div>${formatDate(employee['EMPLOYMENT DATE']) || 'N/A'}</div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label class="text-muted small">Income Tax Number</label>
+            <div>${escapeHtml(employee['INCOME TAX NUMBER'] || 'N/A')}</div>
+          </div>
+        </div>
+        ${employee['TERMINATION DATE'] ? `
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label class="text-muted small">Termination Date</label>
+            <div class="text-danger">${formatDate(employee['TERMINATION DATE'])}</div>
+          </div>
+        </div>
+        ` : ''}
+      </div>
+
+      <!-- Additional Information -->
+      <div class="row mb-4">
+        <div class="col-12">
+          <h6 class="border-bottom pb-2"><i class="fas fa-info-circle"></i> Additional Information</h6>
+        </div>
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label class="text-muted small">Overall Size</label>
+            <div>${employee.OveralSize || 'N/A'}</div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label class="text-muted small">Shoe Size</label>
+            <div>${employee.ShoeSize || 'N/A'}</div>
+          </div>
+        </div>
+        ${employee.NOTES ? `
+        <div class="col-12">
+          <div class="mb-3">
+            <label class="text-muted small">Notes</label>
+            <div class="p-2 bg-light rounded">${escapeHtml(employee.NOTES)}</div>
+          </div>
+        </div>
+        ` : ''}
+      </div>
+    `;
+
+    content.innerHTML = html;
+  }
+
+  /**
+   * Display error message
+   */
+  function displayError(message) {
+    var content = document.getElementById('employeeViewContent');
+    if (content) {
+      content.innerHTML = `
+        <div class="alert alert-danger">
+          <i class="fas fa-exclamation-circle"></i> ${escapeHtml(message)}
+        </div>
+      `;
+    }
+  }
+
+  /**
+   * Edit current employee
+   */
+  function editCurrentEmployee() {
+    if (currentEmployeeId && typeof loadModule === 'function') {
+      // Set employee ID in sessionStorage for edit form
+      sessionStorage.setItem('editEmployeeId', currentEmployeeId);
+      sessionStorage.removeItem('viewEmployeeId');
+      loadModule('employee-edit', {id: currentEmployeeId});
+    }
+  }
+
+  /**
+   * Get badge class for employment status
+   */
+  function getStatusBadgeClass(status) {
+    switch(status) {
+      case 'Permanent':
+        return 'bg-success';
+      case 'Temporary':
+        return 'bg-warning';
+      case 'Contract':
+        return 'bg-info';
+      case 'Terminated':
+      case 'Resigned':
+        return 'bg-danger';
+      default:
+        return 'bg-secondary';
+    }
+  }
+
+  /**
+   * Format date for display
+   */
+  function formatDate(dateValue) {
+    if (!dateValue) return '';
+    var d = new Date(dateValue);
+    return d.toLocaleDateString('en-ZA', { year: 'numeric', month: 'long', day: 'numeric' });
+  }
+
+  /**
+   * Escape HTML to prevent XSS
+   */
+  function escapeHtml(text) {
+    if (!text) return '';
+    var div = document.createElement('div');
+    div.textContent = text.toString();
+    return div.innerHTML;
+  }
+
+  // Initialize on load
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeEmployeeView);
+  } else {
+    initializeEmployeeView();
+  }
+</script>

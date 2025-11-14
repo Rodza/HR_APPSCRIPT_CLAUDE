@@ -462,6 +462,10 @@
         }
 
         function loadEmployeeFormModule() {
+            // Clear any stored employee IDs for new employee form
+            sessionStorage.removeItem('editEmployeeId');
+            sessionStorage.removeItem('viewEmployeeId');
+
             google.script.run
                 .withSuccessHandler(function(html) {
                     if (html) {
@@ -478,7 +482,6 @@
         }
 
         function loadEmployeeViewModule(data) {
-            // TODO: Implement employee view with ID parameter
             const employeeId = data && data.id ? data.id : null;
             if (!employeeId) {
                 showError('No employee ID provided');
@@ -486,16 +489,15 @@
                 return;
             }
 
+            // Store employee ID in sessionStorage for the view module to access
+            sessionStorage.setItem('viewEmployeeId', employeeId);
+
             google.script.run
                 .withSuccessHandler(function(html) {
                     if (html) {
                         const contentArea = document.getElementById('contentArea');
                         contentArea.innerHTML = html;
                         executeModuleScripts(contentArea);
-                        // Pass employee ID to the loaded module
-                        if (typeof window.initEmployeeView === 'function') {
-                            window.initEmployeeView(employeeId);
-                        }
                     } else {
                         showError('Failed to load Employee View module');
                     }
@@ -506,7 +508,6 @@
         }
 
         function loadEmployeeEditModule(data) {
-            // TODO: Implement employee edit with ID parameter
             const employeeId = data && data.id ? data.id : null;
             if (!employeeId) {
                 showError('No employee ID provided');
@@ -514,16 +515,17 @@
                 return;
             }
 
+            // Store employee ID in sessionStorage for the edit form to access
+            sessionStorage.setItem('editEmployeeId', employeeId);
+            // Clear view ID if present
+            sessionStorage.removeItem('viewEmployeeId');
+
             google.script.run
                 .withSuccessHandler(function(html) {
                     if (html) {
                         const contentArea = document.getElementById('contentArea');
                         contentArea.innerHTML = html;
                         executeModuleScripts(contentArea);
-                        // Pass employee ID to the loaded module
-                        if (typeof window.initEmployeeEdit === 'function') {
-                            window.initEmployeeEdit(employeeId);
-                        }
                     } else {
                         showError('Failed to load Employee Edit module');
                     }
