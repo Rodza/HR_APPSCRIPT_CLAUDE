@@ -101,13 +101,6 @@ function addLoanTransaction(data) {
     // Append to sheet
     loanSheet.appendRow(rowData);
 
-    // Recalculate balances to ensure accuracy
-    Logger.log('🔄 Recalculating loan balances...');
-    const recalcResult = recalculateLoanBalances(data.employeeId);
-    if (!recalcResult.success) {
-      Logger.log('⚠️ Warning: Failed to recalculate balances: ' + recalcResult.error);
-    }
-
     const result = {
       loanId: loanId,
       employeeId: data.employeeId,
@@ -175,11 +168,28 @@ function getCurrentLoanBalance(employeeId) {
     for (let i = 1; i < data.length; i++) {
       const row = data[i];
       if (row[empIdCol] === employeeId) {
-        employeeRecords.push({
-          transactionDate: parseDate(row[transDateCol]),
-          timestamp: parseDate(row[timestampCol]),
-          balanceAfter: row[balanceAfterCol]
-        });
+        try {
+          // Skip if critical data is missing
+          if (!row[transDateCol] || !row[timestampCol]) {
+            Logger.log('⚠️ Skipping row ' + (i + 1) + ' - missing date fields');
+            continue;
+          }
+
+          const balanceAfter = row[balanceAfterCol];
+          if (balanceAfter === null || balanceAfter === undefined || balanceAfter === '') {
+            Logger.log('⚠️ Skipping row ' + (i + 1) + ' - missing balance after');
+            continue;
+          }
+
+          employeeRecords.push({
+            transactionDate: parseDate(row[transDateCol]),
+            timestamp: parseDate(row[timestampCol]),
+            balanceAfter: parseFloat(balanceAfter)
+          });
+        } catch (dateError) {
+          Logger.log('⚠️ Skipping row ' + (i + 1) + ' - invalid date: ' + dateError.message);
+          continue;
+        }
       }
     }
 
@@ -259,17 +269,28 @@ function getLoanHistory(employeeId, startDate, endDate) {
       const rowEmpId = row[empIdCol];
 
       if (rowEmpId === employeeId) {
-        const record = buildObjectFromRow(row, headers);
+        try {
+          // Skip if no transaction date
+          if (!row[transDateCol]) {
+            Logger.log('⚠️ Skipping row ' + (i + 1) + ' - missing transaction date');
+            continue;
+          }
 
-        // Apply date filters
-        if (filterStartDate || filterEndDate) {
-          const transDate = parseDate(row[transDateCol]);
+          const record = buildObjectFromRow(row, headers);
 
-          if (filterStartDate && transDate < filterStartDate) continue;
-          if (filterEndDate && transDate > filterEndDate) continue;
+          // Apply date filters
+          if (filterStartDate || filterEndDate) {
+            const transDate = parseDate(row[transDateCol]);
+
+            if (filterStartDate && transDate < filterStartDate) continue;
+            if (filterEndDate && transDate > filterEndDate) continue;
+          }
+
+          records.push(record);
+        } catch (error) {
+          Logger.log('⚠️ Skipping row ' + (i + 1) + ' - error: ' + error.message);
+          continue;
         }
-
-        records.push(record);
       }
     }
 
