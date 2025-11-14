@@ -95,6 +95,20 @@ function testListEmployeesMinimal() {
  * @returns {Object} Response with employee list
  */
 function listEmployees(filters) {
+  // ULTRA-SIMPLE VERSION - Test if function even executes
+  console.log('LISTEMPLOYEES CALLED - ULTRA SIMPLE VERSION');
+
+  return {
+    success: true,
+    data: [{name: 'Hardcoded Test Employee'}],
+    error: null
+  };
+}
+
+/**
+ * Full implementation - temporarily disabled for testing
+ */
+function listEmployeesFull(filters) {
   try {
     console.log('=== listEmployees() START (from web app) ===');
     console.log('Filters received:', filters);
