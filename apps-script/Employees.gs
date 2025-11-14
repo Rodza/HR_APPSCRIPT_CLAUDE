@@ -476,6 +476,51 @@ function getEmployeeById(id) {
 }
 
 // ============================================================================
+// FIELD NAME TRANSFORMATION
+// ============================================================================
+
+/**
+ * Transform camelCase field names from frontend to uppercase sheet column names
+ * @param {Object} data - Employee data with camelCase field names
+ * @returns {Object} Employee data with uppercase field names
+ */
+function transformEmployeeFieldNames(data) {
+  var transformed = {};
+
+  // Define field mapping from camelCase (frontend) to UPPERCASE (backend/sheet)
+  var fieldMapping = {
+    'employeeName': 'EMPLOYEE NAME',
+    'surname': 'SURNAME',
+    'idNumber': 'ID NUMBER',
+    'dateOfBirth': 'DATE OF BIRTH',
+    'contactNumber': 'CONTACT NUMBER',
+    'alternativeContact': 'ALTERNATIVE CONTACT',
+    'altContactName': 'ALT CONTACT NAME',
+    'address': 'ADDRESS',
+    'employer': 'EMPLOYER',
+    'employmentStatus': 'EMPLOYMENT STATUS',
+    'hourlyRate': 'HOURLY RATE',
+    'clockInRef': 'ClockInRef',
+    'employmentDate': 'EMPLOYMENT DATE',
+    'incomeTaxNumber': 'INCOME TAX NUMBER',
+    'terminationDate': 'TERMINATION DATE',
+    'overalSize': 'OveralSize',
+    'shoeSize': 'ShoeSize',
+    'notes': 'NOTES'
+  };
+
+  // Transform camelCase fields to uppercase
+  for (var key in data) {
+    if (data.hasOwnProperty(key)) {
+      var mappedKey = fieldMapping[key] || key;
+      transformed[mappedKey] = data[key];
+    }
+  }
+
+  return transformed;
+}
+
+// ============================================================================
 // CREATE EMPLOYEE
 // ============================================================================
 
@@ -489,6 +534,11 @@ function createEmployee(employeeData) {
     console.log('=== createEmployee() START ===');
     console.log('Employee data received:', JSON.stringify(employeeData));
     logFunctionStart('createEmployee', employeeData);
+
+    // Step 0: Transform camelCase fields to uppercase sheet column names
+    console.log('Step 0: Transforming field names...');
+    employeeData = transformEmployeeFieldNames(employeeData);
+    console.log('Transformed data:', JSON.stringify(employeeData));
 
     // Step 1: Validate required fields
     console.log('Step 1: Validating required fields...');
@@ -590,6 +640,11 @@ function updateEmployee(id, employeeData) {
     if (!id) {
       throw new Error('Employee ID is required');
     }
+
+    // Transform camelCase fields to uppercase sheet column names
+    console.log('Step 0: Transforming field names...');
+    employeeData = transformEmployeeFieldNames(employeeData);
+    console.log('Transformed data:', JSON.stringify(employeeData));
 
     // Get sheets
     var sheets = getSheets();
