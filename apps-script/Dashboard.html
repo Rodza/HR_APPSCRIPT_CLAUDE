@@ -295,6 +295,15 @@
                 case 'employees':
                     loadEmployeesModule();
                     break;
+                case 'employee-form':
+                    loadEmployeeFormModule();
+                    break;
+                case 'employee-view':
+                    loadEmployeeViewModule(event);
+                    break;
+                case 'employee-edit':
+                    loadEmployeeEditModule(event);
+                    break;
                 case 'leave':
                     loadLeaveModule();
                     break;
@@ -443,6 +452,78 @@
                     handleError(error);
                 })
                 .include('EmployeeList');
+        }
+
+        function loadEmployeeFormModule() {
+            google.script.run
+                .withSuccessHandler(function(html) {
+                    if (html) {
+                        const contentArea = document.getElementById('contentArea');
+                        contentArea.innerHTML = html;
+                        executeModuleScripts(contentArea);
+                    } else {
+                        showError('Failed to load Employee Form module');
+                    }
+                    hideLoading();
+                })
+                .withFailureHandler(handleError)
+                .include('EmployeeForm');
+        }
+
+        function loadEmployeeViewModule(data) {
+            // TODO: Implement employee view with ID parameter
+            const employeeId = data && data.id ? data.id : null;
+            if (!employeeId) {
+                showError('No employee ID provided');
+                hideLoading();
+                return;
+            }
+
+            google.script.run
+                .withSuccessHandler(function(html) {
+                    if (html) {
+                        const contentArea = document.getElementById('contentArea');
+                        contentArea.innerHTML = html;
+                        executeModuleScripts(contentArea);
+                        // Pass employee ID to the loaded module
+                        if (typeof window.initEmployeeView === 'function') {
+                            window.initEmployeeView(employeeId);
+                        }
+                    } else {
+                        showError('Failed to load Employee View module');
+                    }
+                    hideLoading();
+                })
+                .withFailureHandler(handleError)
+                .include('EmployeeView');
+        }
+
+        function loadEmployeeEditModule(data) {
+            // TODO: Implement employee edit with ID parameter
+            const employeeId = data && data.id ? data.id : null;
+            if (!employeeId) {
+                showError('No employee ID provided');
+                hideLoading();
+                return;
+            }
+
+            google.script.run
+                .withSuccessHandler(function(html) {
+                    if (html) {
+                        const contentArea = document.getElementById('contentArea');
+                        contentArea.innerHTML = html;
+                        executeModuleScripts(contentArea);
+                        // Pass employee ID to the loaded module
+                        if (typeof window.initEmployeeEdit === 'function') {
+                            window.initEmployeeEdit(employeeId);
+                        }
+                    } else {
+                        showError('Failed to load Employee Edit module');
+                    }
+                    hideLoading();
+                })
+                .withFailureHandler(handleError)
+                .include('EmployeeForm');
         }
 
         function loadLeaveModule() {
