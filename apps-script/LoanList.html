@@ -96,79 +96,83 @@
     </div>
 
     <script>
-        let allEmployees = [];
-        let selectedEmployeeId = null;
+        // Wrap in IIFE to prevent re-declaration errors on module reload
+        (function() {
+            // Initialize data storage on window
+            window.loanListData = window.loanListData || {};
+            window.loanListData.allEmployees = [];
+            window.loanListData.selectedEmployeeId = null;
 
-        function loadEmployees() {
-            google.script.run
-                .withSuccessHandler(function(result) {
-                    if (result.success) {
-                        allEmployees = result.data;
-                        const select = document.getElementById('filterEmployee');
-                        select.innerHTML = '<option value="">All Employees</option>' +
-                            result.data.map(emp =>
-                                `<option value="${emp.id}">${emp.REFNAME}</option>`
-                            ).join('');
-                    }
-                })
-                .listEmployees({});
-        }
+            window.loadEmployees = function() {
+                google.script.run
+                    .withSuccessHandler(function(result) {
+                        if (result.success) {
+                            window.loanListData.allEmployees = result.data;
+                            const select = document.getElementById('filterEmployee');
+                            select.innerHTML = '<option value="">All Employees</option>' +
+                                result.data.map(emp =>
+                                    `<option value="${emp.id}">${emp.REFNAME}</option>`
+                                ).join('');
+                        }
+                    })
+                    .listEmployees({});
+            };
 
-        function loadLoans() {
+            window.loadLoans = function() {
             showLoading();
 
-            const employeeId = document.getElementById('filterEmployee').value;
-            const startDate = document.getElementById('filterStartDate').value || null;
-            const endDate = document.getElementById('filterEndDate').value || null;
+                const employeeId = document.getElementById('filterEmployee').value;
+                const startDate = document.getElementById('filterStartDate').value || null;
+                const endDate = document.getElementById('filterEndDate').value || null;
 
-            if (employeeId) {
-                selectedEmployeeId = employeeId;
-                // Load balance and history for specific employee
-                loadEmployeeLoanHistory(employeeId, startDate, endDate);
-            } else {
-                selectedEmployeeId = null;
-                document.getElementById('balanceDisplay').style.display = 'none';
-                // Show message that employee must be selected
-                document.getElementById('loansTableBody').innerHTML =
-                    '<tr><td colspan="8" class="text-center"><i class="fas fa-info-circle"></i> Please select an employee to view loan transactions</td></tr>';
-                hideLoading();
-            }
-        }
-
-        function loadEmployeeLoanHistory(employeeId, startDate, endDate) {
-            // Get employee name
-            const employee = allEmployees.find(emp => emp.id === employeeId);
-            const employeeName = employee ? employee.REFNAME : 'Unknown';
-
-            // Load current balance
-            google.script.run
-                .withSuccessHandler(function(result) {
-                    if (result.success) {
-                        document.getElementById('selectedEmployeeName').textContent = employeeName;
-                        document.getElementById('currentBalance').textContent = formatCurrency(result.data);
-                        document.getElementById('balanceDisplay').style.display = 'block';
-                    }
-                })
-                .getCurrentLoanBalance(employeeId);
-
-            // Load transaction history
-            google.script.run
-                .withSuccessHandler(function(result) {
+                if (employeeId) {
+                    window.loanListData.selectedEmployeeId = employeeId;
+                    // Load balance and history for specific employee
+                    loadEmployeeLoanHistory(employeeId, startDate, endDate);
+                } else {
+                    window.loanListData.selectedEmployeeId = null;
+                    document.getElementById('balanceDisplay').style.display = 'none';
+                    // Show message that employee must be selected
+                    document.getElementById('loansTableBody').innerHTML =
+                        '<tr><td colspan="8" class="text-center"><i class="fas fa-info-circle"></i> Please select an employee to view loan transactions</td></tr>';
                     hideLoading();
-                    if (result.success) {
-                        displayLoans(result.data);
-                    } else {
-                        showError('Failed to load loan history: ' + result.error);
-                    }
-                })
-                .withFailureHandler(function(error) {
-                    hideLoading();
-                    showError('Error: ' + error.message);
-                })
-                .getLoanHistory(employeeId, startDate, endDate);
-        }
+                }
+            };
 
-        function displayLoans(loans) {
+            window.loadEmployeeLoanHistory = function(employeeId, startDate, endDate) {
+                // Get employee name
+                const employee = window.loanListData.allEmployees.find(emp => emp.id === employeeId);
+                const employeeName = employee ? employee.REFNAME : 'Unknown';
+
+                // Load current balance
+                google.script.run
+                    .withSuccessHandler(function(result) {
+                        if (result.success) {
+                            document.getElementById('selectedEmployeeName').textContent = employeeName;
+                            document.getElementById('currentBalance').textContent = formatCurrency(result.data);
+                            document.getElementById('balanceDisplay').style.display = 'block';
+                        }
+                    })
+                    .getCurrentLoanBalance(employeeId);
+
+                // Load transaction history
+                google.script.run
+                    .withSuccessHandler(function(result) {
+                        hideLoading();
+                        if (result.success) {
+                            displayLoans(result.data);
+                        } else {
+                            showError('Failed to load loan history: ' + result.error);
+                        }
+                    })
+                    .withFailureHandler(function(error) {
+                        hideLoading();
+                        showError('Error: ' + error.message);
+                    })
+                    .getLoanHistory(employeeId, startDate, endDate);
+            };
+
+            window.displayLoans = function(loans) {
             const tbody = document.getElementById('loansTableBody');
 
             if (loans.length === 0) {
@@ -192,31 +196,32 @@
                         <td><small>${loan.Notes || '-'}</small></td>
                     </tr>
                 `;
-            }).join('');
-        }
+                }).join('');
+            };
 
-        function filterLoans() {
-            loadLoans();
-        }
+            window.filterLoans = function() {
+                loadLoans();
+            };
 
-        function clearFilters() {
-            document.getElementById('filterEmployee').value = '';
-            document.getElementById('filterStartDate').value = '';
-            document.getElementById('filterEndDate').value = '';
-            document.getElementById('balanceDisplay').style.display = 'none';
+            window.clearFilters = function() {
+                document.getElementById('filterEmployee').value = '';
+                document.getElementById('filterStartDate').value = '';
+                document.getElementById('filterEndDate').value = '';
+                document.getElementById('balanceDisplay').style.display = 'none';
+                document.getElementById('loansTableBody').innerHTML =
+                    '<tr><td colspan="8" class="text-center"><i class="fas fa-info-circle"></i> Please select an employee to view loan transactions</td></tr>';
+            };
+
+            window.showLoanForm = function() {
+                loadModule('loanForm');
+            };
+
+            // Load employees on page load
+            loadEmployees();
+            // Show initial message
             document.getElementById('loansTableBody').innerHTML =
                 '<tr><td colspan="8" class="text-center"><i class="fas fa-info-circle"></i> Please select an employee to view loan transactions</td></tr>';
-        }
-
-        function showLoanForm() {
-            loadModule('loanForm');
-        }
-
-        // Load employees on page load
-        loadEmployees();
-        // Show initial message
-        document.getElementById('loansTableBody').innerHTML =
-            '<tr><td colspan="8" class="text-center"><i class="fas fa-info-circle"></i> Please select an employee to view loan transactions</td></tr>';
+        })();
     </script>
 </body>
 </html>
