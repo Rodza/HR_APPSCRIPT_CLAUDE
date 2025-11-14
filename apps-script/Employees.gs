@@ -43,6 +43,48 @@ function testSimpleResponse() {
   return result;
 }
 
+/**
+ * Minimal test of listEmployees - just the basics
+ * @returns {Object} Response
+ */
+function testListEmployeesMinimal() {
+  console.log('=== testListEmployeesMinimal START ===');
+
+  try {
+    console.log('Step 1: Calling formatResponse directly...');
+    var testResponse = formatResponse(true, [], null);
+    console.log('formatResponse result:', JSON.stringify(testResponse));
+
+    console.log('Step 2: Trying to get sheets...');
+    var sheets = getSheets();
+    console.log('Got sheets:', Object.keys(sheets).join(', '));
+
+    console.log('Step 3: Checking empdetails...');
+    if (!sheets.empdetails) {
+      console.error('No empdetails sheet!');
+      return formatResponse(false, [], 'No empdetails sheet');
+    }
+    console.log('empdetails exists:', sheets.empdetails.getName());
+
+    console.log('Step 4: Getting data...');
+    var data = sheets.empdetails.getDataRange().getValues();
+    console.log('Got', data.length, 'rows');
+
+    console.log('Step 5: Creating response...');
+    var response = formatResponse(true, [{test: 'data'}], null);
+    console.log('Response created:', JSON.stringify(response));
+
+    console.log('=== testListEmployeesMinimal END ===');
+    return response;
+
+  } catch (error) {
+    console.error('=== testListEmployeesMinimal ERROR ===');
+    console.error('Error:', error.toString());
+    console.error('Stack:', error.stack);
+    return formatResponse(false, [], error.toString());
+  }
+}
+
 // ============================================================================
 // LIST EMPLOYEES
 // ============================================================================
