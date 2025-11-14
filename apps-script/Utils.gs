@@ -524,66 +524,6 @@ function getCurrentTimestamp() {
 }
 
 /**
- * Parse date value to Date object
- * Handles Date objects, strings, and numbers
- *
- * @param {Date|string|number} dateValue - Date value to parse
- * @returns {Date} Parsed date object
- * @throws {Error} If date format is invalid
- */
-function parseDate(dateValue) {
-  // Return as-is if already a Date object
-  if (dateValue instanceof Date) {
-    return dateValue;
-  }
-
-  // Parse string
-  if (typeof dateValue === 'string') {
-    var parsed = new Date(dateValue);
-    if (isNaN(parsed.getTime())) {
-      throw new Error('Invalid date string: ' + dateValue);
-    }
-    return parsed;
-  }
-
-  // Parse timestamp
-  if (typeof dateValue === 'number') {
-    var parsed = new Date(dateValue);
-    if (isNaN(parsed.getTime())) {
-      throw new Error('Invalid date timestamp: ' + dateValue);
-    }
-    return parsed;
-  }
-
-  // Handle null/undefined
-  if (dateValue === null || dateValue === undefined) {
-    throw new Error('Date value is required');
-  }
-
-  throw new Error('Invalid date format: ' + typeof dateValue);
-}
-
-/**
- * Calculate number of days between two dates
- *
- * @param {Date|string} startDate - Start date
- * @param {Date|string} endDate - End date
- * @returns {number} Number of days between dates (can be negative)
- */
-function calculateDaysBetween(startDate, endDate) {
-  var start = parseDate(startDate);
-  var end = parseDate(endDate);
-
-  // Get time difference in milliseconds
-  var timeDiff = end.getTime() - start.getTime();
-
-  // Convert to days
-  var daysDiff = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
-
-  return daysDiff;
-}
-
-/**
  * Find column index by header name (case-insensitive)
  * Alias for indexOf() for consistency with other modules
  *
@@ -606,6 +546,15 @@ function findColumnIndex(headers, columnName) {
  */
 function generateId() {
   return Utilities.getUuid().substring(0, 8);
+}
+
+/**
+ * Generate full UUID
+ *
+ * @returns {string} Full UUID string
+ */
+function generateFullUUID() {
+  return Utilities.getUuid();
 }
 
 // ============================================================================

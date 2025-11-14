@@ -320,6 +320,9 @@
                 case 'loans':
                     loadLoansModule();
                     break;
+                case 'loanForm':
+                    loadLoanFormModule(moduleData);
+                    break;
                 case 'timesheets':
                     loadTimesheetsModule();
                     break;
@@ -591,6 +594,29 @@
                 })
                 .withFailureHandler(handleError)
                 .include('LoanList');
+        }
+
+        function loadLoanFormModule(data) {
+            // Store form parameters for the loan form to access
+            if (data) {
+                window.loanFormParams = data;
+            } else {
+                window.loanFormParams = {};
+            }
+
+            google.script.run
+                .withSuccessHandler(function(html) {
+                    if (html) {
+                        const contentArea = document.getElementById('contentArea');
+                        contentArea.innerHTML = html;
+                        executeModuleScripts(contentArea);
+                    } else {
+                        showError('Failed to load Loan Form module');
+                    }
+                    hideLoading();
+                })
+                .withFailureHandler(handleError)
+                .include('LoanForm');
         }
 
         function loadTimesheetsModule() {
