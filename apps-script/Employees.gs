@@ -452,11 +452,17 @@ function getEmployeeById(id) {
       if (data[i][idCol] === id) {
         var employee = buildObjectFromRow(data[i], headers);
         console.log('✓ Employee found at row', (i + 1) + ':', employee.REFNAME);
+
+        // Step 5: Sanitize employee data for web serialization
+        console.log('Step 5: Sanitizing employee data for web...');
+        var sanitizedEmployee = sanitizeEmployeeForWeb(employee);
+        console.log('✓ Employee data sanitized');
+
         logSuccess('Found employee: ' + employee.REFNAME);
         logFunctionEnd('getEmployeeById', {found: true});
 
         console.log('=== getEmployeeById() END - SUCCESS ===');
-        return formatResponse(true, employee, null);
+        return formatResponse(true, sanitizedEmployee, null);
       }
     }
 

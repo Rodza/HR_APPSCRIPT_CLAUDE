@@ -207,12 +207,21 @@
     </div>
 
     <script>
-        // Check if editing existing employee
-        const editEmployeeId = sessionStorage.getItem('editEmployeeId');
+        /**
+         * Initialize the employee form
+         * This is called automatically when the module loads
+         */
+        function initializeEmployeeForm() {
+            // Check if editing existing employee
+            const editEmployeeId = sessionStorage.getItem('editEmployeeId');
 
-        if (editEmployeeId) {
-            document.getElementById('formTitle').textContent = 'Edit Employee';
-            loadEmployeeForEdit(editEmployeeId);
+            if (editEmployeeId) {
+                console.log('Edit mode detected, loading employee:', editEmployeeId);
+                document.getElementById('formTitle').textContent = 'Edit Employee';
+                loadEmployeeForEdit(editEmployeeId);
+            } else {
+                console.log('Add mode - no employee ID in sessionStorage');
+            }
         }
 
         function loadEmployeeForEdit(employeeId) {
@@ -327,6 +336,14 @@
             const month = String(d.getMonth() + 1).padStart(2, '0');
             const day = String(d.getDate()).padStart(2, '0');
             return `${year}-${month}-${day}`;
+        }
+
+        // Initialize form when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initializeEmployeeForm);
+        } else {
+            // DOM is already loaded (dynamic loading)
+            initializeEmployeeForm();
         }
     </script>
 </body>
