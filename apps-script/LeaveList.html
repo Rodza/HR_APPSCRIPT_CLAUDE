@@ -79,8 +79,9 @@
     </div>
 
     <script>
-        var allLeaveRecords = [];
-        var filteredLeaveRecords = [];
+        // Use window properties to avoid re-declaration errors when module reloads
+        window.allLeaveRecords = [];
+        window.filteredLeaveRecords = [];
 
         function loadLeave() {
             showLoading();
@@ -88,8 +89,8 @@
                 .withSuccessHandler(function(result) {
                     hideLoading();
                     if (result.success) {
-                        allLeaveRecords = result.data;
-                        filteredLeaveRecords = result.data;
+                        window.allLeaveRecords = result.data;
+                        window.filteredLeaveRecords = result.data;
                         displayLeave(result.data);
                     } else {
                         showError('Failed to load leave records: ' + result.error);
@@ -135,7 +136,7 @@
             const startDate = document.getElementById('filterStartDate').value;
             const endDate = document.getElementById('filterEndDate').value;
 
-            filteredLeaveRecords = allLeaveRecords.filter(leave => {
+            window.filteredLeaveRecords = window.allLeaveRecords.filter(leave => {
                 const matchesSearch = !searchText ||
                     (leave['EMPLOYEE NAME'] && leave['EMPLOYEE NAME'].toLowerCase().includes(searchText));
 
@@ -157,7 +158,7 @@
                 return matchesSearch && matchesReason && matchesDateRange;
             });
 
-            displayLeave(filteredLeaveRecords);
+            displayLeave(window.filteredLeaveRecords);
         }
 
         function clearFilters() {
