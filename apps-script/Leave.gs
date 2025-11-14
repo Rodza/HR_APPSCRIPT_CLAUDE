@@ -140,7 +140,7 @@ function getLeaveHistory(employeeName) {
       const rowEmpName = row[empNameCol];
 
       if (rowEmpName === employeeName) {
-        records.push(rowToObject(row, headers));
+        records.push(buildObjectFromRow(row, headers));
       }
     }
 
@@ -191,7 +191,7 @@ function listLeave(filters) {
     // Convert all rows to objects
     let records = [];
     for (let i = 1; i < data.length; i++) {
-      records.push(rowToObject(data[i], headers));
+      records.push(buildObjectFromRow(data[i], headers));
     }
 
     // Apply filters if provided

@@ -194,7 +194,7 @@ function getPayslip(recordNumber) {
       throw new Error('Payslip not found: ' + recordNumber);
     }
 
-    const payslip = rowToObject(row, headers);
+    const payslip = buildObjectFromRow(row, headers);
 
     return { success: true, data: payslip };
 
@@ -229,7 +229,7 @@ function updatePayslip(recordNumber, data) {
     }
 
     // Get current payslip
-    const currentPayslip = rowToObject(rows[rowIndex], headers);
+    const currentPayslip = buildObjectFromRow(rows[rowIndex], headers);
 
     // Merge updates
     const updatedPayslip = Object.assign({}, currentPayslip, data);
@@ -279,7 +279,7 @@ function listPayslips(filters = {}) {
     let rows = allData.slice(1);
 
     // Convert to objects
-    let payslips = rows.map(row => rowToObject(row, headers));
+    let payslips = rows.map(row => buildObjectFromRow(row, headers));
 
     // Apply filters
     if (filters.employeeName) {

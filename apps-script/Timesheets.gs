@@ -331,7 +331,7 @@ function approveTimesheet(id) {
 
     for (let i = 1; i < sheetData.length; i++) {
       if (sheetData[i][idCol] === id) {
-        timesheetRecord = rowToObject(sheetData[i], headers);
+        timesheetRecord = buildObjectFromRow(sheetData[i], headers);
         rowIndex = i + 1;
         break;
       }
@@ -520,7 +520,7 @@ function listPendingTimesheets(filters) {
     // Convert all rows to objects
     let records = [];
     for (let i = 1; i < data.length; i++) {
-      records.push(rowToObject(data[i], headers));
+      records.push(buildObjectFromRow(data[i], headers));
     }
 
     // Apply filters if provided
