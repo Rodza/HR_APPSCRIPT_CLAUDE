@@ -18,7 +18,7 @@
 <body>
     <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
-            <h5><i class="fas fa-calendar-plus"></i> Record Leave</h5>
+            <h5 id="formTitle"><i class="fas fa-calendar-plus"></i> Record Leave</h5>
             <button class="btn btn-secondary btn-sm" onclick="loadModule('leave')">
                 <i class="fas fa-arrow-left"></i> Back to List
             </button>
@@ -79,8 +79,8 @@
                 </div>
 
                 <div class="d-flex gap-2">
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-save"></i> Save Leave
+                    <button type="submit" class="btn btn-primary" id="submitBtn">
+                        <i class="fas fa-save"></i> <span id="submitBtnText">Save Leave</span>
                     </button>
                     <button type="button" class="btn btn-secondary" onclick="loadModule('leave')">
                         <i class="fas fa-times"></i> Cancel
@@ -91,6 +91,60 @@
     </div>
 
     <script>
+        // Edit mode state
+        var editMode = false;
+        var editRowNumber = null;
+
+        // Check if we're in edit mode (passed from LeaveList)
+        function initializeForm() {
+            // Get parameters if passed
+            var params = window.leaveFormParams || {};
+
+            if (params.mode === 'edit' && params.record && params.rowNumber) {
+                editMode = true;
+                editRowNumber = params.rowNumber;
+
+                // Update UI for edit mode
+                document.getElementById('formTitle').innerHTML = '<i class="fas fa-edit"></i> Edit Leave Record';
+                document.getElementById('submitBtnText').textContent = 'Update Leave';
+
+                // Pre-populate form fields
+                setTimeout(function() {
+                    populateFormForEdit(params.record);
+                }, 500); // Wait for employees to load
+            }
+        }
+
+        // Populate form fields for editing
+        function populateFormForEdit(record) {
+            document.getElementById('employeeName').value = record['EMPLOYEE NAME'] || '';
+
+            // Format dates for input (YYYY-MM-DD)
+            if (record['STARTDATE.LEAVE']) {
+                var startDate = new Date(record['STARTDATE.LEAVE']);
+                document.getElementById('startDate').value = formatDateForInput(startDate);
+            }
+
+            if (record['RETURNDATE.LEAVE']) {
+                var returnDate = new Date(record['RETURNDATE.LEAVE']);
+                document.getElementById('returnDate').value = formatDateForInput(returnDate);
+            }
+
+            document.getElementById('reason').value = record['REASON'] || '';
+            document.getElementById('notes').value = record['NOTES'] || '';
+
+            // Calculate total days
+            calculateTotalDays();
+        }
+
+        // Format date as YYYY-MM-DD for input fields
+        function formatDateForInput(date) {
+            var year = date.getFullYear();
+            var month = String(date.getMonth() + 1).padStart(2, '0');
+            var day = String(date.getDate()).padStart(2, '0');
+            return year + '-' + month + '-' + day;
+        }
+
         // Load employees for dropdown
         function loadEmployees() {
             google.script.run
@@ -149,27 +203,52 @@
                 notes: document.getElementById('notes').value.trim() || null
             };
 
-            google.script.run
-                .withSuccessHandler(function(result) {
-                    hideLoading();
-                    if (result.success) {
-                        showSuccess('Leave record saved successfully');
-                        setTimeout(function() {
-                            loadModule('leave');
-                        }, 1500);
-                    } else {
-                        showError(result.error);
-                    }
-                })
-                .withFailureHandler(function(error) {
-                    hideLoading();
-                    showError('Error: ' + error.message);
-                })
-                .addLeave(data);
+            if (editMode && editRowNumber) {
+                // Edit mode - call editLeave
+                google.script.run
+                    .withSuccessHandler(function(result) {
+                        hideLoading();
+                        if (result.success) {
+                            showSuccess('Leave record updated successfully');
+                            setTimeout(function() {
+                                loadModule('leave');
+                            }, 1500);
+                        } else {
+                            showError(result.error);
+                        }
+                    })
+                    .withFailureHandler(function(error) {
+                        hideLoading();
+                        showError('Error: ' + error.message);
+                    })
+                    .editLeave(editRowNumber, data);
+            } else {
+                // Add mode - call addLeave
+                google.script.run
+                    .withSuccessHandler(function(result) {
+                        hideLoading();
+                        if (result.success) {
+                            showSuccess('Leave record saved successfully');
+                            setTimeout(function() {
+                                loadModule('leave');
+                            }, 1500);
+                        } else {
+                            showError(result.error);
+                        }
+                    })
+                    .withFailureHandler(function(error) {
+                        hideLoading();
+                        showError('Error: ' + error.message);
+                    })
+                    .addLeave(data);
+            }
         }
 
         // Load employees on page load
         loadEmployees();
+
+        // Initialize form (check for edit mode)
+        initializeForm();
     </script>
 </body>
 </html>
