@@ -79,14 +79,17 @@
     </div>
 
     <script>
-        // Initialize data arrays - safe for re-execution
-        if (!window.leaveModuleData) {
-            window.leaveModuleData = {};
-        }
-        window.leaveModuleData.allRecords = [];
-        window.leaveModuleData.filteredRecords = [];
+        // Wrap in IIFE to prevent re-declaration errors on module reload
+        (function() {
+            // Initialize data storage on window
+            if (!window.leaveModuleData) {
+                window.leaveModuleData = {};
+            }
+            window.leaveModuleData.allRecords = [];
+            window.leaveModuleData.filteredRecords = [];
 
-        function loadLeave() {
+            // Assign functions to window to make them globally accessible and prevent redeclaration errors
+            window.loadLeave = function() {
             showLoading();
             google.script.run
                 .withSuccessHandler(function(result) {
@@ -104,9 +107,9 @@
                     showError('Error: ' + error.message);
                 })
                 .listLeave({});
-        }
+            };
 
-        function displayLeave(records) {
+            window.displayLeave = function(records) {
             const tbody = document.getElementById('leaveTableBody');
 
             if (records.length === 0) {
@@ -131,9 +134,9 @@
                     </tr>
                 `;
             }).join('');
-        }
+            };
 
-        function filterLeave() {
+            window.filterLeave = function() {
             const searchText = document.getElementById('searchEmployee').value.toLowerCase();
             const reason = document.getElementById('filterReason').value;
             const startDate = document.getElementById('filterStartDate').value;
@@ -162,22 +165,23 @@
             });
 
             displayLeave(window.leaveModuleData.filteredRecords);
-        }
+            };
 
-        function clearFilters() {
+            window.clearFilters = function() {
             document.getElementById('searchEmployee').value = '';
             document.getElementById('filterReason').value = '';
             document.getElementById('filterStartDate').value = '';
             document.getElementById('filterEndDate').value = '';
             filterLeave();
-        }
+            };
 
-        function showLeaveForm() {
-            loadModule('leaveForm');
-        }
+            window.showLeaveForm = function() {
+                loadModule('leaveForm');
+            };
 
-        // Load leave records on page load
-        loadLeave();
+            // Load leave records on page load
+            window.loadLeave();
+        })();
     </script>
 </body>
 </html>
