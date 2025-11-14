@@ -542,7 +542,20 @@ function createEmployee(employeeData) {
 
     // Step 1: Validate required fields
     console.log('Step 1: Validating required fields...');
-    var requiredFields = EMPLOYEE_REQUIRED_FIELDS;
+    // Defensive check: use global constant if available, otherwise use fallback
+    var requiredFields = (typeof EMPLOYEE_REQUIRED_FIELDS !== 'undefined')
+      ? EMPLOYEE_REQUIRED_FIELDS
+      : [
+          'EMPLOYEE NAME',
+          'SURNAME',
+          'EMPLOYER',
+          'HOURLY RATE',
+          'ID NUMBER',
+          'CONTACT NUMBER',
+          'ADDRESS',
+          'EMPLOYMENT STATUS',
+          'ClockInRef'
+        ];
     var missingFields = [];
 
     for (var i = 0; i < requiredFields.length; i++) {
