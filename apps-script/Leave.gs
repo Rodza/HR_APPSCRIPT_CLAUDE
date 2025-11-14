@@ -143,7 +143,13 @@ function getLeaveHistory(employeeName) {
       const rowEmpName = row[empNameCol];
 
       if (rowEmpName === employeeName) {
-        records.push(buildObjectFromRow(row, headers));
+        const record = buildObjectFromRow(row, headers);
+        // Only include records with valid required date fields
+        if (record['STARTDATE.LEAVE'] && record['RETURNDATE.LEAVE']) {
+          records.push(record);
+        } else {
+          Logger.log('⚠️ Skipping record with missing dates for employee: ' + employeeName);
+        }
       }
     }
 
@@ -203,10 +209,21 @@ function listLeave(filters) {
     const data = leaveSheet.getDataRange().getValues();
     const headers = data[0];
 
-    // Convert all rows to objects
+    // Convert all rows to objects and filter out records with missing required date fields
     let records = [];
+    let skippedOnLoad = 0;
     for (let i = 1; i < data.length; i++) {
-      records.push(buildObjectFromRow(data[i], headers));
+      const record = buildObjectFromRow(data[i], headers);
+      // Only include records with valid required date fields
+      if (record['STARTDATE.LEAVE'] && record['RETURNDATE.LEAVE']) {
+        records.push(record);
+      } else {
+        skippedOnLoad++;
+      }
+    }
+
+    if (skippedOnLoad > 0) {
+      Logger.log('⚠️ Skipped ' + skippedOnLoad + ' records with missing dates on initial load');
     }
 
     // Apply filters if provided
@@ -236,7 +253,7 @@ function listLeave(filters) {
       }
     }
 
-    // Sort by start date (descending - most recent first)
+    // Sort records by start date (descending - most recent first)
     records.sort((a, b) => {
       const dateA = parseDate(a['STARTDATE.LEAVE']);
       const dateB = parseDate(b['STARTDATE.LEAVE']);
