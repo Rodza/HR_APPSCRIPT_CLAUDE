@@ -418,9 +418,22 @@
             google.script.run
                 .withSuccessHandler(function(html) {
                     if (html) {
-                        document.getElementById('contentArea').innerHTML = html;
-                        // FIX: Initialize any scripts in the loaded HTML
-                        initializeLoadedContent();
+                        const contentArea = document.getElementById('contentArea');
+                        contentArea.innerHTML = html;
+
+                        // CRITICAL FIX: Extract and execute scripts from loaded HTML
+                        const scripts = contentArea.querySelectorAll('script');
+                        scripts.forEach(function(oldScript) {
+                            const newScript = document.createElement('script');
+                            if (oldScript.src) {
+                                newScript.src = oldScript.src;
+                            } else {
+                                newScript.textContent = oldScript.textContent;
+                            }
+                            oldScript.parentNode.replaceChild(newScript, oldScript);
+                        });
+
+                        console.log('Employee module loaded and scripts executed');
                     } else {
                         showError('Failed to load Employees module');
                     }
@@ -436,8 +449,9 @@
             google.script.run
                 .withSuccessHandler(function(html) {
                     if (html) {
-                        document.getElementById('contentArea').innerHTML = html;
-                        initializeLoadedContent();
+                        const contentArea = document.getElementById('contentArea');
+                        contentArea.innerHTML = html;
+                        executeModuleScripts(contentArea);
                     } else {
                         showError('Failed to load Leave module');
                     }
@@ -451,8 +465,9 @@
             google.script.run
                 .withSuccessHandler(function(html) {
                     if (html) {
-                        document.getElementById('contentArea').innerHTML = html;
-                        initializeLoadedContent();
+                        const contentArea = document.getElementById('contentArea');
+                        contentArea.innerHTML = html;
+                        executeModuleScripts(contentArea);
                     } else {
                         showError('Failed to load Loans module');
                     }
@@ -466,8 +481,9 @@
             google.script.run
                 .withSuccessHandler(function(html) {
                     if (html) {
-                        document.getElementById('contentArea').innerHTML = html;
-                        initializeLoadedContent();
+                        const contentArea = document.getElementById('contentArea');
+                        contentArea.innerHTML = html;
+                        executeModuleScripts(contentArea);
                     } else {
                         showError('Failed to load Timesheets module');
                     }
@@ -481,8 +497,9 @@
             google.script.run
                 .withSuccessHandler(function(html) {
                     if (html) {
-                        document.getElementById('contentArea').innerHTML = html;
-                        initializeLoadedContent();
+                        const contentArea = document.getElementById('contentArea');
+                        contentArea.innerHTML = html;
+                        executeModuleScripts(contentArea);
                     } else {
                         showError('Failed to load Payroll module');
                     }
@@ -496,8 +513,9 @@
             google.script.run
                 .withSuccessHandler(function(html) {
                     if (html) {
-                        document.getElementById('contentArea').innerHTML = html;
-                        initializeLoadedContent();
+                        const contentArea = document.getElementById('contentArea');
+                        contentArea.innerHTML = html;
+                        executeModuleScripts(contentArea);
                     } else {
                         showError('Failed to load Reports module');
                     }
@@ -507,19 +525,18 @@
                 .include('ReportsMenu');
         }
 
-        // FIX: Initialize dynamically loaded content
-        function initializeLoadedContent() {
-            // Re-run any initialization scripts for dynamically loaded content
-            // This ensures MutationObserver and other scripts work properly
-            
-            // Check if there's a loadEmployees function and call it
-            if (typeof loadEmployees === 'function') {
-                try {
-                    loadEmployees();
-                } catch (e) {
-                    console.error('Error initializing employees:', e);
+        // Execute scripts from dynamically loaded modules
+        function executeModuleScripts(container) {
+            const scripts = container.querySelectorAll('script');
+            scripts.forEach(function(oldScript) {
+                const newScript = document.createElement('script');
+                if (oldScript.src) {
+                    newScript.src = oldScript.src;
+                } else {
+                    newScript.textContent = oldScript.textContent;
                 }
-            }
+                oldScript.parentNode.replaceChild(newScript, oldScript);
+            });
 
             // Initialize any Bootstrap components
             var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
