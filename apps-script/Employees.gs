@@ -482,6 +482,85 @@ function getEmployeeById(id) {
 }
 
 // ============================================================================
+// GET EMPLOYEE BY NAME
+// ============================================================================
+
+/**
+ * Get a single employee by REFNAME (full name)
+ * @param {string} name - Employee REFNAME (e.g., "John Smith")
+ * @returns {Object} Response with employee data
+ */
+function getEmployeeByName(name) {
+  try {
+    console.log('=== getEmployeeByName() START ===');
+    console.log('Looking for employee name:', name);
+    logFunctionStart('getEmployeeByName', {name: name});
+
+    if (!name) {
+      throw new Error('Employee name is required');
+    }
+
+    // Step 1: Get sheets
+    console.log('Step 1: Getting sheets...');
+    var sheets = getSheets();
+    var empSheet = sheets.empdetails;
+
+    if (!empSheet) {
+      throw new Error('Employee Details sheet not found');
+    }
+    console.log('✓ Employee sheet found:', empSheet.getName());
+
+    // Step 2: Get data
+    console.log('Step 2: Getting data...');
+    var data = empSheet.getDataRange().getValues();
+    var headers = data[0];
+    console.log('✓ Data retrieved:', data.length, 'rows');
+
+    // Step 3: Find REFNAME column
+    console.log('Step 3: Finding REFNAME column...');
+    var refNameCol = indexOf(headers, 'REFNAME');
+
+    if (refNameCol === -1) {
+      throw new Error('REFNAME column not found in sheet');
+    }
+    console.log('✓ REFNAME column index:', refNameCol);
+
+    // Step 4: Search for employee by name
+    console.log('Step 4: Searching for employee...');
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][refNameCol] === name) {
+        var employee = buildObjectFromRow(data[i], headers);
+        console.log('✓ Employee found at row', (i + 1) + ':', employee.REFNAME);
+
+        // Step 5: Sanitize employee data for web serialization
+        console.log('Step 5: Sanitizing employee data for web...');
+        var sanitizedEmployee = sanitizeEmployeeForWeb(employee);
+        console.log('✓ Employee data sanitized');
+
+        logSuccess('Found employee: ' + employee.REFNAME);
+        logFunctionEnd('getEmployeeByName', {found: true});
+
+        console.log('=== getEmployeeByName() END - SUCCESS ===');
+        return formatResponse(true, sanitizedEmployee, null);
+      }
+    }
+
+    console.log('✗ Employee not found with name:', name);
+    logWarning('Employee not found: ' + name);
+    logFunctionEnd('getEmployeeByName', {found: false});
+
+    console.log('=== getEmployeeByName() END - NOT FOUND ===');
+    return formatResponse(false, null, 'Employee not found');
+
+  } catch (error) {
+    console.error('=== getEmployeeByName() ERROR ===');
+    console.error('Full error:', error.toString());
+    logError('Failed to get employee by name', error);
+    return formatResponse(false, null, error.toString());
+  }
+}
+
+// ============================================================================
 // FIELD NAME TRANSFORMATION
 // ============================================================================
 
