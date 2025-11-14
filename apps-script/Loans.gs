@@ -252,7 +252,7 @@ function getLoanHistory(employeeId, startDate, endDate) {
       const rowEmpId = row[empIdCol];
 
       if (rowEmpId === employeeId) {
-        const record = rowToObject(row, headers);
+        const record = buildObjectFromRow(row, headers);
 
         // Apply date filters
         if (filterStartDate || filterEndDate) {
@@ -485,7 +485,7 @@ function findLoanRecordBySalaryLink(recordNumber) {
       const searchValue = String(recordNumber);
 
       if (salaryLink === searchValue) {
-        const record = rowToObject(row, headers);
+        const record = buildObjectFromRow(row, headers);
         record._rowIndex = i + 1;  // Store row index for updates
         return { success: true, data: record };
       }
