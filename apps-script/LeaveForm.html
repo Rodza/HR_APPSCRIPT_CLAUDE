@@ -108,10 +108,7 @@
                 document.getElementById('formTitle').innerHTML = '<i class="fas fa-edit"></i> Edit Leave Record';
                 document.getElementById('submitBtnText').textContent = 'Update Leave';
 
-                // Pre-populate form fields
-                setTimeout(function() {
-                    populateFormForEdit(params.record);
-                }, 500); // Wait for employees to load
+                // Form will be populated after employees load (see loadEmployees success handler)
             }
         }
 
@@ -156,6 +153,11 @@
                                 .filter(emp => !emp['TERMINATION DATE']) // Only active employees
                                 .map(emp => `<option value="${emp.REFNAME}">${emp.REFNAME}</option>`)
                                 .join('');
+
+                        // If in edit mode, populate form now that employees are loaded
+                        if (editMode && window.leaveFormParams && window.leaveFormParams.record) {
+                            populateFormForEdit(window.leaveFormParams.record);
+                        }
                     } else {
                         showError('Failed to load employees: ' + result.error);
                     }
