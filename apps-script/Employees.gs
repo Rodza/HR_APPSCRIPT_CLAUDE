@@ -90,19 +90,181 @@ function testListEmployeesMinimal() {
 // ============================================================================
 
 /**
+ * Sanitize employee object for serialization to web app
+ * Converts dates, handles null values, ensures all data is serializable
+ * @param {Object} emp - Employee object from sheet
+ * @returns {Object} Sanitized employee object
+ */
+function sanitizeEmployeeForWeb(emp) {
+  var sanitized = {};
+
+  for (var key in emp) {
+    if (emp.hasOwnProperty(key)) {
+      var value = emp[key];
+
+      // Convert Date objects to ISO strings
+      if (value instanceof Date) {
+        sanitized[key] = value.toISOString();
+      }
+      // Convert null/undefined to empty string
+      else if (value === null || value === undefined) {
+        sanitized[key] = '';
+      }
+      // Keep numbers, strings, booleans as-is
+      else if (typeof value === 'number' || typeof value === 'string' || typeof value === 'boolean') {
+        sanitized[key] = value;
+      }
+      // Convert everything else to string
+      else {
+        sanitized[key] = String(value);
+      }
+    }
+  }
+
+  return sanitized;
+}
+
+/**
  * List all employees with optional filters
  * @param {Object} filters - Optional filters {employer, status, search, activeOnly}
  * @returns {Object} Response with employee list
  */
 function listEmployees(filters) {
-  // ULTRA-SIMPLE VERSION - Test if function even executes
-  console.log('LISTEMPLOYEES CALLED - ULTRA SIMPLE VERSION');
+  try {
+    console.log('=== listEmployees() START (from web app) ===');
+    console.log('Filters received:', filters);
 
-  return {
-    success: true,
-    data: [{name: 'Hardcoded Test Employee'}],
-    error: null
-  };
+    // Step 1: Get sheets
+    console.log('Step 1: Getting sheets...');
+    var sheets = getSheets();
+    console.log('✓ Sheets retrieved');
+
+    // Step 2: Get employee sheet
+    console.log('Step 2: Getting employee sheet...');
+    var empSheet = sheets.empdetails;
+
+    if (!empSheet) {
+      console.error('✗ Employee Details sheet not found!');
+      console.error('Available sheets:', Object.keys(sheets));
+      throw new Error('Employee Details sheet not found');
+    }
+    console.log('✓ Employee sheet found:', empSheet.getName());
+
+    // Step 3: Get data range
+    console.log('Step 3: Getting data range...');
+    var data = empSheet.getDataRange().getValues();
+    console.log('✓ Data retrieved:', data.length, 'rows total');
+
+    if (data.length === 0) {
+      console.warn('Sheet is empty!');
+      return formatResponse(true, [], null);
+    }
+
+    // Step 4: Extract headers
+    console.log('Step 4: Extracting headers...');
+    var headers = data[0];
+    console.log('✓ Headers:', headers.join(', '));
+
+    // Step 5: Build employee objects
+    console.log('Step 5: Building employee objects...');
+    var employees = [];
+    var skippedRows = 0;
+
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][0]) { // Skip empty rows
+        try {
+          var employee = buildObjectFromRow(data[i], headers);
+          employees.push(employee);
+        } catch (rowError) {
+          console.error('Error building row ' + (i + 1) + ':', rowError);
+          skippedRows++;
+        }
+      } else {
+        skippedRows++;
+      }
+    }
+
+    console.log('✓ Built', employees.length, 'employee objects');
+    if (skippedRows > 0) {
+      console.log('  Skipped', skippedRows, 'empty/invalid rows');
+    }
+
+    // Step 6: Apply filters
+    var originalCount = employees.length;
+
+    if (filters) {
+      console.log('Step 6: Applying filters...');
+
+      // Filter by employer
+      if (filters.employer && filters.employer !== '') {
+        console.log('  Filtering by employer:', filters.employer);
+        employees = filterByField(employees, 'EMPLOYER', filters.employer);
+        console.log('  After employer filter:', employees.length, 'employees');
+      }
+
+      // Filter by search (name)
+      if (filters.search && filters.search !== '') {
+        console.log('  Filtering by search term:', filters.search);
+        employees = filterBySearch(employees, 'REFNAME', filters.search);
+        console.log('  After search filter:', employees.length, 'employees');
+      }
+
+      // Filter by status
+      if (filters.status && filters.status !== '') {
+        console.log('  Filtering by status:', filters.status);
+        employees = filterByField(employees, 'EMPLOYMENT STATUS', filters.status);
+        console.log('  After status filter:', employees.length, 'employees');
+      }
+
+      // Filter active only
+      if (filters.activeOnly) {
+        console.log('  Filtering active only');
+        employees = employees.filter(function(emp) {
+          return emp['EMPLOYMENT STATUS'] !== 'Terminated' &&
+                 emp['EMPLOYMENT STATUS'] !== 'Resigned';
+        });
+        console.log('  After active filter:', employees.length, 'employees');
+      }
+    } else {
+      console.log('Step 6: No filters provided, returning all employees');
+    }
+
+    console.log('✓ Final count:', employees.length, '/', originalCount, 'employees');
+
+    // CRITICAL FIX: Sanitize employee data for web serialization
+    console.log('Step 7: Sanitizing employee data for web...');
+    var sanitizedEmployees = [];
+    for (var i = 0; i < employees.length; i++) {
+      try {
+        var sanitized = sanitizeEmployeeForWeb(employees[i]);
+        sanitizedEmployees.push(sanitized);
+      } catch (sanitizeError) {
+        console.error('Error sanitizing employee ' + (i + 1) + ':', sanitizeError);
+      }
+    }
+    console.log('✓ Sanitized', sanitizedEmployees.length, 'employees');
+
+    console.log('=== listEmployees() END - SUCCESS ===');
+    console.log('Preparing response...');
+
+    var response = formatResponse(true, sanitizedEmployees, null);
+    console.log('Response created:', response ? 'OK' : 'NULL');
+    console.log('Response.success:', response.success);
+    console.log('Response.data length:', response.data ? response.data.length : 'NULL');
+
+    return response;
+
+  } catch (error) {
+    console.error('=== listEmployees() ERROR ===');
+    console.error('Error type:', error.name);
+    console.error('Error message:', error.message);
+    console.error('Full error:', error.toString());
+    console.error('Stack trace:', error.stack);
+
+    var errorResponse = formatResponse(false, [], error.toString());
+    console.log('Error response created:', errorResponse ? 'OK' : 'NULL');
+    return errorResponse;
+  }
 }
 
 /**
