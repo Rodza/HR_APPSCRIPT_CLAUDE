@@ -523,17 +523,143 @@ function getCurrentTimestamp() {
   });
 }
 
+/**
+ * Parse date value to Date object
+ * Handles Date objects, strings, and numbers
+ *
+ * @param {Date|string|number} dateValue - Date value to parse
+ * @returns {Date} Parsed date object
+ * @throws {Error} If date format is invalid
+ */
+function parseDate(dateValue) {
+  // Return as-is if already a Date object
+  if (dateValue instanceof Date) {
+    return dateValue;
+  }
+
+  // Parse string
+  if (typeof dateValue === 'string') {
+    var parsed = new Date(dateValue);
+    if (isNaN(parsed.getTime())) {
+      throw new Error('Invalid date string: ' + dateValue);
+    }
+    return parsed;
+  }
+
+  // Parse timestamp
+  if (typeof dateValue === 'number') {
+    var parsed = new Date(dateValue);
+    if (isNaN(parsed.getTime())) {
+      throw new Error('Invalid date timestamp: ' + dateValue);
+    }
+    return parsed;
+  }
+
+  // Handle null/undefined
+  if (dateValue === null || dateValue === undefined) {
+    throw new Error('Date value is required');
+  }
+
+  throw new Error('Invalid date format: ' + typeof dateValue);
+}
+
+/**
+ * Calculate number of days between two dates
+ *
+ * @param {Date|string} startDate - Start date
+ * @param {Date|string} endDate - End date
+ * @returns {number} Number of days between dates (can be negative)
+ */
+function calculateDaysBetween(startDate, endDate) {
+  var start = parseDate(startDate);
+  var end = parseDate(endDate);
+
+  // Get time difference in milliseconds
+  var timeDiff = end.getTime() - start.getTime();
+
+  // Convert to days
+  var daysDiff = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
+
+  return daysDiff;
+}
+
+/**
+ * Find column index by header name (case-insensitive)
+ * Alias for indexOf() for consistency with other modules
+ *
+ * @param {Array} headers - Array of header values
+ * @param {string} columnName - Column name to find
+ * @returns {number} Column index or -1 if not found
+ */
+function findColumnIndex(headers, columnName) {
+  return indexOf(headers, columnName);
+}
+
 // ============================================================================
 // ID GENERATION
 // ============================================================================
 
 /**
  * Generate unique ID
- * 
+ *
  * @returns {string} 8-character unique ID
  */
 function generateId() {
   return Utilities.getUuid().substring(0, 8);
+}
+
+// ============================================================================
+// DATA SANITIZATION FOR WEB SERIALIZATION
+// ============================================================================
+
+/**
+ * Sanitize object for serialization to web app
+ * Converts dates, handles null values, ensures all data is serializable
+ * This is a general-purpose version that works for any object type
+ *
+ * @param {Object} obj - Object to sanitize
+ * @returns {Object} Sanitized object
+ */
+function sanitizeForWeb(obj) {
+  var sanitized = {};
+
+  for (var key in obj) {
+    if (obj.hasOwnProperty(key)) {
+      var value = obj[key];
+
+      // Convert Date objects to ISO strings
+      if (value instanceof Date) {
+        sanitized[key] = value.toISOString();
+      }
+      // Convert null/undefined to empty string
+      else if (value === null || value === undefined) {
+        sanitized[key] = '';
+      }
+      // Keep numbers, strings, booleans as-is
+      else if (typeof value === 'number' || typeof value === 'string' || typeof value === 'boolean') {
+        sanitized[key] = value;
+      }
+      // Recursively sanitize nested objects
+      else if (typeof value === 'object' && !Array.isArray(value)) {
+        sanitized[key] = sanitizeForWeb(value);
+      }
+      // Handle arrays
+      else if (Array.isArray(value)) {
+        sanitized[key] = value.map(function(item) {
+          if (typeof item === 'object') {
+            return sanitizeForWeb(item);
+          }
+          return item;
+        });
+      }
+      // Convert everything else to string
+      else {
+        sanitized[key] = String(value);
+      }
+    }
+  }
+
+  return sanitized;
 }
 
 // ============================================================================

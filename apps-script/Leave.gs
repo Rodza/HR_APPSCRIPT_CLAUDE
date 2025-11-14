@@ -90,10 +90,13 @@ function addLeave(data) {
       user: user
     };
 
+    // Sanitize result for web serialization (convert Date objects to ISO strings)
+    const sanitizedResult = sanitizeForWeb(result);
+
     Logger.log('✅ Leave record added successfully');
     Logger.log('========== ADD LEAVE COMPLETE ==========\n');
 
-    return { success: true, data: result };
+    return { success: true, data: sanitizedResult };
 
   } catch (error) {
     Logger.log('❌ ERROR in addLeave: ' + error.message);
@@ -144,10 +147,22 @@ function getLeaveHistory(employeeName) {
       }
     }
 
-    Logger.log('✅ Found ' + records.length + ' leave records');
+    // Sanitize records for web serialization (convert Date objects to ISO strings)
+    Logger.log('Sanitizing ' + records.length + ' records for web...');
+    const sanitizedRecords = [];
+    for (let i = 0; i < records.length; i++) {
+      try {
+        const sanitized = sanitizeForWeb(records[i]);
+        sanitizedRecords.push(sanitized);
+      } catch (sanitizeError) {
+        Logger.log('❌ Error sanitizing record ' + (i + 1) + ': ' + sanitizeError.message);
+      }
+    }
+
+    Logger.log('✅ Found ' + sanitizedRecords.length + ' leave records (after sanitization)');
     Logger.log('========== GET LEAVE HISTORY COMPLETE ==========\n');
 
-    return { success: true, data: records };
+    return { success: true, data: sanitizedRecords };
 
   } catch (error) {
     Logger.log('❌ ERROR in getLeaveHistory: ' + error.message);
@@ -228,10 +243,22 @@ function listLeave(filters) {
       return dateB - dateA;
     });
 
-    Logger.log('✅ Found ' + records.length + ' leave records (after filtering)');
+    // Sanitize records for web serialization (convert Date objects to ISO strings)
+    Logger.log('Sanitizing ' + records.length + ' records for web...');
+    const sanitizedRecords = [];
+    for (let i = 0; i < records.length; i++) {
+      try {
+        const sanitized = sanitizeForWeb(records[i]);
+        sanitizedRecords.push(sanitized);
+      } catch (sanitizeError) {
+        Logger.log('❌ Error sanitizing record ' + (i + 1) + ': ' + sanitizeError.message);
+      }
+    }
+
+    Logger.log('✅ Found ' + sanitizedRecords.length + ' leave records (after filtering and sanitization)');
     Logger.log('========== LIST LEAVE COMPLETE ==========\n');
 
-    return { success: true, data: records };
+    return { success: true, data: sanitizedRecords };
 
   } catch (error) {
     Logger.log('❌ ERROR in listLeave: ' + error.message);
