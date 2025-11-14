@@ -6,8 +6,8 @@
  * Leave Pay is entered manually in MASTERSALARY if applicable.
  *
  * Sheet: LEAVE
- * Columns: TIMESTAMP, EMPLOYEE NAME, STARTDATE.LEAVE, WEEK.DAY, RETURNDATE.LEAVE,
- *          TOTALDAYS.LEAVE, REASON, NOTES, USER, IMAGE
+ * Columns: TIMESTAMP, EMPLOYEE NAME, STARTDATE.LEAVE, RETURNDATE.LEAVE,
+ *          TOTALDAYS.LEAVE, REASON, NOTES, USER, IMAGE, WEEK.DAY
  *
  * WEEK.DAY - Automatically calculated from STARTDATE.LEAVE (e.g., "Monday", "Tuesday")
  */
@@ -87,13 +87,13 @@ function addLeave(data) {
       timestamp,                          // TIMESTAMP
       data.employeeName,                  // EMPLOYEE NAME
       startDate,                          // STARTDATE.LEAVE
-      weekDay,                            // WEEK.DAY (automatically calculated)
       returnDate,                         // RETURNDATE.LEAVE
       totalDays,                          // TOTALDAYS.LEAVE
       data.reason,                        // REASON
       data.notes || '',                   // NOTES
       user,                               // USER
-      data.imageUrl || ''                 // IMAGE
+      data.imageUrl || '',                // IMAGE
+      weekDay                             // WEEK.DAY (automatically calculated)
     ];
 
     // Append to sheet
@@ -305,6 +305,205 @@ function listLeave(filters) {
   }
 }
 
+// ==================== EDIT LEAVE RECORD ====================
+
+/**
+ * Edit an existing leave record
+ *
+ * @param {number} rowNumber - Row number of the leave record (1-based, excluding header)
+ * @param {Object} data - Updated leave data (only include fields to update)
+ * @param {string} [data.employeeName] - Employee REFNAME
+ * @param {Date|string} [data.startDate] - Leave start date
+ * @param {Date|string} [data.returnDate] - Expected return date
+ * @param {string} [data.reason] - Leave reason from LEAVE_REASONS
+ * @param {string} [data.notes] - Additional notes
+ * @param {string} [data.imageUrl] - Supporting document URL
+ *
+ * @returns {Object} Result with success flag and data/error
+ *
+ * @example
+ * const result = editLeave(5, {
+ *   startDate: '2025-11-05',
+ *   returnDate: '2025-11-07',
+ *   notes: 'Extended sick leave'
+ * });
+ */
+function editLeave(rowNumber, data) {
+  try {
+    Logger.log('\n========== EDIT LEAVE ==========');
+    Logger.log('Row Number: ' + rowNumber);
+    Logger.log('Update Data: ' + JSON.stringify(data));
+
+    if (!rowNumber || rowNumber < 1) {
+      throw new Error('Valid row number is required (must be >= 1)');
+    }
+
+    // Get sheets
+    const sheets = getSheets();
+    const leaveSheet = sheets.leave;
+
+    if (!leaveSheet) {
+      throw new Error('Leave sheet not found');
+    }
+
+    // Get all data
+    const allData = leaveSheet.getDataRange().getValues();
+    const headers = allData[0];
+
+    // Calculate actual sheet row (add 1 for header row)
+    const sheetRowIndex = rowNumber + 1;
+
+    if (sheetRowIndex > allData.length) {
+      throw new Error('Row number out of range: ' + rowNumber);
+    }
+
+    // Get current record
+    const currentRow = allData[sheetRowIndex - 1];
+    const currentRecord = buildObjectFromRow(currentRow, headers);
+
+    Logger.log('📋 Current record: ' + JSON.stringify(currentRecord));
+
+    // Merge updates with current data
+    const updatedRecord = {
+      employeeName: data.employeeName || currentRecord['EMPLOYEE NAME'],
+      startDate: data.startDate || currentRecord['STARTDATE.LEAVE'],
+      returnDate: data.returnDate || currentRecord['RETURNDATE.LEAVE'],
+      reason: data.reason || currentRecord['REASON'],
+      notes: data.hasOwnProperty('notes') ? data.notes : currentRecord['NOTES'],
+      imageUrl: data.hasOwnProperty('imageUrl') ? data.imageUrl : currentRecord['IMAGE']
+    };
+
+    // Validate updated record
+    validateLeave(updatedRecord);
+
+    // Parse dates
+    const startDate = parseDate(updatedRecord.startDate);
+    const returnDate = parseDate(updatedRecord.returnDate);
+
+    // Recalculate total days and week day
+    const totalDays = calculateDaysBetween(startDate, returnDate) + 1;
+    const weekDay = getDayOfWeek(startDate);
+
+    Logger.log('📅 Updated leave period: ' + formatDate(startDate) + ' to ' + formatDate(returnDate));
+    Logger.log('📊 Updated total days: ' + totalDays);
+    Logger.log('📅 Updated start day: ' + weekDay);
+
+    // Prepare updated row data (keep original timestamp and user)
+    const updatedRowData = [
+      currentRecord['TIMESTAMP'],                // TIMESTAMP (keep original)
+      updatedRecord.employeeName,                // EMPLOYEE NAME
+      startDate,                                 // STARTDATE.LEAVE
+      returnDate,                                // RETURNDATE.LEAVE
+      totalDays,                                 // TOTALDAYS.LEAVE
+      updatedRecord.reason,                      // REASON
+      updatedRecord.notes || '',                 // NOTES
+      currentRecord['USER'],                     // USER (keep original)
+      updatedRecord.imageUrl || '',              // IMAGE
+      weekDay                                    // WEEK.DAY (recalculated)
+    ];
+
+    // Update the row in the sheet
+    const range = leaveSheet.getRange(sheetRowIndex, 1, 1, headers.length);
+    range.setValues([updatedRowData]);
+
+    const result = {
+      rowNumber: rowNumber,
+      employeeName: updatedRecord.employeeName,
+      startDate: startDate,
+      returnDate: returnDate,
+      totalDays: totalDays,
+      weekDay: weekDay,
+      reason: updatedRecord.reason,
+      notes: updatedRecord.notes || '',
+      imageUrl: updatedRecord.imageUrl || ''
+    };
+
+    // Sanitize result for web serialization
+    const sanitizedResult = sanitizeForWeb(result);
+
+    Logger.log('✅ Leave record updated successfully');
+    Logger.log('========== EDIT LEAVE COMPLETE ==========\n');
+
+    return { success: true, data: sanitizedResult };
+
+  } catch (error) {
+    Logger.log('❌ ERROR in editLeave: ' + error.message);
+    Logger.log('Stack: ' + error.stack);
+    Logger.log('========== EDIT LEAVE FAILED ==========\n');
+    return { success: false, error: error.message };
+  }
+}
+
+// ==================== DELETE LEAVE RECORD ====================
+
+/**
+ * Delete a leave record
+ *
+ * @param {number} rowNumber - Row number of the leave record to delete (1-based, excluding header)
+ *
+ * @returns {Object} Result with success flag and data/error
+ *
+ * @example
+ * const result = deleteLeave(5);
+ */
+function deleteLeave(rowNumber) {
+  try {
+    Logger.log('\n========== DELETE LEAVE ==========');
+    Logger.log('Row Number: ' + rowNumber);
+
+    if (!rowNumber || rowNumber < 1) {
+      throw new Error('Valid row number is required (must be >= 1)');
+    }
+
+    // Get sheets
+    const sheets = getSheets();
+    const leaveSheet = sheets.leave;
+
+    if (!leaveSheet) {
+      throw new Error('Leave sheet not found');
+    }
+
+    // Get all data to verify row exists
+    const allData = leaveSheet.getDataRange().getValues();
+    const headers = allData[0];
+
+    // Calculate actual sheet row (add 1 for header row)
+    const sheetRowIndex = rowNumber + 1;
+
+    if (sheetRowIndex > allData.length) {
+      throw new Error('Row number out of range: ' + rowNumber);
+    }
+
+    // Get the record before deleting (for logging and return)
+    const recordToDelete = allData[sheetRowIndex - 1];
+    const deletedRecord = buildObjectFromRow(recordToDelete, headers);
+
+    Logger.log('📋 Deleting record: ' + JSON.stringify(deletedRecord));
+
+    // Delete the row
+    leaveSheet.deleteRow(sheetRowIndex);
+
+    const result = {
+      rowNumber: rowNumber,
+      deletedRecord: deletedRecord
+    };
+
+    // Sanitize result for web serialization
+    const sanitizedResult = sanitizeForWeb(result);
+
+    Logger.log('✅ Leave record deleted successfully');
+    Logger.log('========== DELETE LEAVE COMPLETE ==========\n');
+
+    return { success: true, data: sanitizedResult };
+
+  } catch (error) {
+    Logger.log('❌ ERROR in deleteLeave: ' + error.message);
+    Logger.log('Stack: ' + error.stack);
+    Logger.log('========== DELETE LEAVE FAILED ==========\n');
+    return { success: false, error: error.message };
+  }
+}
+
 // ==================== VALIDATION ====================
 
 /**
@@ -411,6 +610,59 @@ function test_listLeave() {
     Logger.log('✅ TEST PASSED: List functions working');
   } else {
     Logger.log('❌ TEST FAILED');
+  }
+
+  Logger.log('========== TEST COMPLETE ==========\n');
+}
+
+/**
+ * Test function for editing leave
+ */
+function test_editLeave() {
+  Logger.log('\n========== TEST: EDIT LEAVE ==========');
+
+  // WARNING: Change row number to an actual existing row in your sheet
+  const testRowNumber = 2; // Change this to test an actual row
+
+  const testData = {
+    startDate: '2025-11-10',
+    returnDate: '2025-11-12',
+    notes: 'Updated via test - extended leave period'
+  };
+
+  const result = editLeave(testRowNumber, testData);
+
+  if (result.success) {
+    Logger.log('✅ TEST PASSED: Leave record edited successfully');
+    Logger.log('Updated record: ' + JSON.stringify(result.data));
+  } else {
+    Logger.log('❌ TEST FAILED: ' + result.error);
+  }
+
+  Logger.log('========== TEST COMPLETE ==========\n');
+}
+
+/**
+ * Test function for deleting leave
+ * WARNING: This will actually delete a row from your sheet!
+ * Only run this on test data.
+ */
+function test_deleteLeave() {
+  Logger.log('\n========== TEST: DELETE LEAVE ==========');
+  Logger.log('⚠️ WARNING: This will delete an actual row from your sheet!');
+
+  // WARNING: Change row number to an actual row you want to delete
+  const testRowNumber = 999; // Set to a high number to avoid accidental deletion
+
+  Logger.log('Attempting to delete row: ' + testRowNumber);
+
+  const result = deleteLeave(testRowNumber);
+
+  if (result.success) {
+    Logger.log('✅ TEST PASSED: Leave record deleted successfully');
+    Logger.log('Deleted record: ' + JSON.stringify(result.data));
+  } else {
+    Logger.log('❌ TEST FAILED: ' + result.error);
   }
 
   Logger.log('========== TEST COMPLETE ==========\n');
