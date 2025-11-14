@@ -23,27 +23,30 @@
 </div>
 
 <script>
-  var currentEmployeeId = null;
+  // Wrap in IIFE to prevent re-declaration errors on module reload
+  (function() {
+    // Store employee ID on window to avoid re-declaration
+    window.currentEmployeeId = null;
 
-  /**
-   * Initialize employee view with ID from sessionStorage
-   */
-  function initializeEmployeeView() {
-    currentEmployeeId = sessionStorage.getItem('viewEmployeeId');
+    /**
+     * Initialize employee view with ID from sessionStorage
+     */
+    window.initializeEmployeeView = function() {
+      window.currentEmployeeId = sessionStorage.getItem('viewEmployeeId');
 
-    if (!currentEmployeeId) {
-      displayError('No employee ID provided');
-      return;
-    }
+      if (!window.currentEmployeeId) {
+        displayError('No employee ID provided');
+        return;
+      }
 
-    loadEmployeeDetails(currentEmployeeId);
-  }
+      loadEmployeeDetails(window.currentEmployeeId);
+    };
 
-  /**
-   * Load employee details from server
-   */
-  function loadEmployeeDetails(employeeId) {
-    google.script.run
+    /**
+     * Load employee details from server
+     */
+    window.loadEmployeeDetails = function(employeeId) {
+      google.script.run
       .withSuccessHandler(function(result) {
         if (result && result.success) {
           displayEmployeeDetails(result.data);
@@ -57,12 +60,12 @@
         displayError('Error loading employee: ' + (error.message || error));
       })
       .getEmployeeById(employeeId);
-  }
+    };
 
-  /**
-   * Display employee details in a formatted layout
-   */
-  function displayEmployeeDetails(employee) {
+    /**
+     * Display employee details in a formatted layout
+     */
+    window.displayEmployeeDetails = function(employee) {
     var content = document.getElementById('employeeViewContent');
     if (!content) return;
 
@@ -199,13 +202,13 @@
       </div>
     `;
 
-    content.innerHTML = html;
-  }
+      content.innerHTML = html;
+    };
 
-  /**
-   * Display error message
-   */
-  function displayError(message) {
+    /**
+     * Display error message
+     */
+    window.displayError = function(message) {
     var content = document.getElementById('employeeViewContent');
     if (content) {
       content.innerHTML = `
@@ -213,25 +216,25 @@
           <i class="fas fa-exclamation-circle"></i> ${escapeHtml(message)}
         </div>
       `;
-    }
-  }
+      }
+    };
 
-  /**
-   * Edit current employee
-   */
-  function editCurrentEmployee() {
-    if (currentEmployeeId && typeof loadModule === 'function') {
-      // Set employee ID in sessionStorage for edit form
-      sessionStorage.setItem('editEmployeeId', currentEmployeeId);
-      sessionStorage.removeItem('viewEmployeeId');
-      loadModule('employee-edit', {id: currentEmployeeId});
-    }
-  }
+    /**
+     * Edit current employee
+     */
+    window.editCurrentEmployee = function() {
+      if (window.currentEmployeeId && typeof loadModule === 'function') {
+        // Set employee ID in sessionStorage for edit form
+        sessionStorage.setItem('editEmployeeId', window.currentEmployeeId);
+        sessionStorage.removeItem('viewEmployeeId');
+        loadModule('employee-edit', {id: window.currentEmployeeId});
+      }
+    };
 
-  /**
-   * Get badge class for employment status
-   */
-  function getStatusBadgeClass(status) {
+    /**
+     * Get badge class for employment status
+     */
+    window.getStatusBadgeClass = function(status) {
     switch(status) {
       case 'Permanent':
         return 'bg-success';
@@ -244,32 +247,33 @@
         return 'bg-danger';
       default:
         return 'bg-secondary';
+      }
+    };
+
+    /**
+     * Format date for display
+     */
+    window.formatDate = function(dateValue) {
+      if (!dateValue) return '';
+      var d = new Date(dateValue);
+      return d.toLocaleDateString('en-ZA', { year: 'numeric', month: 'long', day: 'numeric' });
+    };
+
+    /**
+     * Escape HTML to prevent XSS
+     */
+    window.escapeHtml = function(text) {
+      if (!text) return '';
+      var div = document.createElement('div');
+      div.textContent = text.toString();
+      return div.innerHTML;
+    };
+
+    // Initialize on load
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', window.initializeEmployeeView);
+    } else {
+      window.initializeEmployeeView();
     }
-  }
-
-  /**
-   * Format date for display
-   */
-  function formatDate(dateValue) {
-    if (!dateValue) return '';
-    var d = new Date(dateValue);
-    return d.toLocaleDateString('en-ZA', { year: 'numeric', month: 'long', day: 'numeric' });
-  }
-
-  /**
-   * Escape HTML to prevent XSS
-   */
-  function escapeHtml(text) {
-    if (!text) return '';
-    var div = document.createElement('div');
-    div.textContent = text.toString();
-    return div.innerHTML;
-  }
-
-  // Initialize on load
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initializeEmployeeView);
-  } else {
-    initializeEmployeeView();
-  }
+  })();
 </script>
