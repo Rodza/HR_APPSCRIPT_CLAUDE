@@ -6,8 +6,16 @@
  * Leave Pay is entered manually in MASTERSALARY if applicable.
  *
  * Sheet: LEAVE
- * Columns: TIMESTAMP, EMPLOYEE NAME, STARTDATE.LEAVE, RETURNDATE.LEAVE,
+ * Columns: TIMESTAMP, EMPLOYEE NAME, STARTDATE.LEAVE, WEEK.DAY, RETURNDATE.LEAVE,
  *          TOTALDAYS.LEAVE, REASON, NOTES, USER, IMAGE
+ *
+ * WEEK.DAY Column Formula (Google Sheets):
+ *   Assuming STARTDATE.LEAVE is in column C:
+ *   - For full day name (Monday, Tuesday, etc.): =TEXT(C2,"DDDD")
+ *   - For abbreviated day name (Mon, Tue, etc.): =TEXT(C2,"DDD")
+ *
+ *   Apply this formula to the first data row (row 2) and drag down or use:
+ *   =ARRAYFORMULA(IF(C2:C="","",TEXT(C2:C,"DDDD")))
  */
 
 // ==================== ADD LEAVE RECORD ====================
@@ -68,6 +76,7 @@ function addLeave(data) {
       timestamp,                          // TIMESTAMP
       data.employeeName,                  // EMPLOYEE NAME
       startDate,                          // STARTDATE.LEAVE
+      '',                                 // WEEK.DAY (filled by formula in sheet)
       returnDate,                         // RETURNDATE.LEAVE
       totalDays,                          // TOTALDAYS.LEAVE
       data.reason,                        // REASON
