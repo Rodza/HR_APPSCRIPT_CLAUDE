@@ -101,6 +101,13 @@ function addLoanTransaction(data) {
     // Append to sheet
     loanSheet.appendRow(rowData);
 
+    // Recalculate balances to ensure accuracy
+    Logger.log('🔄 Recalculating loan balances...');
+    const recalcResult = recalculateLoanBalances(data.employeeId);
+    if (!recalcResult.success) {
+      Logger.log('⚠️ Warning: Failed to recalculate balances: ' + recalcResult.error);
+    }
+
     const result = {
       loanId: loanId,
       employeeId: data.employeeId,
@@ -280,10 +287,15 @@ function getLoanHistory(employeeId, startDate, endDate) {
       return timeA - timeB;  // Ascending
     });
 
+    // Sanitize records for web serialization
+    const sanitizedRecords = records.map(function(record) {
+      return sanitizeForWeb(record);
+    });
+
     Logger.log('✅ Found ' + records.length + ' loan records');
     Logger.log('========== GET LOAN HISTORY COMPLETE ==========\n');
 
-    return { success: true, data: records };
+    return { success: true, data: sanitizedRecords };
 
   } catch (error) {
     Logger.log('❌ ERROR in getLoanHistory: ' + error.message);
