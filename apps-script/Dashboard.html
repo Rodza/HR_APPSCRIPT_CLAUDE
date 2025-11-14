@@ -269,18 +269,25 @@
 
         // ==================== MODULE LOADING ====================
 
-        function loadModule(module, event) {
-            if (event) {
-                event.preventDefault();
-                event.stopPropagation();
+        function loadModule(module, eventOrData) {
+            // Check if the second parameter is an actual event object
+            var isEvent = eventOrData && typeof eventOrData.preventDefault === 'function';
+            var moduleData = null;
+
+            if (isEvent) {
+                eventOrData.preventDefault();
+                eventOrData.stopPropagation();
+            } else if (eventOrData) {
+                // It's data, not an event
+                moduleData = eventOrData;
             }
 
             // Update active menu
             const menuItems = document.querySelectorAll('.menu-item');
             menuItems.forEach(item => item.classList.remove('active'));
-            
-            if (event && event.currentTarget) {
-                event.currentTarget.classList.add('active');
+
+            if (isEvent && eventOrData.currentTarget) {
+                eventOrData.currentTarget.classList.add('active');
             }
 
             // Show loading
@@ -299,10 +306,10 @@
                     loadEmployeeFormModule();
                     break;
                 case 'employee-view':
-                    loadEmployeeViewModule(event);
+                    loadEmployeeViewModule(moduleData || eventOrData);
                     break;
                 case 'employee-edit':
-                    loadEmployeeEditModule(event);
+                    loadEmployeeEditModule(moduleData || eventOrData);
                     break;
                 case 'leave':
                     loadLeaveModule();
