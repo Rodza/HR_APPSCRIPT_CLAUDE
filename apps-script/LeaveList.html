@@ -64,6 +64,7 @@
                             <th>Date Recorded</th>
                             <th>Employee</th>
                             <th>Start Date</th>
+                            <th>Day</th>
                             <th>Return Date</th>
                             <th>Total Days</th>
                             <th>Reason</th>
@@ -72,7 +73,7 @@
                         </tr>
                     </thead>
                     <tbody id="leaveTableBody">
-                        <tr><td colspan="8" class="text-center">Loading...</td></tr>
+                        <tr><td colspan="9" class="text-center">Loading...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -114,7 +115,7 @@
             const tbody = document.getElementById('leaveTableBody');
 
             if (records.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="8" class="text-center">No leave records found</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="9" class="text-center">No leave records found</td></tr>';
                 return;
             }
 
@@ -126,11 +127,15 @@
                 // Row number is index + 1 (1-based)
                 const rowNumber = index + 1;
 
+                // Get the day of week
+                const weekDay = leave['WEEK.DAY'] || '';
+
                 return `
                     <tr>
                         <td>${formatDate(leave.TIMESTAMP)}</td>
                         <td><strong>${leave['EMPLOYEE NAME'] || ''}</strong></td>
                         <td>${formatDate(leave['STARTDATE.LEAVE'])}</td>
+                        <td><span class="badge bg-info">${weekDay}</span></td>
                         <td>${formatDate(leave['RETURNDATE.LEAVE'])}</td>
                         <td><span class="badge bg-secondary">${leave['TOTALDAYS.LEAVE'] || 0} days</span></td>
                         <td><span class="badge ${reasonClass}">${leave.REASON || ''}</span></td>
