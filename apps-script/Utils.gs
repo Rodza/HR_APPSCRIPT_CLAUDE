@@ -436,28 +436,80 @@ function filterBySearch(array, field, search) {
 // ============================================================================
 
 /**
+ * Parse date from various input formats
+ *
+ * @param {Date|string|number} dateValue - Date in various formats
+ * @returns {Date} Parsed Date object
+ * @throws {Error} If date format is invalid
+ */
+function parseDate(dateValue) {
+  if (!dateValue) {
+    throw new Error('Date value is required');
+  }
+
+  // Already a Date object
+  if (dateValue instanceof Date) {
+    return dateValue;
+  }
+
+  // String or number - convert to Date
+  if (typeof dateValue === 'string' || typeof dateValue === 'number') {
+    var parsed = new Date(dateValue);
+
+    // Check if valid date
+    if (isNaN(parsed.getTime())) {
+      throw new Error('Invalid date format: ' + dateValue);
+    }
+
+    return parsed;
+  }
+
+  throw new Error('Invalid date format: ' + typeof dateValue);
+}
+
+/**
+ * Calculate days between two dates
+ *
+ * @param {Date|string} startDate - Start date
+ * @param {Date|string} endDate - End date
+ * @returns {number} Number of days between dates (not inclusive)
+ */
+function calculateDaysBetween(startDate, endDate) {
+  var start = parseDate(startDate);
+  var end = parseDate(endDate);
+
+  // Calculate difference in milliseconds
+  var diffMs = end - start;
+
+  // Convert to days
+  var diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  return diffDays;
+}
+
+/**
  * Format date to YYYY-MM-DD
- * 
+ *
  * @param {Date} date - Date to format
  * @returns {string} Formatted date string
  */
 function formatDate(date) {
   if (!date) return '';
-  
+
   if (!(date instanceof Date)) {
     date = new Date(date);
   }
-  
+
   var year = date.getFullYear();
   var month = ('0' + (date.getMonth() + 1)).slice(-2);
   var day = ('0' + date.getDate()).slice(-2);
-  
+
   return year + '-' + month + '-' + day;
 }
 
 /**
  * Get current timestamp
- * 
+ *
  * @returns {string} Current timestamp in readable format
  */
 function getCurrentTimestamp() {
