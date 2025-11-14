@@ -12,7 +12,7 @@
  * List of valid employers
  * Employees can be assigned to either employer
  */
-const EMPLOYER_LIST = [
+var EMPLOYER_LIST = [
   'SA Grinding Wheels',
   'Scorpio Abrasives'
 ];
@@ -20,7 +20,7 @@ const EMPLOYER_LIST = [
 /**
  * Company contact information for PDF generation
  */
-const COMPANY_INFO = {
+var COMPANY_INFO = {
   address1: '18 DODGE STREET',
   address2: 'AUREUS',
   address3: 'RANDFONTEIN',
@@ -35,7 +35,7 @@ const COMPANY_INFO = {
  * Valid employment status options
  * Affects UIF calculation (only permanent employees pay UIF)
  */
-const EMPLOYMENT_STATUS_LIST = [
+var EMPLOYMENT_STATUS_LIST = [
   'Permanent',
   'Temporary',
   'Contract'
@@ -44,19 +44,19 @@ const EMPLOYMENT_STATUS_LIST = [
 /**
  * UIF rate (1% for permanent employees)
  */
-const UIF_RATE = 0.01;
+var UIF_RATE = 0.01;
 
 /**
  * Overtime multiplier (1.5x standard rate)
  */
-const OVERTIME_MULTIPLIER = 1.5;
+var OVERTIME_MULTIPLIER = 1.5;
 
 // ==================== LEAVE CONFIGURATION ====================
 
 /**
  * Valid leave reasons
  */
-const LEAVE_REASONS = [
+var LEAVE_REASONS = [
   'AWOL',
   'Sick Leave',
   'Annual Leave',
@@ -68,7 +68,7 @@ const LEAVE_REASONS = [
 /**
  * Loan transaction types
  */
-const LOAN_TYPES = [
+var LOAN_TYPES = [
   'Disbursement',
   'Repayment'
 ];
@@ -76,7 +76,7 @@ const LOAN_TYPES = [
 /**
  * Loan disbursement modes
  */
-const DISBURSEMENT_MODES = [
+var DISBURSEMENT_MODES = [
   'With Salary',   // Loan amount added to Paid to Account
   'Separate',      // Loan disbursed separately, not added to Paid to Account
   'Manual Entry'   // Manual loan entry (not linked to payslip)
@@ -87,7 +87,7 @@ const DISBURSEMENT_MODES = [
 /**
  * Timesheet status options
  */
-const TIMESHEET_STATUS = [
+var TIMESHEET_STATUS = [
   'Pending',
   'Approved',
   'Rejected'
@@ -99,7 +99,7 @@ const TIMESHEET_STATUS = [
  * Required fields for employee creation
  * These fields must have values before saving
  */
-const EMPLOYEE_REQUIRED_FIELDS = [
+var EMPLOYEE_REQUIRED_FIELDS = [
   'EMPLOYEE NAME',
   'SURNAME',
   'EMPLOYER',
@@ -114,7 +114,7 @@ const EMPLOYEE_REQUIRED_FIELDS = [
 /**
  * All employee fields (required + optional)
  */
-const EMPLOYEE_ALL_FIELDS = [
+var EMPLOYEE_ALL_FIELDS = [
   'id',                      // System-generated UUID
   'REFNAME',                 // Auto-generated: "FirstName Surname"
   'EMPLOYEE NAME',           // Required
@@ -148,7 +148,7 @@ const EMPLOYEE_ALL_FIELDS = [
 /**
  * Payslip fields
  */
-const PAYSLIP_FIELDS = [
+var PAYSLIP_FIELDS = [
   'RECORDNUMBER',            // Unique payslip number
   'TIMESTAMP',               // Creation timestamp
   'EMPLOYEE NAME',           // Reference to employee
@@ -191,68 +191,68 @@ const PAYSLIP_FIELDS = [
 /**
  * South African ID Number format (13 digits)
  */
-const SA_ID_NUMBER_PATTERN = /^\d{13}$/;
+var SA_ID_NUMBER_PATTERN = /^\d{13}$/;
 
 /**
  * South African phone number formats
  * Accepts: 0821234567, +27821234567, 082 123 4567, etc.
  */
-const SA_PHONE_PATTERN = /^(\+27|0)[0-9]{9}$/;
+var SA_PHONE_PATTERN = /^(\+27|0)[0-9]{9}$/;
 
 /**
  * Email validation pattern
  */
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+var EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // ==================== SYSTEM SETTINGS ====================
 
 /**
  * Maximum number of records to display per page in lists
  */
-const RECORDS_PER_PAGE = 50;
+var RECORDS_PER_PAGE = 50;
 
 /**
  * Report generation timeout (milliseconds)
  */
-const REPORT_TIMEOUT = 300000; // 5 minutes
+var REPORT_TIMEOUT = 300000; // 5 minutes
 
 /**
  * Auto-sync change detection window (milliseconds)
  * Only process changes within the last 5 minutes to avoid reprocessing old data
  */
-const CHANGE_DETECTION_WINDOW = 300000; // 5 minutes
+var CHANGE_DETECTION_WINDOW = 300000; // 5 minutes
 
 /**
  * Currency symbol
  */
-const CURRENCY_SYMBOL = 'R';
+var CURRENCY_SYMBOL = 'R';
 
 /**
  * Date format for display
  */
-const DATE_FORMAT = 'DD MMMM YYYY'; // e.g., "17 October 2025"
+var DATE_FORMAT = 'DD MMMM YYYY'; // e.g., "17 October 2025"
 
 /**
  * Short date format for tables
  */
-const SHORT_DATE_FORMAT = 'YYYY-MM-DD'; // e.g., "2025-10-17"
+var SHORT_DATE_FORMAT = 'YYYY-MM-DD'; // e.g., "2025-10-17"
 
 // ==================== GOOGLE DRIVE SETTINGS ====================
 
 /**
  * Folder name for storing generated reports
  */
-const REPORTS_FOLDER_NAME = 'Payroll Reports';
+var REPORTS_FOLDER_NAME = 'Payroll Reports';
 
 /**
  * Folder name for storing generated payslip PDFs
  */
-const PAYSLIPS_FOLDER_NAME = 'Payslip PDFs';
+var PAYSLIPS_FOLDER_NAME = 'Payslip PDFs';
 
 /**
  * Report file naming patterns
  */
-const REPORT_FILE_NAMES = {
+var REPORT_FILE_NAMES = {
   outstandingLoans: 'Outstanding Loans Report - {date}',
   individualStatement: 'Loan Statement - {employeeName} - {startDate} to {endDate}',
   weeklyPayroll: 'Weekly Payroll Summary - Week Ending {weekEnding}'
@@ -264,7 +264,7 @@ const REPORT_FILE_NAMES = {
  * Expected sheet names (case-insensitive, whitespace-removed matching)
  * The system will look for these names in the spreadsheet
  */
-const EXPECTED_SHEET_NAMES = {
+var EXPECTED_SHEET_NAMES = {
   salary: ['MASTERSALARY', 'salaryrecords', 'payroll'],
   loans: ['EmployeeLoans', 'loantransactions', 'loans'],
   empdetails: ['EMPDETAILS', 'employeedetails', 'employees'],
@@ -277,7 +277,7 @@ const EXPECTED_SHEET_NAMES = {
 /**
  * Standard error messages
  */
-const ERROR_MESSAGES = {
+var ERROR_MESSAGES = {
   // General
   SHEET_NOT_FOUND: 'Required sheet not found: {sheetName}',
   INVALID_INPUT: 'Invalid input data provided',
@@ -312,7 +312,7 @@ const ERROR_MESSAGES = {
 /**
  * Standard success messages
  */
-const SUCCESS_MESSAGES = {
+var SUCCESS_MESSAGES = {
   EMPLOYEE_CREATED: 'Employee created successfully',
   EMPLOYEE_UPDATED: 'Employee updated successfully',
   EMPLOYEE_TERMINATED: 'Employee terminated successfully',
