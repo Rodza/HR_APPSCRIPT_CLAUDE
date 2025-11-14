@@ -100,28 +100,32 @@
     </div>
 
     <script>
-        let allPayslips = [];
+        // Wrap in IIFE to prevent re-declaration errors on module reload
+        (function() {
+            // Initialize data storage on window
+            window.payrollListData = window.payrollListData || {};
+            window.payrollListData.allPayslips = [];
 
-        function loadPayslips() {
-            showLoading();
-            google.script.run
-                .withSuccessHandler(function(result) {
-                    hideLoading();
-                    if (result.success) {
-                        allPayslips = result.data;
-                        filterPayslips();
-                    } else {
-                        showError('Failed to load payslips: ' + result.error);
-                    }
-                })
-                .withFailureHandler(function(error) {
-                    hideLoading();
-                    showError('Error: ' + error.message);
-                })
-                .listPayslips({});
-        }
+            window.loadPayslips = function() {
+                showLoading();
+                google.script.run
+                    .withSuccessHandler(function(result) {
+                        hideLoading();
+                        if (result.success) {
+                            window.payrollListData.allPayslips = result.data;
+                            filterPayslips();
+                        } else {
+                            showError('Failed to load payslips: ' + result.error);
+                        }
+                    })
+                    .withFailureHandler(function(error) {
+                        hideLoading();
+                        showError('Error: ' + error.message);
+                    })
+                    .listPayslips({});
+            };
 
-        function displayPayslips(payslips) {
+            window.displayPayslips = function(payslips) {
             const tbody = document.getElementById('payslipsTableBody');
 
             if (payslips.length === 0) {
@@ -175,18 +179,18 @@
             document.getElementById('totalCount').textContent = payslips.length;
             document.getElementById('totalGross').textContent = formatCurrency(totalGross);
             document.getElementById('totalNet').textContent = formatCurrency(totalNet);
-            document.getElementById('totalPaid').textContent = formatCurrency(totalPaid);
-            document.getElementById('summaryRow').style.display = 'block';
-        }
+                document.getElementById('totalPaid').textContent = formatCurrency(totalPaid);
+                document.getElementById('summaryRow').style.display = 'block';
+            };
 
-        function filterPayslips() {
-            const searchText = document.getElementById('searchEmployee').value.toLowerCase();
-            const employer = document.getElementById('filterEmployer').value;
-            const weekEnding = document.getElementById('filterWeekEnding').value;
-            const startDate = document.getElementById('filterStartDate').value;
-            const endDate = document.getElementById('filterEndDate').value;
+            window.filterPayslips = function() {
+                const searchText = document.getElementById('searchEmployee').value.toLowerCase();
+                const employer = document.getElementById('filterEmployer').value;
+                const weekEnding = document.getElementById('filterWeekEnding').value;
+                const startDate = document.getElementById('filterStartDate').value;
+                const endDate = document.getElementById('filterEndDate').value;
 
-            let filtered = allPayslips.filter(p => {
+                let filtered = window.payrollListData.allPayslips.filter(p => {
                 const matchesSearch = !searchText ||
                     (p['EMPLOYEE NAME'] && p['EMPLOYEE NAME'].toLowerCase().includes(searchText));
 
@@ -210,35 +214,35 @@
                     }
                 }
 
-                return matchesSearch && matchesEmployer && matchesWeekEnding && matchesDateRange;
-            });
+                    return matchesSearch && matchesEmployer && matchesWeekEnding && matchesDateRange;
+                });
 
-            displayPayslips(filtered);
-        }
+                displayPayslips(filtered);
+            };
 
-        function clearFilters() {
+            window.clearFilters = function() {
             document.getElementById('searchEmployee').value = '';
             document.getElementById('filterEmployer').value = '';
             document.getElementById('filterWeekEnding').value = '';
-            document.getElementById('filterStartDate').value = '';
-            document.getElementById('filterEndDate').value = '';
-            filterPayslips();
-        }
+                document.getElementById('filterStartDate').value = '';
+                document.getElementById('filterEndDate').value = '';
+                filterPayslips();
+            };
 
-        function showPayrollForm(recordNumber) {
+            window.showPayrollForm = function(recordNumber) {
             loadModule('payrollForm');
-            if (recordNumber) {
-                sessionStorage.setItem('editPayslipRecordNumber', recordNumber);
-            } else {
-                sessionStorage.removeItem('editPayslipRecordNumber');
-            }
-        }
+                if (recordNumber) {
+                    sessionStorage.setItem('editPayslipRecordNumber', recordNumber);
+                } else {
+                    sessionStorage.removeItem('editPayslipRecordNumber');
+                }
+            };
 
-        function editPayslip(recordNumber) {
-            showPayrollForm(recordNumber);
-        }
+            window.editPayslip = function(recordNumber) {
+                showPayrollForm(recordNumber);
+            };
 
-        function viewPayslip(recordNumber) {
+            window.viewPayslip = function(recordNumber) {
             showLoading();
             google.script.run
                 .withSuccessHandler(function(result) {
@@ -249,14 +253,14 @@
                         showError(result.error);
                     }
                 })
-                .withFailureHandler(function(error) {
-                    hideLoading();
-                    showError('Error: ' + error.message);
-                })
-                .getPayslip(recordNumber);
-        }
+                    .withFailureHandler(function(error) {
+                        hideLoading();
+                        showError('Error: ' + error.message);
+                    })
+                    .getPayslip(recordNumber);
+            };
 
-        function showPayslipDetails(payslip) {
+            window.showPayslipDetails = function(payslip) {
             const details = `
                 <div class="modal fade" id="payslipModal" tabindex="-1">
                     <div class="modal-dialog modal-lg">
@@ -314,12 +318,12 @@
             const existing = document.getElementById('payslipModal');
             if (existing) existing.remove();
 
-            document.body.insertAdjacentHTML('beforeend', details);
-            const modal = new bootstrap.Modal(document.getElementById('payslipModal'));
-            modal.show();
-        }
+                document.body.insertAdjacentHTML('beforeend', details);
+                const modal = new bootstrap.Modal(document.getElementById('payslipModal'));
+                modal.show();
+            };
 
-        function generatePDF(recordNumber) {
+            window.generatePDF = function(recordNumber) {
             showLoading();
             showInfo('Generating PDF... This may take a moment.');
 
@@ -333,15 +337,16 @@
                         showError('Failed to generate PDF: ' + result.error);
                     }
                 })
-                .withFailureHandler(function(error) {
-                    hideLoading();
-                    showError('Error: ' + error.message);
-                })
-                .generatePayslipPDF(recordNumber);
-        }
+                    .withFailureHandler(function(error) {
+                        hideLoading();
+                        showError('Error: ' + error.message);
+                    })
+                    .generatePayslipPDF(recordNumber);
+            };
 
-        // Load payslips on page load
-        loadPayslips();
+            // Load payslips on page load
+            loadPayslips();
+        })();
     </script>
 </body>
 </html>
