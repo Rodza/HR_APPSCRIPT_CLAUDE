@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <title>Payroll Module Debug Checker</title>
+    <style>
+        body { font-family: monospace; padding: 20px; background: #1e1e1e; color: #d4d4d4; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #444; background: #2d2d2d; }
+        .pass { color: #4ec9b0; }
+        .fail { color: #f48771; }
+        .warning { color: #dcdcaa; }
+        .info { color: #569cd6; }
+        h2 { color: #4ec9b0; border-bottom: 2px solid #4ec9b0; padding-bottom: 5px; }
+        h3 { color: #569cd6; margin-top: 15px; }
+        pre { background: #1e1e1e; padding: 10px; border-left: 3px solid #569cd6; overflow-x: auto; }
+        .test-result { padding: 5px; margin: 5px 0; }
+        button { background: #0e639c; color: white; border: none; padding: 10px 20px; margin: 5px; cursor: pointer; }
+        button:hover { background: #1177bb; }
+    </style>
+</head>
+<body>
+    <h1>🐛 Payroll Module Debug Checker</h1>
+
+    <div class="section">
+        <h2>1. Window Object Functions Check</h2>
+        <div id="windowFunctionsCheck"></div>
+    </div>
+
+    <div class="section">
+        <h2>2. Function Call Test</h2>
+        <div id="functionCallTest"></div>
+    </div>
+
+    <div class="section">
+        <h2>3. Script Execution Order Test</h2>
+        <div id="scriptOrderTest"></div>
+    </div>
+
+    <div class="section">
+        <h2>4. Inline Handler Test</h2>
+        <button onclick="testInlineHandler()">Click to Test Inline Handler</button>
+        <div id="inlineHandlerResult"></div>
+    </div>
+
+    <div class="section">
+        <h2>5. Module Loading Simulation</h2>
+        <button onclick="simulateModuleLoad()">Simulate PayrollForm Load</button>
+        <div id="moduleLoadResult"></div>
+    </div>
+
+    <div class="section">
+        <h2>6. Error Stack Trace Catcher</h2>
+        <div id="errorCatcher"></div>
+    </div>
+
+    <div class="section">
+        <h2>7. Recommendations</h2>
+        <div id="recommendations"></div>
+    </div>
+
+    <script>
+        // Global error handler
+        window.addEventListener('error', function(e) {
+            const errorDiv = document.getElementById('errorCatcher');
+            errorDiv.innerHTML += `
+                <div class="test-result fail">
+                    ❌ <strong>Error Caught:</strong> ${e.message}<br>
+                    <strong>File:</strong> ${e.filename}<br>
+                    <strong>Line:</strong> ${e.lineno}:${e.colno}<br>
+                    <strong>Stack:</strong><pre>${e.error ? e.error.stack : 'N/A'}</pre>
+                </div>
+            `;
+        });
+
+        // Test 1: Check if functions exist on window object
+        function checkWindowFunctions() {
+            const div = document.getElementById('windowFunctionsCheck');
+            const requiredFunctions = [
+                'formatCurrency',
+                'formatDate',
+                'showLoading',
+                'hideLoading',
+                'showSuccess',
+                'showError',
+                'showInfo',
+                'showToast',
+                'loadEmployees',
+                'onEmployeeChange',
+                'calculatePreview',
+                'loadLoanBalance',
+                'updatePreview',
+                'savePayslip'
+            ];
+
+            let html = '<h3>Required Functions on window object:</h3>';
+            let allPass = true;
+
+            requiredFunctions.forEach(funcName => {
+                const exists = typeof window[funcName] === 'function';
+                const status = exists ? 'pass' : 'fail';
+                const icon = exists ? '✅' : '❌';
+
+                html += `<div class="test-result ${status}">${icon} window.${funcName}: ${exists ? 'EXISTS' : 'MISSING'}</div>`;
+
+                if (!exists) allPass = false;
+            });
+
+            html += `<div class="test-result ${allPass ? 'pass' : 'fail'}"><strong>Overall: ${allPass ? 'PASS ✅' : 'FAIL ❌'}</strong></div>`;
+            div.innerHTML = html;
+        }
+
+        // Test 2: Try calling functions
+        function testFunctionCalls() {
+            const div = document.getElementById('functionCallTest');
+            let html = '<h3>Function Call Tests:</h3>';
+
+            // Test formatCurrency
+            try {
+                const result = window.formatCurrency(1234.56);
+                html += `<div class="test-result pass">✅ window.formatCurrency(1234.56) = "${result}"</div>`;
+            } catch (e) {
+                html += `<div class="test-result fail">❌ window.formatCurrency failed: ${e.message}</div>`;
+            }
+
+            // Test direct call
+            try {
+                const result = formatCurrency(9876.54);
+                html += `<div class="test-result pass">✅ formatCurrency(9876.54) = "${result}"</div>`;
+            } catch (e) {
+                html += `<div class="test-result fail">❌ formatCurrency (direct) failed: ${e.message}</div>`;
+            }
+
+            // Test formatDate
+            try {
+                const result = window.formatDate(new Date());
+                html += `<div class="test-result pass">✅ window.formatDate(new Date()) = "${result}"</div>`;
+            } catch (e) {
+                html += `<div class="test-result fail">❌ window.formatDate failed: ${e.message}</div>`;
+            }
+
+            div.innerHTML = html;
+        }
+
+        // Test 3: Check script execution order
+        function checkScriptOrder() {
+            const div = document.getElementById('scriptOrderTest');
+            let html = '<h3>Script Execution Timeline:</h3>';
+
+            html += `<div class="test-result info">ℹ️ Document Ready State: ${document.readyState}</div>`;
+            html += `<div class="test-result info">ℹ️ Scripts Loaded: ${document.scripts.length}</div>`;
+
+            // Check if DOM is fully loaded
+            if (document.readyState === 'complete') {
+                html += `<div class="test-result pass">✅ DOM is fully loaded</div>`;
+            } else {
+                html += `<div class="test-result warning">⚠️ DOM may not be fully loaded</div>`;
+            }
+
+            div.innerHTML = html;
+        }
+
+        // Test 4: Inline handler test
+        window.testInlineHandler = function() {
+            const div = document.getElementById('inlineHandlerResult');
+            let html = '<h3>Inline Handler Test Results:</h3>';
+
+            try {
+                // This simulates what happens in PayrollForm when onchange="calculatePreview()" is called
+                if (typeof formatCurrency === 'undefined') {
+                    html += `<div class="test-result fail">❌ formatCurrency is UNDEFINED in inline handler context</div>`;
+                    html += `<div class="test-result info">ℹ️ Trying window.formatCurrency...</div>`;
+
+                    if (typeof window.formatCurrency === 'function') {
+                        const result = window.formatCurrency(100);
+                        html += `<div class="test-result pass">✅ window.formatCurrency works: ${result}</div>`;
+                    } else {
+                        html += `<div class="test-result fail">❌ window.formatCurrency also undefined!</div>`;
+                    }
+                } else {
+                    const result = formatCurrency(100);
+                    html += `<div class="test-result pass">✅ formatCurrency works in inline context: ${result}</div>`;
+                }
+            } catch (e) {
+                html += `<div class="test-result fail">❌ Error in inline handler: ${e.message}<pre>${e.stack}</pre></div>`;
+            }
+
+            div.innerHTML = html;
+        };
+
+        // Test 5: Simulate module loading
+        window.simulateModuleLoad = function() {
+            const div = document.getElementById('moduleLoadResult');
+            div.innerHTML = '<h3>Simulating PayrollForm Module Load...</h3>';
+
+            // Create a test script element like executeModuleScripts does
+            const testScript = document.createElement('script');
+            testScript.textContent = `
+                (function() {
+                    try {
+                        document.getElementById('moduleLoadResult').innerHTML +=
+                            '<div class="test-result info">ℹ️ Script executing...</div>';
+
+                        // Test if formatCurrency exists
+                        if (typeof formatCurrency !== 'undefined') {
+                            document.getElementById('moduleLoadResult').innerHTML +=
+                                '<div class="test-result pass">✅ formatCurrency found: ' + formatCurrency(500) + '</div>';
+                        } else if (typeof window.formatCurrency !== 'undefined') {
+                            document.getElementById('moduleLoadResult').innerHTML +=
+                                '<div class="test-result pass">✅ window.formatCurrency found: ' + window.formatCurrency(500) + '</div>';
+                        } else {
+                            document.getElementById('moduleLoadResult').innerHTML +=
+                                '<div class="test-result fail">❌ formatCurrency NOT FOUND in module context</div>';
+                        }
+                    } catch (e) {
+                        document.getElementById('moduleLoadResult').innerHTML +=
+                            '<div class="test-result fail">❌ Error: ' + e.message + '</div>';
+                    }
+                })();
+            `;
+
+            document.body.appendChild(testScript);
+        };
+
+        // Generate recommendations
+        function generateRecommendations() {
+            const div = document.getElementById('recommendations');
+            let html = '<h3>Based on the tests above:</h3>';
+
+            const hasWindowFunctions = typeof window.formatCurrency === 'function';
+
+            if (!hasWindowFunctions) {
+                html += `
+                    <div class="test-result fail">
+                        <strong>❌ CRITICAL: Functions not defined on window object</strong><br>
+                        <strong>Fix:</strong> Ensure PayrollForm.html wraps all code in IIFE and defines functions on window object BEFORE they're used.
+                    </div>
+                `;
+            } else {
+                html += `
+                    <div class="test-result pass">
+                        <strong>✅ Functions are properly defined on window object</strong>
+                    </div>
+                `;
+            }
+
+            html += `
+                <div class="test-result info">
+                    <strong>📋 Checklist:</strong><br>
+                    1. All utility functions should be defined on window object<br>
+                    2. Functions should be defined BEFORE any code tries to use them<br>
+                    3. Inline event handlers (onclick, onchange) should use window.functionName or define local references<br>
+                    4. IIFE should not hide functions from global scope<br>
+                    5. Check browser console for actual error line numbers
+                </div>
+            `;
+
+            div.innerHTML = html;
+        }
+
+        // Run all tests on page load
+        window.addEventListener('DOMContentLoaded', function() {
+            console.log('🐛 Running Payroll Debug Checker...');
+
+            checkWindowFunctions();
+            testFunctionCalls();
+            checkScriptOrder();
+            generateRecommendations();
+        });
+    </script>
+</body>
+</html>
