@@ -106,19 +106,36 @@
          * Initialize the loan list module
          */
         function initializeLoanList() {
-            console.log('Initializing Loan List');
-            loadEmployees();
-            // Show initial message
+            console.log('🚀 ===== LOAN LIST MODULE INITIALIZING =====');
+            console.log('DOM readyState:', document.readyState);
+            console.log('Current time:', new Date().toISOString());
+
             var tbody = document.getElementById('loansTableBody');
+            console.log('loansTableBody element:', tbody ? 'FOUND' : 'NOT FOUND');
+
+            loadEmployees();
+
+            // Show initial message
             if (tbody) {
                 tbody.innerHTML = '<tr><td colspan="8" class="text-center"><i class="fas fa-info-circle"></i> Please select an employee to view loan transactions</td></tr>';
+                console.log('✓ Initial message set');
+            } else {
+                console.error('❌ Cannot set initial message - tbody not found');
             }
+
+            console.log('===== LOAN LIST MODULE INITIALIZED =====');
         }
 
         function loadEmployees() {
+            console.log('📞 Calling listEmployees()...');
             google.script.run
                 .withSuccessHandler(function(result) {
+                    console.log('✅ listEmployees() response:', result);
+                    console.log('Response type:', typeof result);
+                    console.log('Is array?', Array.isArray(result));
+
                     if (result && result.success && result.data) {
+                        console.log('✓ Using result.data format, employees:', result.data.length);
                         loanListData.allEmployees = result.data;
                         const select = document.getElementById('filterEmployee');
                         if (select) {
@@ -126,9 +143,12 @@
                                 result.data.map(emp =>
                                     `<option value="${emp.id}">${emp.REFNAME}</option>`
                                 ).join('');
+                            console.log('✓ Employee dropdown populated with', result.data.length, 'employees');
+                        } else {
+                            console.error('❌ filterEmployee element not found!');
                         }
                     } else if (result && Array.isArray(result)) {
-                        // Handle case where listEmployees returns array directly
+                        console.log('✓ Using direct array format, employees:', result.length);
                         loanListData.allEmployees = result;
                         const select = document.getElementById('filterEmployee');
                         if (select) {
@@ -136,16 +156,19 @@
                                 result.map(emp =>
                                     `<option value="${emp.id}">${emp.REFNAME}</option>`
                                 ).join('');
+                            console.log('✓ Employee dropdown populated with', result.length, 'employees');
+                        } else {
+                            console.error('❌ filterEmployee element not found!');
                         }
                     } else {
-                        console.error('Unexpected response format from listEmployees:', result);
+                        console.error('❌ Unexpected response format from listEmployees:', result);
                         if (typeof showError === 'function') {
                             showError('Failed to load employees');
                         }
                     }
                 })
                 .withFailureHandler(function(error) {
-                    console.error('Failed to load employees:', error);
+                    console.error('❌ Failed to load employees:', error);
                     if (typeof showError === 'function') {
                         showError('Error loading employees: ' + error.message);
                     }
@@ -154,6 +177,8 @@
         }
 
         function loadLoans() {
+            console.log('🔄 loadLoans() called');
+
             if (typeof showLoading === 'function') {
                 showLoading();
             }
@@ -162,11 +187,15 @@
             const startDate = document.getElementById('filterStartDate').value || null;
             const endDate = document.getElementById('filterEndDate').value || null;
 
+            console.log('Filter values:', {employeeId, startDate, endDate});
+
             if (employeeId) {
+                console.log('✓ Employee selected, loading loan history');
                 loanListData.selectedEmployeeId = employeeId;
                 // Load balance and history for specific employee
                 loadEmployeeLoanHistory(employeeId, startDate, endDate);
             } else {
+                console.log('⚠️ No employee selected, showing message');
                 loanListData.selectedEmployeeId = null;
                 var balanceDisplay = document.getElementById('balanceDisplay');
                 if (balanceDisplay) {
@@ -176,6 +205,9 @@
                 var tbody = document.getElementById('loansTableBody');
                 if (tbody) {
                     tbody.innerHTML = '<tr><td colspan="8" class="text-center"><i class="fas fa-info-circle"></i> Please select an employee to view loan transactions</td></tr>';
+                    console.log('✓ Initial message shown');
+                } else {
+                    console.error('❌ loansTableBody element not found!');
                 }
                 if (typeof hideLoading === 'function') {
                     hideLoading();
@@ -184,13 +216,19 @@
         }
 
         function loadEmployeeLoanHistory(employeeId, startDate, endDate) {
+            console.log('🔍 loadEmployeeLoanHistory called with:', {employeeId, startDate, endDate});
+
             // Get employee name
             const employee = loanListData.allEmployees.find(emp => emp.id === employeeId);
             const employeeName = employee ? employee.REFNAME : 'Unknown';
+            console.log('Employee found:', employeeName);
 
             // Load current balance
+            console.log('📞 Calling getCurrentLoanBalance(' + employeeId + ')...');
             google.script.run
                 .withSuccessHandler(function(result) {
+                    console.log('✅ getCurrentLoanBalance() response:', result);
+
                     var empNameElem = document.getElementById('selectedEmployeeName');
                     var balanceElem = document.getElementById('currentBalance');
                     var balanceDisplay = document.getElementById('balanceDisplay');
@@ -199,15 +237,17 @@
 
                     if (result && result.success) {
                         const balance = result.data || 0;
+                        console.log('✓ Balance loaded:', balance);
                         if (balanceElem) balanceElem.textContent = formatCurrency(balance);
                         if (balanceDisplay) balanceDisplay.style.display = 'block';
                     } else {
+                        console.warn('⚠️ Balance result not successful, using 0');
                         if (balanceElem) balanceElem.textContent = formatCurrency(0);
                         if (balanceDisplay) balanceDisplay.style.display = 'block';
                     }
                 })
                 .withFailureHandler(function(error) {
-                    console.error('Failed to load balance:', error);
+                    console.error('❌ Failed to load balance:', error);
                     var empNameElem = document.getElementById('selectedEmployeeName');
                     var balanceElem = document.getElementById('currentBalance');
                     var balanceDisplay = document.getElementById('balanceDisplay');
@@ -219,15 +259,25 @@
                 .getCurrentLoanBalance(employeeId);
 
             // Load transaction history
+            console.log('📞 Calling getLoanHistory(' + employeeId + ', ' + startDate + ', ' + endDate + ')...');
             google.script.run
                 .withSuccessHandler(function(result) {
+                    console.log('✅ getLoanHistory() response:', result);
+                    console.log('Response type:', typeof result);
+
                     if (typeof hideLoading === 'function') {
                         hideLoading();
                     }
+
                     if (result && result.success) {
+                        console.log('✓ Loan history success, records:', result.data ? result.data.length : 0);
+                        if (result.data && result.data.length > 0) {
+                            console.log('First loan record:', result.data[0]);
+                        }
                         displayLoans(result.data || []);
                     } else {
                         const errorMsg = result && result.error ? result.error : 'Unknown error';
+                        console.error('❌ Loan history failed:', errorMsg);
                         if (typeof showError === 'function') {
                             showError('Failed to load loan history: ' + errorMsg);
                         }
@@ -235,6 +285,7 @@
                     }
                 })
                 .withFailureHandler(function(error) {
+                    console.error('❌ getLoanHistory() failed:', error);
                     if (typeof hideLoading === 'function') {
                         hideLoading();
                     }
@@ -247,34 +298,46 @@
         }
 
         function displayLoans(loans) {
+            console.log('📊 displayLoans called with', loans ? loans.length : 0, 'loans');
+
             const tbody = document.getElementById('loansTableBody');
             if (!tbody) {
-                console.error('Loan table body element not found');
+                console.error('❌ Loan table body element not found!');
                 return;
             }
 
             if (!loans || loans.length === 0) {
+                console.log('⚠️ No loans to display');
                 tbody.innerHTML = '<tr><td colspan="8" class="text-center">No loan transactions found</td></tr>';
                 return;
             }
 
-            tbody.innerHTML = loans.map(loan => {
-                const typeClass = loan.LoanType === 'Disbursement' ? 'badge-disbursement' : 'badge-repayment';
-                const amountClass = loan.LoanAmount > 0 ? 'amount-positive' : 'amount-negative';
+            console.log('✓ Rendering', loans.length, 'loan transactions');
+            console.log('Sample loan data:', loans[0]);
 
-                return `
-                    <tr>
-                        <td>${formatDate(loan.TransactionDate)}</td>
-                        <td><strong>${loan['Employee Name'] || ''}</strong></td>
-                        <td><span class="badge ${typeClass}">${loan.LoanType}</span></td>
-                        <td class="${amountClass}">${formatCurrency(loan.LoanAmount)}</td>
-                        <td><small>${loan.DisbursementMode}</small></td>
-                        <td><strong>${formatCurrency(loan.BalanceAfter)}</strong></td>
-                        <td>${loan.SalaryLink || '-'}</td>
-                        <td><small>${loan.Notes || '-'}</small></td>
-                    </tr>
-                `;
-            }).join('');
+            try {
+                tbody.innerHTML = loans.map((loan, index) => {
+                    const typeClass = loan.LoanType === 'Disbursement' ? 'badge-disbursement' : 'badge-repayment';
+                    const amountClass = loan.LoanAmount > 0 ? 'amount-positive' : 'amount-negative';
+
+                    return `
+                        <tr>
+                            <td>${formatDate(loan.TransactionDate)}</td>
+                            <td><strong>${loan['Employee Name'] || ''}</strong></td>
+                            <td><span class="badge ${typeClass}">${loan.LoanType}</span></td>
+                            <td class="${amountClass}">${formatCurrency(loan.LoanAmount)}</td>
+                            <td><small>${loan.DisbursementMode}</small></td>
+                            <td><strong>${formatCurrency(loan.BalanceAfter)}</strong></td>
+                            <td>${loan.SalaryLink || '-'}</td>
+                            <td><small>${loan.Notes || '-'}</small></td>
+                        </tr>
+                    `;
+                }).join('');
+                console.log('✅ Loans rendered successfully');
+            } catch (error) {
+                console.error('❌ Error rendering loans:', error);
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center text-danger">Error displaying loans</td></tr>';
+            }
         }
 
         function filterLoans() {
