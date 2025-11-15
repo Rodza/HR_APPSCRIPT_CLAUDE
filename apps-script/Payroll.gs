@@ -450,7 +450,15 @@ function listPayslips(filters) {
     }
 
     Logger.log('📋 Returning ' + payslips.length + ' payslips (after filters)');
-    const result = { success: true, data: payslips };
+
+    // Sanitize data for web - convert Date objects to strings
+    const sanitizedPayslips = payslips.map(function(payslip) {
+      return sanitizeForWeb(payslip);
+    });
+
+    Logger.log('📋 Sanitized ' + sanitizedPayslips.length + ' payslips for web');
+
+    const result = { success: true, data: sanitizedPayslips };
     Logger.log('📋 listPayslips result type:', typeof result);
     Logger.log('📋 listPayslips result.success:', result.success);
     return result;
