@@ -346,3 +346,92 @@ function diagnosticTraceCreatePayslip() {
 
   console.log('\n========== TRACE COMPLETE ==========');
 }
+
+/**
+ * Test listPayslips function to debug null return issue
+ */
+function diagnosticTestListPayslips() {
+  console.log('========== DIAGNOSTIC TEST: LIST PAYSLIPS ==========');
+
+  try {
+    console.log('\n--- STEP 1: Testing listPayslips with no filters ---');
+    const result1 = safeCall(() => listPayslips({}), 'listPayslips({})');
+
+    if (!result1) {
+      console.error('❌ FATAL: listPayslips returned null/undefined');
+      return { success: false, error: 'listPayslips returned null' };
+    }
+
+    console.log('Result type:', typeof result1);
+    console.log('Result has success property:', result1.hasOwnProperty('success'));
+    console.log('Result.success:', result1.success);
+
+    if (result1.success) {
+      console.log('✓ listPayslips succeeded');
+      console.log('  Number of payslips:', result1.data ? result1.data.length : 'null');
+
+      if (result1.data && result1.data.length > 0) {
+        console.log('  First payslip sample:');
+        const first = result1.data[0];
+        console.log('    - RECORDNUMBER:', first.RECORDNUMBER);
+        console.log('    - EMPLOYEE NAME:', first['EMPLOYEE NAME']);
+        console.log('    - WEEKENDING:', first.WEEKENDING);
+        console.log('    - NETTSALARY:', first.NETTSALARY);
+      } else {
+        console.log('  ℹ️ No payslips found in database');
+      }
+    } else {
+      console.error('❌ listPayslips failed with error:', result1.error);
+    }
+
+    console.log('\n--- STEP 2: Testing listPayslips without parameters ---');
+    const result2 = safeCall(() => listPayslips(), 'listPayslips()');
+
+    if (!result2) {
+      console.error('❌ FATAL: listPayslips() with no params returned null/undefined');
+    } else {
+      console.log('✓ listPayslips() with no params worked:', result2.success);
+    }
+
+    console.log('\n--- STEP 3: Testing sheet access ---');
+    const sheets = safeCall(() => getSheets(), 'getSheets');
+    if (!sheets) {
+      console.error('❌ FATAL: getSheets returned null');
+    } else {
+      console.log('✓ Sheets retrieved');
+      console.log('  - Has salary sheet:', !!sheets.salary);
+      if (sheets.salary) {
+        const data = sheets.salary.getDataRange().getValues();
+        console.log('  - MASTERSALARY rows:', data.length);
+        console.log('  - MASTERSALARY columns:', data[0] ? data[0].length : 0);
+      }
+    }
+
+    console.log('\n--- STEP 4: Testing buildObjectFromRow ---');
+    if (sheets && sheets.salary) {
+      const data = sheets.salary.getDataRange().getValues();
+      const headers = data[0];
+      if (data.length > 1) {
+        const row = data[1];
+        const obj = safeCall(() => buildObjectFromRow(row, headers), 'buildObjectFromRow');
+        if (!obj) {
+          console.error('❌ FATAL: buildObjectFromRow returned null');
+        } else {
+          console.log('✓ buildObjectFromRow succeeded');
+          console.log('  Object keys count:', Object.keys(obj).length);
+          console.log('  Sample keys:', Object.keys(obj).slice(0, 5).join(', '));
+        }
+      } else {
+        console.log('  ℹ️ No data rows to test buildObjectFromRow');
+      }
+    }
+
+    console.log('\n========== ALL DIAGNOSTIC TESTS FOR LIST PAYSLIPS COMPLETE ==========');
+    return { success: true };
+
+  } catch (error) {
+    console.error('❌ FATAL ERROR in diagnosticTestListPayslips:', error.toString());
+    console.error('Stack trace:', error.stack);
+    return { success: false, error: error.toString() };
+  }
+}
