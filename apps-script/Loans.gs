@@ -236,7 +236,8 @@ function getCurrentLoanBalance(employeeId) {
 function getLoanHistory(employeeId, startDate, endDate) {
   try {
     Logger.log('\n========== GET LOAN HISTORY ==========');
-    Logger.log('Employee ID: ' + employeeId);
+    Logger.log('Looking for Employee ID: ' + employeeId);
+    Logger.log('Employee ID type: ' + typeof employeeId);
     if (startDate) Logger.log('Start Date: ' + startDate);
     if (endDate) Logger.log('End Date: ' + endDate);
 
@@ -250,6 +251,9 @@ function getLoanHistory(employeeId, startDate, endDate) {
     const data = loanSheet.getDataRange().getValues();
     const headers = data[0];
 
+    Logger.log('📊 Total rows in sheet: ' + (data.length - 1));
+    Logger.log('📋 Headers: ' + headers.join(', '));
+
     // Find column indexes
     const empIdCol = findColumnIndex(headers, 'Employee ID');
     const transDateCol = findColumnIndex(headers, 'TransactionDate');
@@ -258,41 +262,78 @@ function getLoanHistory(employeeId, startDate, endDate) {
       throw new Error('Employee ID column not found in EmployeeLoans sheet');
     }
 
+    Logger.log('Employee ID column index: ' + empIdCol);
+
+    // Log first few employee IDs to see what's in the sheet
+    Logger.log('\n📝 Employee IDs in sheet:');
+    const uniqueEmpIds = [];
+    for (let i = 1; i < Math.min(data.length, 6); i++) {
+      const rowEmpId = data[i][empIdCol];
+      Logger.log('  Row ' + (i + 1) + ': "' + rowEmpId + '" (type: ' + typeof rowEmpId + ')');
+      if (rowEmpId && !uniqueEmpIds.includes(rowEmpId)) {
+        uniqueEmpIds.push(rowEmpId);
+      }
+    }
+
     // Parse filter dates if provided
     let filterStartDate = startDate ? parseDate(startDate) : null;
     let filterEndDate = endDate ? parseDate(endDate) : null;
 
     // Filter records
     let records = [];
+    let matchedRows = 0;
+    let skippedNoDate = 0;
+    let skippedError = 0;
+
     for (let i = 1; i < data.length; i++) {
       const row = data[i];
       const rowEmpId = row[empIdCol];
 
       if (rowEmpId === employeeId) {
+        matchedRows++;
+        Logger.log('✓ Row ' + (i + 1) + ' matches employee ID');
+
         try {
           // Skip if no transaction date
           if (!row[transDateCol]) {
-            Logger.log('⚠️ Skipping row ' + (i + 1) + ' - missing transaction date');
+            Logger.log('  ⚠️ Skipping - missing transaction date');
+            skippedNoDate++;
             continue;
           }
 
           const record = buildObjectFromRow(row, headers);
+          Logger.log('  ✓ Record built successfully');
 
           // Apply date filters
           if (filterStartDate || filterEndDate) {
             const transDate = parseDate(row[transDateCol]);
 
-            if (filterStartDate && transDate < filterStartDate) continue;
-            if (filterEndDate && transDate > filterEndDate) continue;
+            if (filterStartDate && transDate < filterStartDate) {
+              Logger.log('  ⚠️ Skipping - before start date');
+              continue;
+            }
+            if (filterEndDate && transDate > filterEndDate) {
+              Logger.log('  ⚠️ Skipping - after end date');
+              continue;
+            }
           }
 
           records.push(record);
+          Logger.log('  ✅ Record added to results');
         } catch (error) {
-          Logger.log('⚠️ Skipping row ' + (i + 1) + ' - error: ' + error.message);
+          Logger.log('  ❌ Error processing row: ' + error.message);
+          skippedError++;
           continue;
         }
       }
     }
+
+    Logger.log('\n📊 Summary:');
+    Logger.log('  Total rows checked: ' + (data.length - 1));
+    Logger.log('  Rows matching employee ID: ' + matchedRows);
+    Logger.log('  Records added: ' + records.length);
+    Logger.log('  Skipped (no date): ' + skippedNoDate);
+    Logger.log('  Skipped (error): ' + skippedError);
 
     // Sort chronologically: TransactionDate first, then Timestamp
     records.sort((a, b) => {
@@ -313,7 +354,7 @@ function getLoanHistory(employeeId, startDate, endDate) {
       return sanitizeForWeb(record);
     });
 
-    Logger.log('✅ Found ' + records.length + ' loan records');
+    Logger.log('✅ Returning ' + sanitizedRecords.length + ' loan records');
     Logger.log('========== GET LOAN HISTORY COMPLETE ==========\n');
 
     return { success: true, data: sanitizedRecords };
