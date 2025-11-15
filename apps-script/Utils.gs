@@ -488,6 +488,25 @@ function calculateDaysBetween(startDate, endDate) {
 }
 
 /**
+ * Round number to specified decimal places
+ *
+ * @param {number} value - Number to round
+ * @param {number} decimals - Number of decimal places (default: 2)
+ * @returns {number} Rounded number
+ */
+function roundTo(value, decimals) {
+  if (decimals === undefined) decimals = 2;
+
+  var number = parseFloat(value);
+  if (isNaN(number)) {
+    return 0;
+  }
+
+  var multiplier = Math.pow(10, decimals);
+  return Math.round(number * multiplier) / multiplier;
+}
+
+/**
  * Format number as currency (South African Rand)
  *
  * @param {number} amount - Amount to format
