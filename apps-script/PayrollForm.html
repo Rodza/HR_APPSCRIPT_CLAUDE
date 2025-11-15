@@ -316,154 +316,171 @@
     </div>
 
     <script>
-        // ===== UTILITY FUNCTIONS (MUST BE DEFINED FIRST) =====
-        // These functions need to be available globally for the module
+        (function() {
+            // ===== UTILITY FUNCTIONS (MUST BE DEFINED FIRST) =====
+            // These functions need to be available globally for the module
 
-        window.formatCurrency = function(amount) {
-            if (amount === null || amount === undefined || amount === '') {
-                return 'R0.00';
-            }
-            return 'R' + parseFloat(amount).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-        };
-
-        window.formatDate = function(date) {
-            if (!date) return '';
-            const d = new Date(date);
-            return d.toLocaleDateString('en-ZA', { year: 'numeric', month: 'long', day: 'numeric' });
-        };
-
-        window.showLoading = function() {
-            var overlay = document.getElementById('loadingOverlay');
-            if (overlay) {
-                overlay.classList.add('show');
-            }
-        };
-
-        window.hideLoading = function() {
-            var overlay = document.getElementById('loadingOverlay');
-            if (overlay) {
-                overlay.classList.remove('show');
-            }
-        };
-
-        window.showSuccess = function(message) {
-            showToast(message, 'success');
-        };
-
-        window.showError = function(message) {
-            showToast(message, 'danger');
-        };
-
-        window.showInfo = function(message) {
-            showToast(message, 'info');
-        };
-
-        window.showToast = function(message, type) {
-            const toastContainer = document.querySelector('.toast-container');
-            if (!toastContainer) {
-                // Fallback to alert if toast container not found
-                alert(message);
-                return;
+            if (!window.formatCurrency) {
+                window.formatCurrency = function(amount) {
+                    if (amount === null || amount === undefined || amount === '') {
+                        return 'R0.00';
+                    }
+                    return 'R' + parseFloat(amount).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+                };
             }
 
-            const toastId = 'toast-' + Date.now();
+            if (!window.formatDate) {
+                window.formatDate = function(date) {
+                    if (!date) return '';
+                    const d = new Date(date);
+                    return d.toLocaleDateString('en-ZA', { year: 'numeric', month: 'long', day: 'numeric' });
+                };
+            }
 
-            const toastHTML = `
-                <div class="toast align-items-center text-white bg-${type} border-0" role="alert" id="${toastId}">
-                    <div class="d-flex">
-                        <div class="toast-body">
-                            ${message}
+            if (!window.showLoading) {
+                window.showLoading = function() {
+                    var overlay = document.getElementById('loadingOverlay');
+                    if (overlay) {
+                        overlay.classList.add('show');
+                    }
+                };
+            }
+
+            if (!window.hideLoading) {
+                window.hideLoading = function() {
+                    var overlay = document.getElementById('loadingOverlay');
+                    if (overlay) {
+                        overlay.classList.remove('show');
+                    }
+                };
+            }
+
+            if (!window.showSuccess) {
+                window.showSuccess = function(message) {
+                    showToast(message, 'success');
+                };
+            }
+
+            if (!window.showError) {
+                window.showError = function(message) {
+                    showToast(message, 'danger');
+                };
+            }
+
+            if (!window.showInfo) {
+                window.showInfo = function(message) {
+                    showToast(message, 'info');
+                };
+            }
+
+            if (!window.showToast) {
+                window.showToast = function(message, type) {
+                    const toastContainer = document.querySelector('.toast-container');
+                    if (!toastContainer) {
+                        // Fallback to alert if toast container not found
+                        alert(message);
+                        return;
+                    }
+
+                    const toastId = 'toast-' + Date.now();
+
+                    const toastHTML = `
+                        <div class="toast align-items-center text-white bg-${type} border-0" role="alert" id="${toastId}">
+                            <div class="d-flex">
+                                <div class="toast-body">
+                                    ${message}
+                                </div>
+                                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                            </div>
                         </div>
-                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
-                    </div>
-                </div>
-            `;
+                    `;
 
-            toastContainer.insertAdjacentHTML('beforeend', toastHTML);
+                    toastContainer.insertAdjacentHTML('beforeend', toastHTML);
 
-            const toastElement = document.getElementById(toastId);
-            if (toastElement && typeof bootstrap !== 'undefined') {
-                const toast = new bootstrap.Toast(toastElement, { delay: 5000 });
-                toast.show();
+                    const toastElement = document.getElementById(toastId);
+                    if (toastElement && typeof bootstrap !== 'undefined') {
+                        const toast = new bootstrap.Toast(toastElement, { delay: 5000 });
+                        toast.show();
 
-                toastElement.addEventListener('hidden.bs.toast', function() {
-                    toastElement.remove();
-                });
+                        toastElement.addEventListener('hidden.bs.toast', function() {
+                            toastElement.remove();
+                        });
+                    }
+                };
             }
-        };
 
-        // Create shorthand references for backward compatibility
-        var formatCurrency = window.formatCurrency;
-        var formatDate = window.formatDate;
-        var showLoading = window.showLoading;
-        var hideLoading = window.hideLoading;
-        var showSuccess = window.showSuccess;
-        var showError = window.showError;
-        var showInfo = window.showInfo;
-        var showToast = window.showToast;
+            // Create shorthand references for backward compatibility
+            var formatCurrency = window.formatCurrency;
+            var formatDate = window.formatDate;
+            var showLoading = window.showLoading;
+            var hideLoading = window.hideLoading;
+            var showSuccess = window.showSuccess;
+            var showError = window.showError;
+            var showInfo = window.showInfo;
+            var showToast = window.showToast;
 
-        // ===== MODULE STATE =====
-        let allEmployees = [];
-        let selectedEmployee = null;
-        let currentCalculation = null;
+            // ===== MODULE STATE =====
+            var allEmployees = [];
+            var selectedEmployee = null;
+            var currentCalculation = null;
 
-        // Check if editing existing payslip
-        const editRecordNumber = sessionStorage.getItem('editPayslipRecordNumber');
+            // Check if editing existing payslip
+            const editRecordNumber = sessionStorage.getItem('editPayslipRecordNumber');
 
-        if (editRecordNumber) {
-            document.getElementById('formTitle').textContent = 'Edit Payslip #' + editRecordNumber;
-            loadPayslipForEdit(editRecordNumber);
-        }
+            if (editRecordNumber) {
+                document.getElementById('formTitle').textContent = 'Edit Payslip #' + editRecordNumber;
+                loadPayslipForEdit(editRecordNumber);
+            }
 
-        // ===== EMPLOYEE FUNCTIONS =====
+            // ===== EMPLOYEE FUNCTIONS =====
 
-        function loadEmployees() {
-            google.script.run
-                .withSuccessHandler(function(result) {
-                    if (result.success) {
-                        allEmployees = result.data;
-                        const select = document.getElementById('employeeName');
-                        select.innerHTML = '<option value="">Select Employee</option>' +
-                            result.data
-                                .filter(emp => !emp['TERMINATION DATE'])
-                                .map(emp => `<option value="${emp.REFNAME}">${emp.REFNAME}</option>`)
-                                .join('');
-                    }
-                })
-                .listEmployees({ activeOnly: true });
-        }
+            window.loadEmployees = function() {
+                google.script.run
+                    .withSuccessHandler(function(result) {
+                        if (result.success) {
+                            allEmployees = result.data;
+                            const select = document.getElementById('employeeName');
+                            select.innerHTML = '<option value="">Select Employee</option>' +
+                                result.data
+                                    .filter(emp => !emp['TERMINATION DATE'])
+                                    .map(emp => `<option value="${emp.REFNAME}">${emp.REFNAME}</option>`)
+                                    .join('');
+                        }
+                    })
+                    .listEmployees({ activeOnly: true });
+            };
 
-        function onEmployeeChange() {
-            const employeeName = document.getElementById('employeeName').value;
-            if (!employeeName) return;
+            window.onEmployeeChange = function() {
+                const employeeName = document.getElementById('employeeName').value;
+                if (!employeeName) return;
 
-            selectedEmployee = allEmployees.find(emp => emp.REFNAME === employeeName);
-            if (!selectedEmployee) return;
+                selectedEmployee = allEmployees.find(emp => emp.REFNAME === employeeName);
+                if (!selectedEmployee) return;
 
-            // Update read-only fields
-            document.getElementById('employer').value = selectedEmployee.EMPLOYER;
-            document.getElementById('employmentStatus').value = selectedEmployee['EMPLOYMENT STATUS'];
-            document.getElementById('hourlyRate').value = formatCurrency(selectedEmployee['HOURLY RATE']);
+                // Update read-only fields
+                document.getElementById('employer').value = selectedEmployee.EMPLOYER;
+                document.getElementById('employmentStatus').value = selectedEmployee['EMPLOYMENT STATUS'];
+                document.getElementById('hourlyRate').value = formatCurrency(selectedEmployee['HOURLY RATE']);
 
-            // Load current loan balance
-            loadLoanBalance(selectedEmployee.id);
+                // Load current loan balance
+                loadLoanBalance(selectedEmployee.id);
 
-            // Recalculate
-            calculatePreview();
-        }
+                // Recalculate
+                calculatePreview();
+            };
 
-        function loadLoanBalance(employeeId) {
-            google.script.run
-                .withSuccessHandler(function(result) {
-                    if (result.success) {
-                        document.getElementById('currentLoanBalance').textContent = formatCurrency(result.data);
-                        document.getElementById('loanBalanceDisplay').style.display = 'block';
-                    }
-                })
-                .getCurrentLoanBalance(employeeId);
-        }
+            window.loadLoanBalance = function(employeeId) {
+                google.script.run
+                    .withSuccessHandler(function(result) {
+                        if (result.success) {
+                            document.getElementById('currentLoanBalance').textContent = formatCurrency(result.data);
+                            document.getElementById('loanBalanceDisplay').style.display = 'block';
+                        }
+                    })
+                    .getCurrentLoanBalance(employeeId);
+            };
 
-        function calculatePreview() {
+            window.calculatePreview = function() {
             if (!selectedEmployee) {
                 // Clear preview
                 document.getElementById('previewStandardTime').textContent = 'R0.00';
@@ -508,135 +525,145 @@
                 .calculatePayslipPreview(data);
         }
 
-        function updatePreview(calc, data) {
-            document.getElementById('previewStandardTime').textContent = formatCurrency(calc.standardTime);
-            document.getElementById('previewOvertime').textContent = formatCurrency(calc.overtime);
-            document.getElementById('previewAdditional').textContent = formatCurrency(data.leavePay + data.bonusPay + data.otherIncome);
-            document.getElementById('previewGross').textContent = formatCurrency(calc.grossSalary);
-            document.getElementById('previewUIF').textContent = formatCurrency(calc.uif);
-            document.getElementById('previewOtherDed').textContent = formatCurrency(data.otherDeductions);
-            document.getElementById('previewTotalDed').textContent = formatCurrency(calc.totalDeductions);
-            document.getElementById('previewNet').textContent = formatCurrency(calc.netSalary);
-            document.getElementById('previewLoanDed').textContent = '-' + formatCurrency(data.loanDeductionThisWeek);
-            document.getElementById('previewNewLoan').textContent = '+' + formatCurrency(data.loanDisbursementType === 'With Salary' ? data.newLoanThisWeek : 0);
-            document.getElementById('previewPaidToAccount').textContent = formatCurrency(calc.paidToAccount);
-        }
-
-        function savePayslip(event) {
-            event.preventDefault();
-
-            if (!selectedEmployee) {
-                showError('Please select an employee');
-                return;
-            }
-
-            showLoading();
-
-            const recordNumber = document.getElementById('recordNumber').value;
-            const data = {
-                employeeName: selectedEmployee.REFNAME,
-                weekEnding: document.getElementById('weekEnding').value,
-                hours: parseInt(document.getElementById('hours').value) || 0,
-                minutes: parseInt(document.getElementById('minutes').value) || 0,
-                overtimeHours: parseInt(document.getElementById('overtimeHours').value) || 0,
-                overtimeMinutes: parseInt(document.getElementById('overtimeMinutes').value) || 0,
-                leavePay: parseFloat(document.getElementById('leavePay').value) || 0,
-                bonusPay: parseFloat(document.getElementById('bonusPay').value) || 0,
-                otherIncome: parseFloat(document.getElementById('otherIncome').value) || 0,
-                otherDeductions: parseFloat(document.getElementById('otherDeductions').value) || 0,
-                otherDeductionsText: document.getElementById('otherDeductionsText').value || '',
-                loanDeductionThisWeek: parseFloat(document.getElementById('loanDeductionThisWeek').value) || 0,
-                newLoanThisWeek: parseFloat(document.getElementById('newLoanThisWeek').value) || 0,
-                loanDisbursementType: document.getElementById('loanDisbursementType').value,
-                notes: document.getElementById('notes').value || ''
+            window.updatePreview = function(calc, data) {
+                document.getElementById('previewStandardTime').textContent = formatCurrency(calc.standardTime);
+                document.getElementById('previewOvertime').textContent = formatCurrency(calc.overtime);
+                document.getElementById('previewAdditional').textContent = formatCurrency(data.leavePay + data.bonusPay + data.otherIncome);
+                document.getElementById('previewGross').textContent = formatCurrency(calc.grossSalary);
+                document.getElementById('previewUIF').textContent = formatCurrency(calc.uif);
+                document.getElementById('previewOtherDed').textContent = formatCurrency(data.otherDeductions);
+                document.getElementById('previewTotalDed').textContent = formatCurrency(calc.totalDeductions);
+                document.getElementById('previewNet').textContent = formatCurrency(calc.netSalary);
+                document.getElementById('previewLoanDed').textContent = '-' + formatCurrency(data.loanDeductionThisWeek);
+                document.getElementById('previewNewLoan').textContent = '+' + formatCurrency(data.loanDisbursementType === 'With Salary' ? data.newLoanThisWeek : 0);
+                document.getElementById('previewPaidToAccount').textContent = formatCurrency(calc.paidToAccount);
             };
 
-            if (recordNumber) {
-                // Update existing
+            window.savePayslip = function(event) {
+                event.preventDefault();
+
+                if (!selectedEmployee) {
+                    showError('Please select an employee');
+                    return;
+                }
+
+                showLoading();
+
+                const recordNumber = document.getElementById('recordNumber').value;
+                const data = {
+                    employeeName: selectedEmployee.REFNAME,
+                    weekEnding: document.getElementById('weekEnding').value,
+                    hours: parseInt(document.getElementById('hours').value) || 0,
+                    minutes: parseInt(document.getElementById('minutes').value) || 0,
+                    overtimeHours: parseInt(document.getElementById('overtimeHours').value) || 0,
+                    overtimeMinutes: parseInt(document.getElementById('overtimeMinutes').value) || 0,
+                    leavePay: parseFloat(document.getElementById('leavePay').value) || 0,
+                    bonusPay: parseFloat(document.getElementById('bonusPay').value) || 0,
+                    otherIncome: parseFloat(document.getElementById('otherIncome').value) || 0,
+                    otherDeductions: parseFloat(document.getElementById('otherDeductions').value) || 0,
+                    otherDeductionsText: document.getElementById('otherDeductionsText').value || '',
+                    loanDeductionThisWeek: parseFloat(document.getElementById('loanDeductionThisWeek').value) || 0,
+                    newLoanThisWeek: parseFloat(document.getElementById('newLoanThisWeek').value) || 0,
+                    loanDisbursementType: document.getElementById('loanDisbursementType').value,
+                    notes: document.getElementById('notes').value || ''
+                };
+
+                if (recordNumber) {
+                    // Update existing
+                    google.script.run
+                        .withSuccessHandler(handleSaveSuccess)
+                        .withFailureHandler(handleSaveError)
+                        .updatePayslip(parseInt(recordNumber), data);
+                } else {
+                    // Create new
+                    google.script.run
+                        .withSuccessHandler(handleSaveSuccess)
+                        .withFailureHandler(handleSaveError)
+                        .createPayslip(data);
+                }
+            };
+
+            var handleSaveSuccess = function(result) {
+                hideLoading();
+                if (result.success) {
+                    showSuccess('Payslip saved successfully! Auto-sync will update loan balance within 5 minutes.');
+                    sessionStorage.removeItem('editPayslipRecordNumber');
+                    setTimeout(function() {
+                        if (typeof loadModule !== 'undefined') {
+                            loadModule('payroll');
+                        } else if (typeof window.loadModule !== 'undefined') {
+                            window.loadModule('payroll');
+                        }
+                    }, 2000);
+                } else {
+                    showError(result.error);
+                }
+            };
+
+            var handleSaveError = function(error) {
+                hideLoading();
+                showError('Error: ' + error.message);
+            };
+
+            var loadPayslipForEdit = function(recordNumber) {
+                showLoading();
                 google.script.run
-                    .withSuccessHandler(handleSaveSuccess)
-                    .withFailureHandler(handleSaveError)
-                    .updatePayslip(parseInt(recordNumber), data);
-            } else {
-                // Create new
-                google.script.run
-                    .withSuccessHandler(handleSaveSuccess)
-                    .withFailureHandler(handleSaveError)
-                    .createPayslip(data);
-            }
-        }
+                    .withSuccessHandler(function(result) {
+                        hideLoading();
+                        if (result.success) {
+                            populateForm(result.data);
+                        } else {
+                            showError('Failed to load payslip: ' + result.error);
+                        }
+                    })
+                    .withFailureHandler(function(error) {
+                        hideLoading();
+                        showError('Error: ' + error.message);
+                    })
+                    .getPayslip(parseInt(recordNumber));
+            };
 
-        function handleSaveSuccess(result) {
-            hideLoading();
-            if (result.success) {
-                showSuccess('Payslip saved successfully! Auto-sync will update loan balance within 5 minutes.');
-                sessionStorage.removeItem('editPayslipRecordNumber');
-                setTimeout(function() {
-                    loadModule('payroll');
-                }, 2000);
-            } else {
-                showError(result.error);
-            }
-        }
+            var populateForm = function(payslip) {
+                document.getElementById('recordNumber').value = payslip.RECORDNUMBER;
+                document.getElementById('employeeName').value = payslip['EMPLOYEE NAME'];
+                onEmployeeChange();
 
-        function handleSaveError(error) {
-            hideLoading();
-            showError('Error: ' + error.message);
-        }
+                document.getElementById('weekEnding').value = formatDateForInput(payslip.WEEKENDING);
+                document.getElementById('hours').value = payslip.HOURS || 0;
+                document.getElementById('minutes').value = payslip.MINUTES || 0;
+                document.getElementById('overtimeHours').value = payslip.OVERTIMEHOURS || 0;
+                document.getElementById('overtimeMinutes').value = payslip.OVERTIMEMINUTES || 0;
+                document.getElementById('leavePay').value = payslip['LEAVE PAY'] || 0;
+                document.getElementById('bonusPay').value = payslip['BONUS PAY'] || 0;
+                document.getElementById('otherIncome').value = payslip.OTHERINCOME || 0;
+                document.getElementById('otherDeductions').value = payslip['OTHER DEDUCTIONS'] || 0;
+                document.getElementById('otherDeductionsText').value = payslip['OTHER DEDUCTIONS TEXT'] || '';
+                document.getElementById('loanDeductionThisWeek').value = payslip.LoanDeductionThisWeek || 0;
+                document.getElementById('newLoanThisWeek').value = payslip.NewLoanThisWeek || 0;
+                document.getElementById('loanDisbursementType').value = payslip.LoanDisbursementType || 'Separate';
+                document.getElementById('notes').value = payslip.NOTES || '';
 
-        function loadPayslipForEdit(recordNumber) {
-            showLoading();
-            google.script.run
-                .withSuccessHandler(function(result) {
-                    hideLoading();
-                    if (result.success) {
-                        populateForm(result.data);
-                    } else {
-                        showError('Failed to load payslip: ' + result.error);
-                    }
-                })
-                .withFailureHandler(function(error) {
-                    hideLoading();
-                    showError('Error: ' + error.message);
-                })
-                .getPayslip(parseInt(recordNumber));
-        }
+                calculatePreview();
+            };
 
-        function populateForm(payslip) {
-            document.getElementById('recordNumber').value = payslip.RECORDNUMBER;
-            document.getElementById('employeeName').value = payslip['EMPLOYEE NAME'];
-            onEmployeeChange();
+            var formatDateForInput = function(dateValue) {
+                if (!dateValue) return '';
+                const d = new Date(dateValue);
+                const year = d.getFullYear();
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+            };
 
-            document.getElementById('weekEnding').value = formatDateForInput(payslip.WEEKENDING);
-            document.getElementById('hours').value = payslip.HOURS || 0;
-            document.getElementById('minutes').value = payslip.MINUTES || 0;
-            document.getElementById('overtimeHours').value = payslip.OVERTIMEHOURS || 0;
-            document.getElementById('overtimeMinutes').value = payslip.OVERTIMEMINUTES || 0;
-            document.getElementById('leavePay').value = payslip['LEAVE PAY'] || 0;
-            document.getElementById('bonusPay').value = payslip['BONUS PAY'] || 0;
-            document.getElementById('otherIncome').value = payslip.OTHERINCOME || 0;
-            document.getElementById('otherDeductions').value = payslip['OTHER DEDUCTIONS'] || 0;
-            document.getElementById('otherDeductionsText').value = payslip['OTHER DEDUCTIONS TEXT'] || '';
-            document.getElementById('loanDeductionThisWeek').value = payslip.LoanDeductionThisWeek || 0;
-            document.getElementById('newLoanThisWeek').value = payslip.NewLoanThisWeek || 0;
-            document.getElementById('loanDisbursementType').value = payslip.LoanDisbursementType || 'Separate';
-            document.getElementById('notes').value = payslip.NOTES || '';
+            // Create references on window for inline event handlers
+            var loadLoanBalance = window.loadLoanBalance;
+            var calculatePreview = window.calculatePreview;
+            var onEmployeeChange = window.onEmployeeChange;
 
-            calculatePreview();
-        }
-
-        function formatDateForInput(dateValue) {
-            if (!dateValue) return '';
-            const d = new Date(dateValue);
-            const year = d.getFullYear();
-            const month = String(d.getMonth() + 1).padStart(2, '0');
-            const day = String(d.getDate()).padStart(2, '0');
-            return `${year}-${month}-${day}`;
-        }
-
-        // ===== INITIALIZATION =====
-        // Load employees on page load
-        loadEmployees();
+            // ===== INITIALIZATION =====
+            // Load employees on page load
+            loadEmployees();
+        })();
     </script>
 </body>
 </html>
