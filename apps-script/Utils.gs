@@ -507,6 +507,29 @@ function roundTo(value, decimals) {
 }
 
 /**
+ * Add audit fields to a data object
+ *
+ * @param {Object} data - The data object to add audit fields to
+ * @param {boolean} isNew - True for new records (adds TIMESTAMP), false for updates (adds MODIFIED_BY, LAST_MODIFIED)
+ */
+function addAuditFields(data, isNew) {
+  var currentUser = getCurrentUser();
+  var currentTime = getCurrentTimestamp();
+
+  if (isNew) {
+    // For new records
+    data.TIMESTAMP = currentTime;
+    data.USER = currentUser;
+    data.MODIFIED_BY = currentUser;
+    data.LAST_MODIFIED = currentTime;
+  } else {
+    // For updates - preserve original TIMESTAMP and USER
+    data.MODIFIED_BY = currentUser;
+    data.LAST_MODIFIED = currentTime;
+  }
+}
+
+/**
  * Format number as currency (South African Rand)
  *
  * @param {number} amount - Amount to format
