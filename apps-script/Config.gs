@@ -150,6 +150,7 @@ var EMPLOYEE_ALL_FIELDS = [
  */
 var PAYSLIP_FIELDS = [
   'RECORDNUMBER',            // Unique payslip number
+  'id',                      // Employee ID (links to EMPLOYEE DETAILS)
   'TIMESTAMP',               // Creation timestamp
   'EMPLOYEE NAME',           // Reference to employee
   'EMPLOYER',                // Looked up from employee
