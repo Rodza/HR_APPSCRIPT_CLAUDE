@@ -316,6 +316,93 @@
     </div>
 
     <script>
+        // ===== UTILITY FUNCTIONS (MUST BE DEFINED FIRST) =====
+        // These functions need to be available globally for the module
+
+        window.formatCurrency = function(amount) {
+            if (amount === null || amount === undefined || amount === '') {
+                return 'R0.00';
+            }
+            return 'R' + parseFloat(amount).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        };
+
+        window.formatDate = function(date) {
+            if (!date) return '';
+            const d = new Date(date);
+            return d.toLocaleDateString('en-ZA', { year: 'numeric', month: 'long', day: 'numeric' });
+        };
+
+        window.showLoading = function() {
+            var overlay = document.getElementById('loadingOverlay');
+            if (overlay) {
+                overlay.classList.add('show');
+            }
+        };
+
+        window.hideLoading = function() {
+            var overlay = document.getElementById('loadingOverlay');
+            if (overlay) {
+                overlay.classList.remove('show');
+            }
+        };
+
+        window.showSuccess = function(message) {
+            showToast(message, 'success');
+        };
+
+        window.showError = function(message) {
+            showToast(message, 'danger');
+        };
+
+        window.showInfo = function(message) {
+            showToast(message, 'info');
+        };
+
+        window.showToast = function(message, type) {
+            const toastContainer = document.querySelector('.toast-container');
+            if (!toastContainer) {
+                // Fallback to alert if toast container not found
+                alert(message);
+                return;
+            }
+
+            const toastId = 'toast-' + Date.now();
+
+            const toastHTML = `
+                <div class="toast align-items-center text-white bg-${type} border-0" role="alert" id="${toastId}">
+                    <div class="d-flex">
+                        <div class="toast-body">
+                            ${message}
+                        </div>
+                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                    </div>
+                </div>
+            `;
+
+            toastContainer.insertAdjacentHTML('beforeend', toastHTML);
+
+            const toastElement = document.getElementById(toastId);
+            if (toastElement && typeof bootstrap !== 'undefined') {
+                const toast = new bootstrap.Toast(toastElement, { delay: 5000 });
+                toast.show();
+
+                toastElement.addEventListener('hidden.bs.toast', function() {
+                    toastElement.remove();
+                });
+            }
+        };
+
+        // Create shorthand references for backward compatibility
+        var formatCurrency = window.formatCurrency;
+        var formatDate = window.formatDate;
+        var showLoading = window.showLoading;
+        var hideLoading = window.hideLoading;
+        var showSuccess = window.showSuccess;
+        var showError = window.showError;
+        var showInfo = window.showInfo;
+        var showToast = window.showToast;
+
+        // ===== MODULE STATE =====
         let allEmployees = [];
         let selectedEmployee = null;
         let currentCalculation = null;
@@ -328,7 +415,8 @@
             loadPayslipForEdit(editRecordNumber);
         }
 
-        // Load employees
+        // ===== EMPLOYEE FUNCTIONS =====
+
         function loadEmployees() {
             google.script.run
                 .withSuccessHandler(function(result) {
@@ -546,80 +634,7 @@
             return `${year}-${month}-${day}`;
         }
 
-        // Utility functions (these would normally be in Dashboard but modules need them too)
-        function formatCurrency(amount) {
-            if (amount === null || amount === undefined || amount === '') {
-                return 'R0.00';
-            }
-            return 'R' + parseFloat(amount).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-        }
-
-        function formatDate(date) {
-            if (!date) return '';
-            const d = new Date(date);
-            return d.toLocaleDateString('en-ZA', { year: 'numeric', month: 'long', day: 'numeric' });
-        }
-
-        function showLoading() {
-            var overlay = document.getElementById('loadingOverlay');
-            if (overlay) {
-                overlay.classList.add('show');
-            }
-        }
-
-        function hideLoading() {
-            var overlay = document.getElementById('loadingOverlay');
-            if (overlay) {
-                overlay.classList.remove('show');
-            }
-        }
-
-        function showSuccess(message) {
-            showToast(message, 'success');
-        }
-
-        function showError(message) {
-            showToast(message, 'danger');
-        }
-
-        function showInfo(message) {
-            showToast(message, 'info');
-        }
-
-        function showToast(message, type) {
-            const toastContainer = document.querySelector('.toast-container');
-            if (!toastContainer) {
-                // Fallback to alert if toast container not found
-                alert(message);
-                return;
-            }
-
-            const toastId = 'toast-' + Date.now();
-
-            const toastHTML = `
-                <div class="toast align-items-center text-white bg-${type} border-0" role="alert" id="${toastId}">
-                    <div class="d-flex">
-                        <div class="toast-body">
-                            ${message}
-                        </div>
-                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
-                    </div>
-                </div>
-            `;
-
-            toastContainer.insertAdjacentHTML('beforeend', toastHTML);
-
-            const toastElement = document.getElementById(toastId);
-            if (toastElement && typeof bootstrap !== 'undefined') {
-                const toast = new bootstrap.Toast(toastElement, { delay: 5000 });
-                toast.show();
-
-                toastElement.addEventListener('hidden.bs.toast', function() {
-                    toastElement.remove();
-                });
-            }
-        }
-
+        // ===== INITIALIZATION =====
         // Load employees on page load
         loadEmployees();
     </script>
