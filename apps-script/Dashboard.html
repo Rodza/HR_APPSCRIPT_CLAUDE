@@ -433,6 +433,21 @@
                 })
                 .listEmployees({ activeOnly: true });
 
+            // Load outstanding loans total
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    if (result && result.success && result.data) {
+                        document.getElementById('outstandingLoans').textContent = formatCurrency(result.data.total);
+                    } else {
+                        document.getElementById('outstandingLoans').textContent = 'R0.00';
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    console.error('Failed to load outstanding loans:', error);
+                    document.getElementById('outstandingLoans').textContent = 'Error';
+                })
+                .getTotalOutstandingLoans();
+
             hideLoading();
         }
 
