@@ -402,6 +402,12 @@
         function loadEmployees() {
             google.script.run
                 .withSuccessHandler(function(result) {
+                    // Defensive null check
+                    if (!result) {
+                        console.error('loadEmployees received null result');
+                        showError('Failed to load employees: Server returned null');
+                        return;
+                    }
                     if (result.success) {
                         allEmployees = result.data;
                         const select = document.getElementById('employeeName');
@@ -410,7 +416,13 @@
                                 .filter(emp => !emp['TERMINATION DATE'])
                                 .map(emp => `<option value="${emp.REFNAME}">${emp.REFNAME}</option>`)
                                 .join('');
+                    } else {
+                        showError('Failed to load employees: ' + (result.error || 'Unknown error'));
                     }
+                })
+                .withFailureHandler(function(error) {
+                    console.error('loadEmployees failed:', error);
+                    showError('Error loading employees: ' + error.message);
                 })
                 .listEmployees({ activeOnly: true });
         }
@@ -437,10 +449,26 @@
         function loadLoanBalance(employeeId) {
             google.script.run
                 .withSuccessHandler(function(result) {
+                    // Defensive null check
+                    if (!result) {
+                        console.error('loadLoanBalance received null result');
+                        document.getElementById('currentLoanBalance').textContent = 'R0.00';
+                        document.getElementById('loanBalanceDisplay').style.display = 'block';
+                        return;
+                    }
                     if (result.success) {
                         document.getElementById('currentLoanBalance').textContent = formatCurrency(result.data);
                         document.getElementById('loanBalanceDisplay').style.display = 'block';
+                    } else {
+                        console.warn('Failed to load loan balance:', result.error);
+                        document.getElementById('currentLoanBalance').textContent = 'R0.00';
+                        document.getElementById('loanBalanceDisplay').style.display = 'block';
                     }
+                })
+                .withFailureHandler(function(error) {
+                    console.error('loadLoanBalance failed:', error);
+                    document.getElementById('currentLoanBalance').textContent = 'R0.00';
+                    document.getElementById('loanBalanceDisplay').style.display = 'block';
                 })
                 .getCurrentLoanBalance(employeeId);
         }
@@ -482,10 +510,23 @@
             // Call backend to calculate
             google.script.run
                 .withSuccessHandler(function(result) {
+                    // Defensive null check
+                    if (!result) {
+                        console.error('calculatePayslipPreview received null result');
+                        showError('Failed to calculate preview: Server returned null');
+                        return;
+                    }
                     if (result.success) {
                         currentCalculation = result.data;
                         updatePreview(result.data, data);
+                    } else {
+                        console.warn('Failed to calculate preview:', result.error);
+                        showError('Calculation error: ' + (result.error || 'Unknown error'));
                     }
+                })
+                .withFailureHandler(function(error) {
+                    console.error('calculatePayslipPreview failed:', error);
+                    showError('Error calculating preview: ' + error.message);
                 })
                 .calculatePayslipPreview(data);
         }
@@ -550,6 +591,12 @@
 
         function handleSaveSuccess(result) {
             hideLoading();
+            // Defensive null check
+            if (!result) {
+                console.error('handleSaveSuccess received null result');
+                showError('Failed to save payslip: Server returned null');
+                return;
+            }
             if (result.success) {
                 showSuccess('Payslip saved successfully! Auto-sync will update loan balance within 5 minutes.');
                 sessionStorage.removeItem('editPayslipRecordNumber');
@@ -561,7 +608,7 @@
                     }
                 }, 2000);
             } else {
-                showError(result.error);
+                showError(result.error || 'Unknown error');
             }
         }
 
@@ -575,10 +622,16 @@
             google.script.run
                 .withSuccessHandler(function(result) {
                     hideLoading();
+                    // Defensive null check
+                    if (!result) {
+                        console.error('loadPayslipForEdit received null result');
+                        showError('Failed to load payslip: Server returned null');
+                        return;
+                    }
                     if (result.success) {
                         populateForm(result.data);
                     } else {
-                        showError('Failed to load payslip: ' + result.error);
+                        showError('Failed to load payslip: ' + (result.error || 'Unknown error'));
                     }
                 })
                 .withFailureHandler(function(error) {
