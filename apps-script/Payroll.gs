@@ -119,7 +119,10 @@ function createPayslip(data) {
     Logger.log('✅ Paid to Account: ' + formatCurrency(data.PaidToAccount));
     Logger.log('========== CREATE PAYSLIP COMPLETE ==========\n');
 
-    return { success: true, data: data };
+    // Sanitize for web - convert Date objects to strings
+    const sanitizedData = sanitizeForWeb(data);
+
+    return { success: true, data: sanitizedData };
 
   } catch (error) {
     Logger.log('❌ ERROR in createPayslip: ' + error.message);
@@ -294,7 +297,10 @@ function getPayslip(recordNumber) {
 
     const payslip = buildObjectFromRow(row, headers);
 
-    return { success: true, data: payslip };
+    // Sanitize for web - convert Date objects to strings
+    const sanitizedPayslip = sanitizeForWeb(payslip);
+
+    return { success: true, data: sanitizedPayslip };
 
   } catch (error) {
     Logger.log('❌ ERROR in getPayslip: ' + error.message);
@@ -379,7 +385,10 @@ function updatePayslip(recordNumber, data) {
     Logger.log('✅ Payslip updated: #' + recordNumber);
     Logger.log('========== UPDATE PAYSLIP COMPLETE ==========\n');
 
-    return { success: true, data: updatedPayslip };
+    // Sanitize for web - convert Date objects to strings
+    const sanitizedPayslip = sanitizeForWeb(updatedPayslip);
+
+    return { success: true, data: sanitizedPayslip };
 
   } catch (error) {
     Logger.log('❌ ERROR in updatePayslip: ' + error.message);
