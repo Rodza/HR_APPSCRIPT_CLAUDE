@@ -370,11 +370,11 @@ function indexOf(headers, columnName) {
  */
 function buildObjectFromRow(row, headers) {
   var obj = {};
-  
+
   for (var i = 0; i < headers.length; i++) {
     var header = String(headers[i]);
     var value = row[i];
-    
+
     // Handle dates
     if (value instanceof Date) {
       obj[header] = value;
@@ -396,8 +396,34 @@ function buildObjectFromRow(row, headers) {
       obj[header] = '';
     }
   }
-  
+
   return obj;
+}
+
+/**
+ * Convert object to array row based on headers
+ * Reverse operation of buildObjectFromRow
+ *
+ * @param {Object} obj - Object to convert to row
+ * @param {Array} headers - Array of header names (column order)
+ * @returns {Array} Row array in header order
+ */
+function objectToRow(obj, headers) {
+  var row = [];
+
+  for (var i = 0; i < headers.length; i++) {
+    var header = String(headers[i]);
+    var value = obj[header];
+
+    // Use the value from the object if it exists, otherwise empty string
+    if (value !== undefined && value !== null) {
+      row.push(value);
+    } else {
+      row.push('');
+    }
+  }
+
+  return row;
 }
 
 /**
