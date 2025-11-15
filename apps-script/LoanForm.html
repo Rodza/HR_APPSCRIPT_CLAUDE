@@ -119,22 +119,45 @@
 
         // Load employees for dropdown
         function loadEmployees() {
+            console.log('📞 Loading employees for loan form...');
             google.script.run
                 .withSuccessHandler(function(result) {
-                    if (result.success) {
-                        allEmployees = result.data;
-                        const select = document.getElementById('employeeName');
+                    console.log('✅ Employee response:', result);
+
+                    let employees = [];
+
+                    if (result && result.success && result.data) {
+                        console.log('✓ Using result.data format');
+                        employees = result.data;
+                    } else if (result && Array.isArray(result)) {
+                        console.log('✓ Using direct array format');
+                        employees = result;
+                    } else {
+                        console.error('❌ Unexpected response format:', result);
+                        if (typeof showError === 'function') {
+                            showError('Failed to load employees: ' + (result.error || 'Unexpected format'));
+                        }
+                        return;
+                    }
+
+                    allEmployees = employees;
+                    const select = document.getElementById('employeeName');
+                    if (select) {
                         select.innerHTML = '<option value="">Select Employee</option>' +
-                            result.data
+                            employees
                                 .filter(emp => !emp['TERMINATION DATE']) // Only active employees
                                 .map(emp => `<option value="${emp.id}">${emp.REFNAME}</option>`)
                                 .join('');
+                        console.log('✓ Employee dropdown populated with', employees.length, 'employees');
                     } else {
-                        showError('Failed to load employees: ' + result.error);
+                        console.error('❌ employeeName dropdown not found');
                     }
                 })
                 .withFailureHandler(function(error) {
-                    showError('Error: ' + error.message);
+                    console.error('❌ Failed to load employees:', error);
+                    if (typeof showError === 'function') {
+                        showError('Error: ' + error.message);
+                    }
                 })
                 .listEmployees({ activeOnly: true });
         }
