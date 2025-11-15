@@ -392,8 +392,15 @@ function updatePayslip(recordNumber, data) {
 /**
  * List payslips with optional filtering
  */
-function listPayslips(filters = {}) {
+function listPayslips(filters) {
   try {
+    // Ensure filters is an object (handle undefined/null)
+    if (!filters) {
+      filters = {};
+    }
+
+    Logger.log('📋 listPayslips called with filters:', JSON.stringify(filters));
+
     const sheets = getSheets();
     const salarySheet = sheets.salary;
     if (!salarySheet) throw new Error('Salary sheet not found');
@@ -402,8 +409,12 @@ function listPayslips(filters = {}) {
     const headers = allData[0];
     let rows = allData.slice(1);
 
+    Logger.log('📋 Found ' + rows.length + ' payslip rows');
+
     // Convert to objects
     let payslips = rows.map(row => buildObjectFromRow(row, headers));
+
+    Logger.log('📋 Converted to ' + payslips.length + ' payslip objects');
 
     // Apply filters
     if (filters.employeeName) {
@@ -438,11 +449,18 @@ function listPayslips(filters = {}) {
       });
     }
 
-    return { success: true, data: payslips };
+    Logger.log('📋 Returning ' + payslips.length + ' payslips (after filters)');
+    const result = { success: true, data: payslips };
+    Logger.log('📋 listPayslips result type:', typeof result);
+    Logger.log('📋 listPayslips result.success:', result.success);
+    return result;
 
   } catch (error) {
     Logger.log('❌ ERROR in listPayslips: ' + error.message);
-    return { success: false, error: error.message };
+    Logger.log('❌ Error stack:', error.stack);
+    const errorResult = { success: false, error: error.message };
+    Logger.log('❌ Returning error result:', JSON.stringify(errorResult));
+    return errorResult;
   }
 }
 
