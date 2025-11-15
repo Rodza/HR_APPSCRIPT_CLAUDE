@@ -53,7 +53,7 @@ function addLoanTransaction(data) {
     // Validate input
     validateLoan(data);
 
-    // Get sheets
+    // Get sheets ONCE and reuse
     const sheets = getSheets();
     const loanSheet = sheets.loans;
 
@@ -68,9 +68,48 @@ function addLoanTransaction(data) {
     }
     const employeeName = empResult.data.REFNAME;
 
-    // Calculate balance before and after
-    const currentBalance = getCurrentLoanBalance(data.employeeId);
-    const balanceBefore = currentBalance.success ? currentBalance.data : 0;
+    // Calculate balance - READ SHEET ONCE, not via getCurrentLoanBalance
+    const loanData = loanSheet.getDataRange().getValues();
+    const headers = loanData[0];
+    const empIdCol = findColumnIndex(headers, 'Employee ID');
+    const transDateCol = findColumnIndex(headers, 'TransactionDate');
+    const timestampCol = findColumnIndex(headers, 'Timestamp');
+    const balanceAfterCol = findColumnIndex(headers, 'BalanceAfter');
+
+    // Find most recent balance for this employee
+    let balanceBefore = 0;
+    const employeeRecords = [];
+
+    for (let i = 1; i < loanData.length; i++) {
+      const row = loanData[i];
+      if (row[empIdCol] === data.employeeId) {
+        try {
+          if (!row[transDateCol] || !row[timestampCol]) continue;
+          const balanceAfter = row[balanceAfterCol];
+          if (balanceAfter === null || balanceAfter === undefined || balanceAfter === '') continue;
+
+          employeeRecords.push({
+            transactionDate: parseDate(row[transDateCol]),
+            timestamp: parseDate(row[timestampCol]),
+            balanceAfter: parseFloat(balanceAfter)
+          });
+        } catch (error) {
+          continue;
+        }
+      }
+    }
+
+    // Sort and get most recent balance
+    if (employeeRecords.length > 0) {
+      employeeRecords.sort((a, b) => {
+        if (a.transactionDate.getTime() !== b.transactionDate.getTime()) {
+          return b.transactionDate - a.transactionDate;
+        }
+        return b.timestamp - a.timestamp;
+      });
+      balanceBefore = employeeRecords[0].balanceAfter;
+    }
+
     const balanceAfter = balanceBefore + data.loanAmount;
 
     Logger.log('💰 Balance before: R' + balanceBefore.toFixed(2));
@@ -755,8 +794,8 @@ function validateLoan(data) {
     errors.push('Invalid disbursement mode. Must be one of: ' + DISBURSEMENT_MODES.join(', '));
   }
 
-  // Check for duplicate SalaryLink if provided
-  if (data.salaryLink) {
+  // Check for duplicate SalaryLink if provided (skip if empty/null to avoid expensive lookup)
+  if (data.salaryLink && data.salaryLink.trim() !== '') {
     const existing = findLoanRecordBySalaryLink(data.salaryLink);
     if (existing.success && existing.data) {
       errors.push('Loan record already exists for payslip #' + data.salaryLink);
