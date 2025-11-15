@@ -348,6 +348,57 @@ function diagnosticTraceCreatePayslip() {
 }
 
 /**
+ * Simple test to verify listPayslips returns a valid result
+ * Call this from Apps Script editor to test
+ */
+function testListPayslipsSimple() {
+  console.log('========== SIMPLE LIST PAYSLIPS TEST ==========');
+
+  try {
+    console.log('Calling listPayslips({})...');
+    const result = listPayslips({});
+
+    console.log('\n--- RESULT ANALYSIS ---');
+    console.log('Result is null:', result === null);
+    console.log('Result is undefined:', result === undefined);
+    console.log('Result type:', typeof result);
+
+    if (result) {
+      console.log('Result has properties:', Object.keys(result).length > 0);
+      console.log('Result properties:', Object.keys(result).join(', '));
+      console.log('Result.success:', result.success);
+      console.log('Result.data type:', typeof result.data);
+      console.log('Result.data is array:', Array.isArray(result.data));
+
+      if (result.data) {
+        console.log('Result.data length:', result.data.length);
+      }
+
+      if (result.error) {
+        console.log('Result.error:', result.error);
+      }
+
+      console.log('\n--- FULL RESULT (stringified) ---');
+      try {
+        console.log(JSON.stringify(result, null, 2));
+      } catch (stringifyError) {
+        console.error('Cannot stringify result:', stringifyError.toString());
+      }
+    } else {
+      console.error('❌ Result is null or undefined!');
+    }
+
+    console.log('\n========== TEST COMPLETE ==========');
+    return result;
+
+  } catch (error) {
+    console.error('❌ ERROR:', error.toString());
+    console.error('Stack:', error.stack);
+    return null;
+  }
+}
+
+/**
  * Test listPayslips function to debug null return issue
  */
 function diagnosticTestListPayslips() {
