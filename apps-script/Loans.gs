@@ -82,20 +82,23 @@ function addLoanTransaction(data) {
     const timestamp = new Date();
     const transactionDate = parseDate(data.transactionDate);
 
-    // Prepare row data
+    // Prepare row data - MUST match header order exactly!
+    // Headers: LoanID, Employee Name, Employee ID, Timestamp, TransactionDate,
+    //          LoanAmount, LoanType, DisbursementMode, SalaryLink, Notes,
+    //          BalanceBefore, BalanceAfter
     const rowData = [
       loanId,                             // LoanID
-      data.employeeId,                    // Employee ID
       employeeName,                       // Employee Name
+      data.employeeId,                    // Employee ID
       timestamp,                          // Timestamp
       transactionDate,                    // TransactionDate
       data.loanAmount,                    // LoanAmount
       data.loanType,                      // LoanType
       data.disbursementMode,              // DisbursementMode
       data.salaryLink || '',              // SalaryLink
+      data.notes || '',                   // Notes
       balanceBefore,                      // BalanceBefore
-      balanceAfter,                       // BalanceAfter
-      data.notes || ''                    // Notes
+      balanceAfter                        // BalanceAfter
     ];
 
     // Append to sheet
@@ -874,6 +877,61 @@ function getTotalOutstandingLoans() {
 }
 
 // ==================== TEST FUNCTIONS ====================
+
+/**
+ * FIX EXISTING LOAN DATA - Run this ONCE to fix column order
+ * The original addLoanTransaction had columns in wrong order
+ * This function swaps Employee Name and Employee ID columns
+ */
+function fixExistingLoanData() {
+  Logger.log('\n========== FIX EXISTING LOAN DATA ==========');
+
+  const sheets = getSheets();
+  const loanSheet = sheets.loans;
+
+  if (!loanSheet) {
+    Logger.log('❌ EmployeeLoans sheet not found');
+    return;
+  }
+
+  const data = loanSheet.getDataRange().getValues();
+  const headers = data[0];
+
+  Logger.log('Headers: ' + headers.join(', '));
+  Logger.log('Total rows: ' + (data.length - 1));
+
+  // Expected: LoanID, Employee Name, Employee ID, ...
+  // Was written as: LoanID, Employee ID, Employee Name, ...
+
+  let fixedCount = 0;
+
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+
+    // Column 1 should be Employee Name but contains Employee ID
+    // Column 2 should be Employee ID but contains Employee Name
+    const wrongEmpId = row[1];     // Currently contains what should be in column 2
+    const wrongEmpName = row[2];   // Currently contains what should be in column 1
+
+    Logger.log('\nRow ' + (i + 1) + ':');
+    Logger.log('  Current Col 1 (should be Name): ' + wrongEmpId);
+    Logger.log('  Current Col 2 (should be ID): ' + wrongEmpName);
+
+    // Swap them
+    loanSheet.getRange(i + 1, 2).setValue(wrongEmpName);  // Set Employee Name
+    loanSheet.getRange(i + 1, 3).setValue(wrongEmpId);    // Set Employee ID
+
+    Logger.log('  ✓ Swapped');
+    fixedCount++;
+  }
+
+  SpreadsheetApp.flush();
+
+  Logger.log('\n✅ Fixed ' + fixedCount + ' loan records');
+  Logger.log('========== FIX COMPLETE ==========\n');
+
+  return { success: true, fixed: fixedCount };
+}
 
 /**
  * Test function for loan operations
