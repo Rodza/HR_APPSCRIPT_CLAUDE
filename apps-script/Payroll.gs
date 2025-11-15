@@ -49,6 +49,7 @@ function createPayslip(data) {
     const employee = empResult.data;
 
     // Enrich data with lookups
+    data.id = employee.id;                                    // Link to employee record
     data['EMPLOYEE NAME'] = data.employeeName;
     data.EMPLOYER = employee.EMPLOYER;
     data['EMPLOYMENT STATUS'] = employee['EMPLOYMENT STATUS'];
@@ -318,6 +319,18 @@ function updatePayslip(recordNumber, data) {
 
     // Merge updates
     const updatedPayslip = Object.assign({}, currentPayslip, data);
+
+    // If employee name changed, update employee ID and related fields
+    if (data.employeeName && data.employeeName !== currentPayslip['EMPLOYEE NAME']) {
+      const empResult = getEmployeeByName(data.employeeName);
+      if (empResult.success) {
+        const employee = empResult.data;
+        updatedPayslip.id = employee.id;
+        updatedPayslip.EMPLOYER = employee.EMPLOYER;
+        updatedPayslip['EMPLOYMENT STATUS'] = employee['EMPLOYMENT STATUS'];
+        updatedPayslip.HOURLYRATE = employee['HOURLY RATE'];
+      }
+    }
 
     // Recalculate
     const calculations = calculatePayslip(updatedPayslip);
