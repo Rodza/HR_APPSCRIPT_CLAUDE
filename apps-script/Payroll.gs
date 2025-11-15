@@ -42,11 +42,22 @@ function createPayslip(data) {
 
     // Get employee details to lookup values
     const empResult = getEmployeeByName(data.employeeName);
+
+    // Defensive null check
+    if (!empResult) {
+      throw new Error('getEmployeeByName returned null for employee: ' + data.employeeName);
+    }
+
     if (!empResult.success) {
       throw new Error('Employee not found: ' + data.employeeName);
     }
 
     const employee = empResult.data;
+
+    // Defensive null check for employee data
+    if (!employee) {
+      throw new Error('Employee data is null for: ' + data.employeeName);
+    }
 
     // Enrich data with lookups
     data.id = employee.id;                                    // Link to employee record
@@ -55,11 +66,17 @@ function createPayslip(data) {
     data['EMPLOYMENT STATUS'] = employee['EMPLOYMENT STATUS'];
     data.HOURLYRATE = employee['HOURLY RATE'];
 
-    // Get current loan balance
-    data.CurrentLoanBalance = getCurrentLoanBalance(employee.id);
+    // Get current loan balance (handle null safely)
+    const loanBalance = getCurrentLoanBalance(employee.id);
+    data.CurrentLoanBalance = (loanBalance !== null && loanBalance !== undefined) ? loanBalance : 0;
 
     // Calculate all payslip values
     const calculations = calculatePayslip(data);
+
+    // Defensive null check for calculations
+    if (!calculations) {
+      throw new Error('calculatePayslip returned null');
+    }
 
     // Merge calculations into data
     Object.assign(data, calculations);
@@ -125,27 +142,36 @@ function calculatePayslipPreview(data) {
     // Get employee details to populate missing fields
     if (data.employeeName) {
       const empResult = getEmployeeByName(data.employeeName);
-      if (empResult.success) {
+
+      // Defensive null check
+      if (empResult && empResult.success && empResult.data) {
         const employee = empResult.data;
         data.EMPLOYER = employee.EMPLOYER;
         data['EMPLOYMENT STATUS'] = employee['EMPLOYMENT STATUS'];
         data.HOURLYRATE = employee['HOURLY RATE'];
+      } else {
+        Logger.log('⚠️ Warning: Could not get employee details for preview: ' + data.employeeName);
       }
     }
 
     // Map UI field names to internal field names
-    data.HOURS = data.hours;
-    data.MINUTES = data.minutes;
-    data.OVERTIMEHOURS = data.overtimeHours;
-    data.OVERTIMEMINUTES = data.overtimeMinutes;
-    data['LEAVE PAY'] = data.leavePay;
-    data['BONUS PAY'] = data.bonusPay;
-    data.OTHERINCOME = data.otherIncome;
-    data['OTHER DEDUCTIONS'] = data.otherDeductions;
-    data.LoanDeductionThisWeek = data.loanDeductionThisWeek;
-    data.NewLoanThisWeek = data.newLoanThisWeek;
+    data.HOURS = data.hours || 0;
+    data.MINUTES = data.minutes || 0;
+    data.OVERTIMEHOURS = data.overtimeHours || 0;
+    data.OVERTIMEMINUTES = data.overtimeMinutes || 0;
+    data['LEAVE PAY'] = data.leavePay || 0;
+    data['BONUS PAY'] = data.bonusPay || 0;
+    data.OTHERINCOME = data.otherIncome || 0;
+    data['OTHER DEDUCTIONS'] = data.otherDeductions || 0;
+    data.LoanDeductionThisWeek = data.loanDeductionThisWeek || 0;
+    data.NewLoanThisWeek = data.newLoanThisWeek || 0;
 
     const calculations = calculatePayslip(data);
+
+    // Defensive null check for calculations
+    if (!calculations) {
+      throw new Error('calculatePayslip returned null in preview');
+    }
 
     return {
       success: true,
