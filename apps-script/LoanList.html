@@ -115,13 +115,8 @@
 
             loadEmployees();
 
-            // Show initial message
-            if (tbody) {
-                tbody.innerHTML = '<tr><td colspan="8" class="text-center"><i class="fas fa-info-circle"></i> Please select an employee to view loan transactions</td></tr>';
-                console.log('✓ Initial message set');
-            } else {
-                console.error('❌ Cannot set initial message - tbody not found');
-            }
+            // Load all employees with loans by default
+            loadAllEmployeesWithLoans();
 
             console.log('===== LOAN LIST MODULE INITIALIZED =====');
         }
@@ -195,23 +190,100 @@
                 // Load balance and history for specific employee
                 loadEmployeeLoanHistory(employeeId, startDate, endDate);
             } else {
-                console.log('⚠️ No employee selected, showing message');
+                console.log('✓ All Employees selected, loading summary');
                 loanListData.selectedEmployeeId = null;
                 var balanceDisplay = document.getElementById('balanceDisplay');
                 if (balanceDisplay) {
                     balanceDisplay.style.display = 'none';
                 }
-                // Show message that employee must be selected
-                var tbody = document.getElementById('loansTableBody');
-                if (tbody) {
-                    tbody.innerHTML = '<tr><td colspan="8" class="text-center"><i class="fas fa-info-circle"></i> Please select an employee to view loan transactions</td></tr>';
-                    console.log('✓ Initial message shown');
-                } else {
-                    console.error('❌ loansTableBody element not found!');
-                }
-                if (typeof hideLoading === 'function') {
-                    hideLoading();
-                }
+                // Load all employees with loans
+                loadAllEmployeesWithLoans();
+            }
+        }
+
+        function loadAllEmployeesWithLoans() {
+            console.log('📞 Calling getEmployeesWithLoans()...');
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    console.log('✅ getEmployeesWithLoans() response:', result);
+
+                    if (typeof hideLoading === 'function') {
+                        hideLoading();
+                    }
+
+                    if (result && result.success) {
+                        console.log('✓ Found', result.data.length, 'employees with loans');
+                        displayEmployeeLoanSummary(result.data);
+                    } else {
+                        const errorMsg = result && result.error ? result.error : 'Unknown error';
+                        console.error('❌ Failed to load employee summaries:', errorMsg);
+                        if (typeof showError === 'function') {
+                            showError('Failed to load employee loan summaries: ' + errorMsg);
+                        }
+                        displayEmployeeLoanSummary([]);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    console.error('❌ getEmployeesWithLoans() failed:', error);
+                    if (typeof hideLoading === 'function') {
+                        hideLoading();
+                    }
+                    if (typeof showError === 'function') {
+                        showError('Error: ' + error.message);
+                    }
+                    displayEmployeeLoanSummary([]);
+                })
+                .getEmployeesWithLoans();
+        }
+
+        function displayEmployeeLoanSummary(employees) {
+            console.log('📊 displayEmployeeLoanSummary called with', employees ? employees.length : 0, 'employees');
+
+            const tbody = document.getElementById('loansTableBody');
+            if (!tbody) {
+                console.error('❌ Loan table body element not found!');
+                return;
+            }
+
+            if (!employees || employees.length === 0) {
+                console.log('⚠️ No employees with loans');
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center">No employees with outstanding loan balances found</td></tr>';
+                return;
+            }
+
+            console.log('✓ Rendering', employees.length, 'employee summaries');
+
+            try {
+                tbody.innerHTML = employees.map(emp => {
+                    const balanceClass = emp.currentBalance > 0 ? 'text-danger' : 'text-success';
+                    const balanceIcon = emp.currentBalance > 0 ? 'fa-arrow-up' : 'fa-arrow-down';
+
+                    return `
+                        <tr style="cursor: pointer;" onclick="selectEmployee('${emp.employeeId}')">
+                            <td colspan="2"><strong>${emp.employeeName}</strong></td>
+                            <td><span class="badge bg-info">${emp.transactionCount} transactions</span></td>
+                            <td colspan="2">${emp.lastTransactionDate}</td>
+                            <td colspan="3">
+                                <strong class="${balanceClass}">
+                                    <i class="fas ${balanceIcon}"></i> ${formatCurrency(emp.currentBalance)}
+                                </strong>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+                console.log('✅ Employee summaries rendered successfully');
+            } catch (error) {
+                console.error('❌ Error rendering employee summaries:', error);
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center text-danger">Error displaying employee summaries</td></tr>';
+            }
+        }
+
+        function selectEmployee(employeeId) {
+            console.log('👤 Selecting employee:', employeeId);
+            const select = document.getElementById('filterEmployee');
+            if (select) {
+                select.value = employeeId;
+                loadLoans();
             }
         }
 

@@ -915,6 +915,129 @@ function getTotalOutstandingLoans() {
   }
 }
 
+// ==================== GET EMPLOYEES WITH LOANS ====================
+
+/**
+ * Gets all employees who have loan balances with their current balances
+ * Used for the "All Employees" view in the loan dashboard
+ *
+ * @returns {Object} Result with success flag and employee loan summaries
+ */
+function getEmployeesWithLoans() {
+  try {
+    Logger.log('\n========== GET EMPLOYEES WITH LOANS ==========');
+
+    const sheets = getSheets();
+    const loanSheet = sheets.loans;
+
+    if (!loanSheet) {
+      throw new Error('EmployeeLoans sheet not found');
+    }
+
+    const data = loanSheet.getDataRange().getValues();
+    const headers = data[0];
+
+    // Find column indexes
+    const empIdCol = findColumnIndex(headers, 'Employee ID');
+    const empNameCol = findColumnIndex(headers, 'Employee Name');
+    const transDateCol = findColumnIndex(headers, 'TransactionDate');
+    const timestampCol = findColumnIndex(headers, 'Timestamp');
+    const balanceAfterCol = findColumnIndex(headers, 'BalanceAfter');
+    const loanAmountCol = findColumnIndex(headers, 'LoanAmount');
+
+    if (empIdCol === -1 || empNameCol === -1 || balanceAfterCol === -1) {
+      throw new Error('Required columns not found in EmployeeLoans sheet');
+    }
+
+    // Group records by employee
+    const employeeBalances = {};
+
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      const empId = row[empIdCol];
+      const empName = row[empNameCol];
+
+      if (!empId) continue;
+
+      try {
+        // Skip if critical data is missing
+        if (!row[transDateCol] || !row[timestampCol]) {
+          continue;
+        }
+
+        const balanceAfter = row[balanceAfterCol];
+        if (balanceAfter === null || balanceAfter === undefined || balanceAfter === '') {
+          continue;
+        }
+
+        if (!employeeBalances[empId]) {
+          employeeBalances[empId] = {
+            employeeId: empId,
+            employeeName: empName,
+            transactions: []
+          };
+        }
+
+        employeeBalances[empId].transactions.push({
+          transactionDate: parseDate(row[transDateCol]),
+          timestamp: parseDate(row[timestampCol]),
+          balanceAfter: parseFloat(balanceAfter),
+          loanAmount: row[loanAmountCol]
+        });
+      } catch (error) {
+        continue;
+      }
+    }
+
+    // Get most recent balance for each employee
+    const employeeSummaries = [];
+
+    for (const empId in employeeBalances) {
+      const empData = employeeBalances[empId];
+      const transactions = empData.transactions;
+
+      // Sort chronologically: TransactionDate first, then Timestamp (descending)
+      transactions.sort((a, b) => {
+        if (a.transactionDate.getTime() !== b.transactionDate.getTime()) {
+          return b.transactionDate - a.transactionDate;  // Descending
+        }
+        return b.timestamp - a.timestamp;  // Descending
+      });
+
+      const currentBalance = transactions[0].balanceAfter;
+      const lastTransactionDate = transactions[0].transactionDate;
+
+      // Only include employees with non-zero balances
+      if (currentBalance !== 0) {
+        employeeSummaries.push({
+          employeeId: empId,
+          employeeName: empData.employeeName,
+          currentBalance: currentBalance,
+          lastTransactionDate: formatDate(lastTransactionDate),
+          transactionCount: transactions.length
+        });
+      }
+    }
+
+    // Sort by balance (highest first)
+    employeeSummaries.sort((a, b) => Math.abs(b.currentBalance) - Math.abs(a.currentBalance));
+
+    Logger.log('✅ Found ' + employeeSummaries.length + ' employees with loan balances');
+    Logger.log('========== GET EMPLOYEES WITH LOANS COMPLETE ==========\n');
+
+    return {
+      success: true,
+      data: employeeSummaries
+    };
+
+  } catch (error) {
+    Logger.log('❌ ERROR in getEmployeesWithLoans: ' + error.message);
+    Logger.log('Stack: ' + error.stack);
+    Logger.log('========== GET EMPLOYEES WITH LOANS FAILED ==========\n');
+    return { success: false, error: error.message };
+  }
+}
+
 // ==================== TEST FUNCTIONS ====================
 
 /**
