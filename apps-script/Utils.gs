@@ -488,6 +488,27 @@ function calculateDaysBetween(startDate, endDate) {
 }
 
 /**
+ * Format number as currency (South African Rand)
+ *
+ * @param {number} amount - Amount to format
+ * @returns {string} Formatted currency string (e.g., "R1,234.56")
+ */
+function formatCurrency(amount) {
+  if (amount === null || amount === undefined || amount === '') {
+    return 'R0.00';
+  }
+
+  var number = parseFloat(amount);
+  if (isNaN(number)) {
+    return 'R0.00';
+  }
+
+  // Format with 2 decimal places and thousands separator
+  var formatted = number.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return 'R' + formatted;
+}
+
+/**
  * Format date to YYYY-MM-DD
  *
  * @param {Date} date - Date to format
