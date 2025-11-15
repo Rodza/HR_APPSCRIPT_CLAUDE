@@ -188,11 +188,17 @@
                 google.script.run
                     .withSuccessHandler(function(result) {
                         hideLoading();
+                        // Defensive null check
+                        if (!result) {
+                            console.error('loadPayslips received null result');
+                            showError('Failed to load payslips: Server returned null');
+                            return;
+                        }
                         if (result.success) {
                             window.payrollListData.allPayslips = result.data;
                             filterPayslips();
                         } else {
-                            showError('Failed to load payslips: ' + result.error);
+                            showError('Failed to load payslips: ' + (result.error || 'Unknown error'));
                         }
                     })
                     .withFailureHandler(function(error) {
@@ -324,10 +330,16 @@
             google.script.run
                 .withSuccessHandler(function(result) {
                     hideLoading();
+                    // Defensive null check
+                    if (!result) {
+                        console.error('viewPayslip received null result');
+                        showError('Failed to load payslip: Server returned null');
+                        return;
+                    }
                     if (result.success) {
                         showPayslipDetails(result.data);
                     } else {
-                        showError(result.error);
+                        showError(result.error || 'Unknown error');
                     }
                 })
                     .withFailureHandler(function(error) {
@@ -407,11 +419,17 @@
             google.script.run
                 .withSuccessHandler(function(result) {
                     hideLoading();
+                    // Defensive null check
+                    if (!result) {
+                        console.error('generatePayslipPDF received null result');
+                        showError('Failed to generate PDF: Server returned null');
+                        return;
+                    }
                     if (result.success) {
                         showSuccess('PDF generated successfully!');
                         loadPayslips(); // Reload to show PDF link
                     } else {
-                        showError('Failed to generate PDF: ' + result.error);
+                        showError('Failed to generate PDF: ' + (result.error || 'Unknown error'));
                     }
                 })
                     .withFailureHandler(function(error) {
