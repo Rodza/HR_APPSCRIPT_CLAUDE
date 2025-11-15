@@ -724,6 +724,114 @@ function validateLoan(data) {
   }
 }
 
+// ==================== GET TOTAL OUTSTANDING LOANS ====================
+
+/**
+ * Gets total outstanding loan balance across all employees
+ * Used for dashboard statistics
+ *
+ * @returns {Object} Result with success flag and total balance
+ */
+function getTotalOutstandingLoans() {
+  try {
+    Logger.log('\n========== GET TOTAL OUTSTANDING LOANS ==========');
+
+    const sheets = getSheets();
+    const loanSheet = sheets.loans;
+
+    if (!loanSheet) {
+      throw new Error('EmployeeLoans sheet not found');
+    }
+
+    const data = loanSheet.getDataRange().getValues();
+    const headers = data[0];
+
+    // Find column indexes
+    const empIdCol = findColumnIndex(headers, 'Employee ID');
+    const transDateCol = findColumnIndex(headers, 'TransactionDate');
+    const timestampCol = findColumnIndex(headers, 'Timestamp');
+    const balanceAfterCol = findColumnIndex(headers, 'BalanceAfter');
+
+    if (empIdCol === -1 || balanceAfterCol === -1) {
+      throw new Error('Required columns not found in EmployeeLoans sheet');
+    }
+
+    // Group records by employee
+    const employeeBalances = {};
+
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      const empId = row[empIdCol];
+
+      if (!empId) continue;
+
+      try {
+        // Skip if critical data is missing
+        if (!row[transDateCol] || !row[timestampCol]) {
+          continue;
+        }
+
+        const balanceAfter = row[balanceAfterCol];
+        if (balanceAfter === null || balanceAfter === undefined || balanceAfter === '') {
+          continue;
+        }
+
+        if (!employeeBalances[empId]) {
+          employeeBalances[empId] = [];
+        }
+
+        employeeBalances[empId].push({
+          transactionDate: parseDate(row[transDateCol]),
+          timestamp: parseDate(row[timestampCol]),
+          balanceAfter: parseFloat(balanceAfter)
+        });
+      } catch (error) {
+        continue;
+      }
+    }
+
+    // Get most recent balance for each employee and sum
+    let totalOutstanding = 0;
+    let employeeCount = 0;
+
+    for (const empId in employeeBalances) {
+      const records = employeeBalances[empId];
+
+      // Sort chronologically: TransactionDate first, then Timestamp (descending)
+      records.sort((a, b) => {
+        if (a.transactionDate.getTime() !== b.transactionDate.getTime()) {
+          return b.transactionDate - a.transactionDate;  // Descending
+        }
+        return b.timestamp - a.timestamp;  // Descending
+      });
+
+      const currentBalance = records[0].balanceAfter;
+      if (currentBalance > 0) {
+        totalOutstanding += currentBalance;
+        employeeCount++;
+      }
+    }
+
+    Logger.log('✅ Total outstanding: R' + totalOutstanding.toFixed(2));
+    Logger.log('Employees with loans: ' + employeeCount);
+    Logger.log('========== GET TOTAL OUTSTANDING LOANS COMPLETE ==========\n');
+
+    return {
+      success: true,
+      data: {
+        total: totalOutstanding,
+        employeeCount: employeeCount
+      }
+    };
+
+  } catch (error) {
+    Logger.log('❌ ERROR in getTotalOutstandingLoans: ' + error.message);
+    Logger.log('Stack: ' + error.stack);
+    Logger.log('========== GET TOTAL OUTSTANDING LOANS FAILED ==========\n');
+    return { success: false, error: error.message };
+  }
+}
+
 // ==================== TEST FUNCTIONS ====================
 
 /**
