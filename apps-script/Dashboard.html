@@ -329,6 +329,9 @@
                 case 'payroll':
                     loadPayrollModule();
                     break;
+                case 'payrollForm':
+                    loadPayrollFormModule();
+                    break;
                 case 'reports':
                     loadReportsModule();
                     break;
@@ -664,6 +667,22 @@
                 })
                 .withFailureHandler(handleError)
                 .include('PayrollList');
+        }
+
+        function loadPayrollFormModule() {
+            google.script.run
+                .withSuccessHandler(function(html) {
+                    if (html) {
+                        const contentArea = document.getElementById('contentArea');
+                        contentArea.innerHTML = html;
+                        executeModuleScripts(contentArea);
+                    } else {
+                        showError('Failed to load Payroll Form module');
+                    }
+                    hideLoading();
+                })
+                .withFailureHandler(handleError)
+                .include('PayrollForm');
         }
 
         function loadReportsModule() {

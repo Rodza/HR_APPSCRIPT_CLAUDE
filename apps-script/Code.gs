@@ -125,15 +125,15 @@ function getClientConfig() {
   return {
     user: getCurrentUser(),
     isAdmin: isAdmin(),
-    version: '1.1.0-fixed', // Version identifier to track deployment
-    lastUpdate: '2025-01-13T21:30:00Z',
+    version: '1.2.0-payroll-enabled', // Version identifier to track deployment
+    lastUpdate: '2025-11-15T00:00:00Z',
     features: {
       employees: true,
-      leave: false,  // Phase 2
-      loans: false,  // Phase 2
-      timesheets: false,  // Phase 3
-      payroll: false,  // Phase 4
-      reports: false  // Phase 5
+      leave: true,
+      loans: true,
+      timesheets: true,
+      payroll: true,  // ENABLED - Fixed module loading
+      reports: true
     }
   };
 }
@@ -145,12 +145,19 @@ function getClientConfig() {
  */
 function getVersion() {
   return {
-    version: '1.1.0-fixed',
-    lastUpdate: '2025-01-13T21:30:00Z',
+    version: '1.2.0-payroll-enabled',
+    lastUpdate: '2025-11-15T00:00:00Z',
     hasFixedSheetMapping: true,
     hasLoggingFunctions: true,
     hasFormatResponse: true,
-    deploymentStatus: 'This is the FIXED version with all updates'
+    hasPayrollModule: true,
+    payrollFeatures: {
+      createPayslip: true,
+      calculatePayslipPreview: true,
+      fieldMapping: true,
+      moduleLoading: true
+    },
+    deploymentStatus: 'Payroll module fully enabled and functional'
   };
 }
 

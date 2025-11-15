@@ -27,6 +27,19 @@ function createPayslip(data) {
     Logger.log('\n========== CREATE PAYSLIP ==========');
     Logger.log('ℹ️ Input: ' + JSON.stringify(data));
 
+    // Map UI field names to internal field names (if needed)
+    if (data.hours !== undefined) data.HOURS = data.hours;
+    if (data.minutes !== undefined) data.MINUTES = data.minutes;
+    if (data.overtimeHours !== undefined) data.OVERTIMEHOURS = data.overtimeHours;
+    if (data.overtimeMinutes !== undefined) data.OVERTIMEMINUTES = data.overtimeMinutes;
+    if (data.leavePay !== undefined) data['LEAVE PAY'] = data.leavePay;
+    if (data.bonusPay !== undefined) data['BONUS PAY'] = data.bonusPay;
+    if (data.otherIncome !== undefined) data.OTHERINCOME = data.otherIncome;
+    if (data.otherDeductions !== undefined) data['OTHER DEDUCTIONS'] = data.otherDeductions;
+    if (data.otherDeductionsText !== undefined) data['OTHER DEDUCTIONS TEXT'] = data.otherDeductionsText;
+    if (data.weekEnding !== undefined) data.WEEKENDING = data.weekEnding;
+    if (data.notes !== undefined) data.NOTES = data.notes;
+
     // Get employee details to lookup values
     const empResult = getEmployeeByName(data.employeeName);
     if (!empResult.success) {
@@ -36,6 +49,7 @@ function createPayslip(data) {
     const employee = empResult.data;
 
     // Enrich data with lookups
+    data['EMPLOYEE NAME'] = data.employeeName;
     data.EMPLOYER = employee.EMPLOYER;
     data['EMPLOYMENT STATUS'] = employee['EMPLOYMENT STATUS'];
     data.HOURLYRATE = employee['HOURLY RATE'];
@@ -95,6 +109,63 @@ function createPayslip(data) {
     Logger.log('========== CREATE PAYSLIP FAILED ==========\n');
 
     return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Calculate payslip preview (for UI)
+ * Wrapper around calculatePayslip that returns {success, data} format
+ *
+ * @param {Object} data - Payslip input data
+ * @returns {Object} Response with {success, data, error}
+ */
+function calculatePayslipPreview(data) {
+  try {
+    // Get employee details to populate missing fields
+    if (data.employeeName) {
+      const empResult = getEmployeeByName(data.employeeName);
+      if (empResult.success) {
+        const employee = empResult.data;
+        data.EMPLOYER = employee.EMPLOYER;
+        data['EMPLOYMENT STATUS'] = employee['EMPLOYMENT STATUS'];
+        data.HOURLYRATE = employee['HOURLY RATE'];
+      }
+    }
+
+    // Map UI field names to internal field names
+    data.HOURS = data.hours;
+    data.MINUTES = data.minutes;
+    data.OVERTIMEHOURS = data.overtimeHours;
+    data.OVERTIMEMINUTES = data.overtimeMinutes;
+    data['LEAVE PAY'] = data.leavePay;
+    data['BONUS PAY'] = data.bonusPay;
+    data.OTHERINCOME = data.otherIncome;
+    data['OTHER DEDUCTIONS'] = data.otherDeductions;
+    data.LoanDeductionThisWeek = data.loanDeductionThisWeek;
+    data.NewLoanThisWeek = data.newLoanThisWeek;
+
+    const calculations = calculatePayslip(data);
+
+    return {
+      success: true,
+      data: {
+        standardTime: calculations.STANDARDTIME,
+        overtime: calculations.OVERTIME,
+        grossSalary: calculations.GROSSSALARY,
+        uif: calculations.UIF,
+        totalDeductions: calculations.TOTALDEDUCTIONS,
+        netSalary: calculations.NETTSALARY,
+        paidToAccount: calculations.PaidToAccount
+      },
+      error: null
+    };
+  } catch (error) {
+    Logger.log('❌ ERROR in calculatePayslipPreview: ' + error.message);
+    return {
+      success: false,
+      data: null,
+      error: error.message
+    };
   }
 }
 
@@ -211,6 +282,20 @@ function updatePayslip(recordNumber, data) {
   try {
     Logger.log('\n========== UPDATE PAYSLIP ==========');
     Logger.log('ℹ️ Record Number: ' + recordNumber);
+
+    // Map UI field names to internal field names (if needed)
+    if (data.hours !== undefined) data.HOURS = data.hours;
+    if (data.minutes !== undefined) data.MINUTES = data.minutes;
+    if (data.overtimeHours !== undefined) data.OVERTIMEHOURS = data.overtimeHours;
+    if (data.overtimeMinutes !== undefined) data.OVERTIMEMINUTES = data.overtimeMinutes;
+    if (data.leavePay !== undefined) data['LEAVE PAY'] = data.leavePay;
+    if (data.bonusPay !== undefined) data['BONUS PAY'] = data.bonusPay;
+    if (data.otherIncome !== undefined) data.OTHERINCOME = data.otherIncome;
+    if (data.otherDeductions !== undefined) data['OTHER DEDUCTIONS'] = data.otherDeductions;
+    if (data.otherDeductionsText !== undefined) data['OTHER DEDUCTIONS TEXT'] = data.otherDeductionsText;
+    if (data.weekEnding !== undefined) data.WEEKENDING = data.weekEnding;
+    if (data.notes !== undefined) data.NOTES = data.notes;
+    if (data.employeeName !== undefined) data['EMPLOYEE NAME'] = data.employeeName;
 
     const sheets = getSheets();
     const salarySheet = sheets.salary;
