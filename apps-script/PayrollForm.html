@@ -416,6 +416,13 @@
                                 .filter(emp => !emp['TERMINATION DATE'])
                                 .map(emp => `<option value="${emp.REFNAME}">${emp.REFNAME}</option>`)
                                 .join('');
+
+                        // After employees are loaded, check if we need to load a payslip for editing
+                        const editRecordNumber = sessionStorage.getItem('editPayslipRecordNumber');
+                        if (editRecordNumber) {
+                            console.log('Loading payslip for edit after employees loaded:', editRecordNumber);
+                            loadPayslipForEdit(editRecordNumber);
+                        }
                     } else {
                         showError('Failed to load employees: ' + (result.error || 'Unknown error'));
                     }
@@ -674,14 +681,14 @@
         }
 
         // ===== INITIALIZATION =====
-        // Check if editing existing payslip
+        // Update form title if editing
         const editRecordNumber = sessionStorage.getItem('editPayslipRecordNumber');
         if (editRecordNumber) {
             document.getElementById('formTitle').textContent = 'Edit Payslip #' + editRecordNumber;
-            loadPayslipForEdit(editRecordNumber);
         }
 
         // Load employees on page load
+        // NOTE: If editing, loadPayslipForEdit() will be called automatically after employees load
         loadEmployees();
     </script>
 </body>
