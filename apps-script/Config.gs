@@ -178,7 +178,7 @@ var PAYSLIP_FIELDS = [
   'LoanRepaymentLogged',     // System flag
   'TOTALDEDUCTIONS',         // Calculated
   'NETTSALARY',              // Calculated
-  'PaidToAccount',           // Calculated (CRITICAL)
+  'PaidtoAccount',           // Calculated (CRITICAL) - Note: lowercase 't' in 'to'
   'FILENAME',                // PDF filename
   'FILELINK',                // PDF URL
   'NOTES',                   // Free text

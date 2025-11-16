@@ -224,7 +224,7 @@
                 totalGross += p.GROSSSALARY || 0;
                 totalDeductions += p.TOTALDEDUCTIONS || 0;
                 totalNet += p.NETTSALARY || 0;
-                totalPaid += p.PaidToAccount || 0;
+                totalPaid += p.PaidtoAccount || 0;
 
                 return `
                     <tr>
@@ -236,7 +236,7 @@
                         <td>${formatCurrency(p.GROSSSALARY || 0)}</td>
                         <td>${formatCurrency(p.TOTALDEDUCTIONS || 0)}</td>
                         <td>${formatCurrency(p.NETTSALARY || 0)}</td>
-                        <td class="amount-cell">${formatCurrency(p.PaidToAccount || 0)}</td>
+                        <td class="amount-cell">${formatCurrency(p.PaidtoAccount || 0)}</td>
                         <td class="action-buttons">
                             <button class="btn btn-sm btn-info" onclick="editPayslip(${p.RECORDNUMBER})" title="Edit">
                                 <i class="fas fa-edit"></i>
@@ -392,7 +392,7 @@
                                 <hr>
                                 <div class="alert alert-success">
                                     <h5>Net Salary: ${formatCurrency(payslip.NETTSALARY)}</h5>
-                                    <h4>Paid to Account: ${formatCurrency(payslip.PaidToAccount)}</h4>
+                                    <h4>Paid to Account: ${formatCurrency(payslip.PaidtoAccount)}</h4>
                                 </div>
                             </div>
                             <div class="modal-footer">

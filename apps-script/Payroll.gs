@@ -116,7 +116,7 @@ function createPayslip(data) {
     SpreadsheetApp.flush();
 
     Logger.log('✅ Payslip created: #' + data.RECORDNUMBER);
-    Logger.log('✅ Paid to Account: ' + formatCurrency(data.PaidToAccount));
+    Logger.log('✅ Paid to Account: ' + formatCurrency(data.PaidtoAccount));
     Logger.log('========== CREATE PAYSLIP COMPLETE ==========\n');
 
     // Sanitize for web - convert Date objects to strings
@@ -185,7 +185,7 @@ function calculatePayslipPreview(data) {
         uif: calculations.UIF,
         totalDeductions: calculations.TOTALDEDUCTIONS,
         netSalary: calculations.NETTSALARY,
-        paidToAccount: calculations.PaidToAccount
+        paidToAccount: calculations.PaidtoAccount
       },
       error: null
     };
@@ -270,7 +270,7 @@ function calculatePayslip(data) {
     UIF: roundTo(uif, 2),
     TOTALDEDUCTIONS: roundTo(totalDeductions, 2),
     NETTSALARY: roundTo(netSalary, 2),
-    PaidToAccount: roundTo(paidToAccount, 2),
+    PaidtoAccount: roundTo(paidToAccount, 2),
     UpdatedLoanBalance: roundTo(updatedBalance, 2)
   };
 }
@@ -635,7 +635,7 @@ function test_calculatePayslip_StandardTime() {
     GROSSSALARY: 1341.42,
     UIF: 13.41,
     NETTSALARY: 1328.01,
-    PaidToAccount: 1178.01
+    PaidtoAccount: 1178.01
   };
 
   let passed = true;
@@ -689,7 +689,7 @@ function test_calculatePayslip_NewLoanWithSalary() {
     STANDARDTIME: 1600.00,
     UIF: 16.00,
     NETTSALARY: 1584.00,
-    PaidToAccount: 2084.00  // Net + Loan
+    PaidtoAccount: 2084.00  // Net + Loan
   };
 
   let passed = true;
@@ -743,7 +743,7 @@ function test_calculatePayslip_UIF() {
     STANDARDTIME: 1400.00,
     UIF: 0.00,  // Temporary employees don't pay UIF
     NETTSALARY: 1400.00,
-    PaidToAccount: 1400.00
+    PaidtoAccount: 1400.00
   };
 
   let passed = true;
@@ -799,7 +799,7 @@ function test_calculatePayslip_Overtime() {
     GROSSSALARY: 1275.00,
     UIF: 12.75,
     NETTSALARY: 1262.25,
-    PaidToAccount: 1262.25
+    PaidtoAccount: 1262.25
   };
 
   let passed = true;
