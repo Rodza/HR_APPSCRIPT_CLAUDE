@@ -313,12 +313,14 @@
             };
 
             window.showPayrollForm = function(recordNumber) {
-            loadModule('payrollForm');
+                // Set/clear sessionStorage BEFORE loading module
                 if (recordNumber) {
                     sessionStorage.setItem('editPayslipRecordNumber', recordNumber);
                 } else {
                     sessionStorage.removeItem('editPayslipRecordNumber');
                 }
+                // Now load the module
+                loadModule('payrollForm');
             };
 
             window.editPayslip = function(recordNumber) {
