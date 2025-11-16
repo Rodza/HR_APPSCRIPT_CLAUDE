@@ -731,15 +731,18 @@
         }
 
         // ===== INITIALIZATION =====
-        // Update form title if editing
-        const editRecordNumber = sessionStorage.getItem('editPayslipRecordNumber');
-        if (editRecordNumber) {
-            document.getElementById('formTitle').textContent = 'Edit Payslip #' + editRecordNumber;
-        }
+        // Wrap in IIFE to create new scope each time module loads
+        (function() {
+            // Update form title if editing
+            const editRecordNumber = sessionStorage.getItem('editPayslipRecordNumber');
+            if (editRecordNumber) {
+                document.getElementById('formTitle').textContent = 'Edit Payslip #' + editRecordNumber;
+            }
 
-        // Load employees on page load
-        // NOTE: If editing, loadPayslipForEdit() will be called automatically after employees load
-        loadEmployees();
+            // Load employees on page load
+            // NOTE: If editing, loadPayslipForEdit() will be called automatically after employees load
+            loadEmployees();
+        })();
     </script>
 </body>
 </html>
