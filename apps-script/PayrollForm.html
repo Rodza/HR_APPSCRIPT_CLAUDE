@@ -401,8 +401,10 @@
         // ===== EMPLOYEE FUNCTIONS (GLOBAL FOR INLINE HANDLERS) =====
 
         function loadEmployees() {
+            console.log('loadEmployees called');
             google.script.run
                 .withSuccessHandler(function(result) {
+                    console.log('loadEmployees success handler called', result);
                     // Defensive null check
                     if (!result) {
                         console.error('loadEmployees received null result');
@@ -411,20 +413,35 @@
                     }
                     if (result.success) {
                         allEmployees = result.data;
+                        console.log('Employees loaded:', allEmployees.length);
+
                         const select = document.getElementById('employeeName');
+                        if (!select) {
+                            console.error('employeeName select element not found!');
+                            return;
+                        }
+
+                        const activeEmployees = result.data.filter(emp => !emp['TERMINATION DATE']);
+                        console.log('Active employees:', activeEmployees.length);
+
                         select.innerHTML = '<option value="">Select Employee</option>' +
-                            result.data
-                                .filter(emp => !emp['TERMINATION DATE'])
+                            activeEmployees
                                 .map(emp => `<option value="${emp.REFNAME}">${emp.REFNAME}</option>`)
                                 .join('');
 
+                        console.log('Employee dropdown populated with', select.options.length, 'options');
+
                         // After employees are loaded, check if we need to load a payslip for editing
                         const editRecordNumber = sessionStorage.getItem('editPayslipRecordNumber');
+                        console.log('Checking editRecordNumber from sessionStorage:', editRecordNumber);
                         if (editRecordNumber) {
                             console.log('Loading payslip for edit after employees loaded:', editRecordNumber);
                             loadPayslipForEdit(editRecordNumber);
+                        } else {
+                            console.log('No editRecordNumber - showing empty form for new payslip');
                         }
                     } else {
+                        console.error('loadEmployees result not successful:', result.error);
                         showError('Failed to load employees: ' + (result.error || 'Unknown error'));
                     }
                 })
