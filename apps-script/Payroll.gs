@@ -580,23 +580,250 @@ function generatePayslipPDF(recordNumber) {
 
     const payslip = result.data;
 
-    // TODO: Full PDF generation implementation
-    // This requires creating a Google Doc with the payslip format
-    // For now, return placeholder
+    // Create PDF content as HTML
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 20px; }
+          .header { text-align: center; margin-bottom: 30px; }
+          .company { font-size: 18px; font-weight: bold; }
+          .title { font-size: 24px; font-weight: bold; margin: 10px 0; }
+          .info-section { margin: 20px 0; }
+          .info-row { display: flex; margin: 5px 0; }
+          .label { width: 200px; font-weight: bold; }
+          .value { flex: 1; }
+          table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+          th, td { padding: 10px; text-align: left; border: 1px solid #ddd; }
+          th { background-color: #f2f2f2; font-weight: bold; }
+          .amount { text-align: right; }
+          .total-row { font-weight: bold; background-color: #f9f9f9; }
+          .footer { margin-top: 30px; font-size: 12px; color: #666; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="company">${payslip.EMPLOYER || 'SA Grinding Wheels'}</div>
+          <div class="title">PAYSLIP</div>
+        </div>
 
-    Logger.log('⚠️ PDF generation not yet implemented');
+        <div class="info-section">
+          <div class="info-row">
+            <div class="label">Payslip Number:</div>
+            <div class="value">#${payslip.RECORDNUMBER}</div>
+          </div>
+          <div class="info-row">
+            <div class="label">Employee:</div>
+            <div class="value">${payslip['EMPLOYEE NAME'] || ''}</div>
+          </div>
+          <div class="info-row">
+            <div class="label">Employment Status:</div>
+            <div class="value">${payslip['EMPLOYMENT STATUS'] || ''}</div>
+          </div>
+          <div class="info-row">
+            <div class="label">Week Ending:</div>
+            <div class="value">${formatDateForDisplay(payslip.WEEKENDING)}</div>
+          </div>
+          <div class="info-row">
+            <div class="label">Date Generated:</div>
+            <div class="value">${formatDateForDisplay(new Date())}</div>
+          </div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Description</th>
+              <th class="amount">Amount (R)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Standard Time (${payslip.HOURS || 0}h ${payslip.MINUTES || 0}m)</td>
+              <td class="amount">${formatAmount(payslip.STANDARDTIME)}</td>
+            </tr>
+            <tr>
+              <td>Overtime (${payslip.OVERTIMEHOURS || 0}h ${payslip.OVERTIMEMINUTES || 0}m)</td>
+              <td class="amount">${formatAmount(payslip.OVERTIME)}</td>
+            </tr>
+            ${payslip['LEAVE PAY'] > 0 ? `<tr><td>Leave Pay</td><td class="amount">${formatAmount(payslip['LEAVE PAY'])}</td></tr>` : ''}
+            ${payslip['BONUS PAY'] > 0 ? `<tr><td>Bonus Pay</td><td class="amount">${formatAmount(payslip['BONUS PAY'])}</td></tr>` : ''}
+            ${payslip.OTHERINCOME > 0 ? `<tr><td>Other Income</td><td class="amount">${formatAmount(payslip.OTHERINCOME)}</td></tr>` : ''}
+            <tr class="total-row">
+              <td><strong>Gross Salary</strong></td>
+              <td class="amount"><strong>${formatAmount(payslip.GROSSSALARY)}</strong></td>
+            </tr>
+            <tr>
+              <td>UIF (1%)</td>
+              <td class="amount">(${formatAmount(payslip.UIF)})</td>
+            </tr>
+            ${payslip['OTHER DEDUCTIONS'] > 0 ? `<tr><td>Other Deductions${payslip['OTHER DEDUCTIONS TEXT'] ? ' - ' + payslip['OTHER DEDUCTIONS TEXT'] : ''}</td><td class="amount">(${formatAmount(payslip['OTHER DEDUCTIONS'])})</td></tr>` : ''}
+            <tr class="total-row">
+              <td><strong>Total Deductions</strong></td>
+              <td class="amount"><strong>(${formatAmount(payslip.TOTALDEDUCTIONS)})</strong></td>
+            </tr>
+            <tr class="total-row">
+              <td><strong>Net Salary</strong></td>
+              <td class="amount"><strong>${formatAmount(payslip.NETTSALARY)}</strong></td>
+            </tr>
+            ${payslip.LoanDeductionThisWeek > 0 ? `<tr><td>Loan Deduction</td><td class="amount">(${formatAmount(payslip.LoanDeductionThisWeek)})</td></tr>` : ''}
+            ${payslip.NewLoanThisWeek > 0 && payslip.LoanDisbursementType === 'With Salary' ? `<tr><td>New Loan (With Salary)</td><td class="amount">${formatAmount(payslip.NewLoanThisWeek)}</td></tr>` : ''}
+            <tr class="total-row" style="background-color: #e8f5e9;">
+              <td><strong>PAID TO ACCOUNT</strong></td>
+              <td class="amount"><strong>${formatAmount(payslip.PaidtoAccount)}</strong></td>
+            </tr>
+          </tbody>
+        </table>
+
+        ${payslip.NOTES ? `<div class="info-section"><div class="label">Notes:</div><div class="value">${payslip.NOTES}</div></div>` : ''}
+
+        <div class="footer">
+          Generated on ${formatDateForDisplay(new Date())} by HR Payroll System
+        </div>
+      </body>
+      </html>
+    `;
+
+    // Create a temporary Google Doc
+    const docName = `Payslip_${payslip.RECORDNUMBER}_${payslip['EMPLOYEE NAME']}_${formatDateForFilename(payslip.WEEKENDING)}`;
+    const doc = DocumentApp.create(docName);
+    const docId = doc.getId();
+
+    // Clear default content and add HTML
+    const body = doc.getBody();
+    body.clear();
+    body.appendParagraph(payslip.EMPLOYER || 'SA Grinding Wheels').setAlignment(DocumentApp.HorizontalAlignment.CENTER).setBold(true);
+    body.appendParagraph('PAYSLIP').setAlignment(DocumentApp.HorizontalAlignment.CENTER).setFontSize(18).setBold(true);
+    body.appendParagraph('');
+    body.appendParagraph(`Payslip Number: #${payslip.RECORDNUMBER}`);
+    body.appendParagraph(`Employee: ${payslip['EMPLOYEE NAME'] || ''}`);
+    body.appendParagraph(`Employment Status: ${payslip['EMPLOYMENT STATUS'] || ''}`);
+    body.appendParagraph(`Week Ending: ${formatDateForDisplay(payslip.WEEKENDING)}`);
+    body.appendParagraph('');
+
+    // Add earnings table
+    const table = body.appendTable();
+    const headerRow = table.appendTableRow();
+    headerRow.appendTableCell('Description').setBackgroundColor('#f2f2f2');
+    headerRow.appendTableCell('Amount (R)').setBackgroundColor('#f2f2f2');
+
+    // Standard time
+    const row1 = table.appendTableRow();
+    row1.appendTableCell(`Standard Time (${payslip.HOURS || 0}h ${payslip.MINUTES || 0}m)`);
+    row1.appendTableCell(formatAmount(payslip.STANDARDTIME));
+
+    // Overtime
+    const row2 = table.appendTableRow();
+    row2.appendTableCell(`Overtime (${payslip.OVERTIMEHOURS || 0}h ${payslip.OVERTIMEMINUTES || 0}m)`);
+    row2.appendTableCell(formatAmount(payslip.OVERTIME));
+
+    // Gross
+    const row3 = table.appendTableRow();
+    row3.appendTableCell('Gross Salary').setBold(true);
+    row3.appendTableCell(formatAmount(payslip.GROSSSALARY)).setBold(true);
+
+    // UIF
+    const row4 = table.appendTableRow();
+    row4.appendTableCell('UIF (1%)');
+    row4.appendTableCell(`(${formatAmount(payslip.UIF)})`);
+
+    // Net
+    const row5 = table.appendTableRow();
+    row5.appendTableCell('Net Salary').setBold(true);
+    row5.appendTableCell(formatAmount(payslip.NETTSALARY)).setBold(true);
+
+    // Paid to Account
+    const row6 = table.appendTableRow();
+    row6.appendTableCell('PAID TO ACCOUNT').setBold(true);
+    row6.appendTableCell(formatAmount(payslip.PaidtoAccount)).setBold(true).setBackgroundColor('#e8f5e9');
+
+    doc.saveAndClose();
+
+    // Convert to PDF
+    const docFile = DriveApp.getFileById(docId);
+    const pdfBlob = docFile.getAs('application/pdf');
+    pdfBlob.setName(docName + '.pdf');
+
+    // Save PDF to Drive (in root or specific folder)
+    const pdfFile = DriveApp.createFile(pdfBlob);
+    const pdfUrl = pdfFile.getUrl();
+
+    // Delete the temporary doc
+    docFile.setTrashed(true);
+
+    // Update payslip record with PDF link
+    const sheets = getSheets();
+    const salarySheet = sheets.salary;
+    const allData = salarySheet.getDataRange().getValues();
+    const headers = allData[0];
+    const rows = allData.slice(1);
+
+    const recordNumCol = findColumnIndex(headers, 'RECORDNUMBER');
+    const fileNameCol = findColumnIndex(headers, 'FILENAME');
+    const fileLinkCol = findColumnIndex(headers, 'FILELINK');
+
+    const rowIndex = rows.findIndex(r => String(r[recordNumCol]) === String(recordNumber));
+    if (rowIndex >= 0) {
+      const sheetRowIndex = rowIndex + 2; // +1 for header, +1 for 0-index
+      if (fileNameCol >= 0) {
+        salarySheet.getRange(sheetRowIndex, fileNameCol + 1).setValue(pdfFile.getName());
+      }
+      if (fileLinkCol >= 0) {
+        salarySheet.getRange(sheetRowIndex, fileLinkCol + 1).setValue(pdfUrl);
+      }
+    }
+
+    Logger.log('✅ PDF generated successfully: ' + pdfFile.getName());
+    Logger.log('✅ PDF URL: ' + pdfUrl);
     Logger.log('========== GENERATE PDF COMPLETE ==========\n');
 
     return {
       success: true,
-      message: 'PDF generation placeholder - implement using Google Docs API',
-      data: { url: '#' }
+      message: 'PDF generated successfully',
+      data: {
+        url: pdfUrl,
+        filename: pdfFile.getName()
+      }
     };
 
   } catch (error) {
     Logger.log('❌ ERROR in generatePayslipPDF: ' + error.message);
+    Logger.log('Stack: ' + error.stack);
     return { success: false, error: error.message };
   }
+}
+
+/**
+ * Helper function to format dates for display
+ */
+function formatDateForDisplay(dateValue) {
+  if (!dateValue) return '';
+  const d = new Date(dateValue);
+  const options = { year: 'numeric', month: 'long', day: 'numeric' };
+  return d.toLocaleDateString('en-ZA', options);
+}
+
+/**
+ * Helper function to format dates for filenames
+ */
+function formatDateForFilename(dateValue) {
+  if (!dateValue) return '';
+  const d = new Date(dateValue);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Helper function to format amounts for display
+ */
+function formatAmount(amount) {
+  if (amount === null || amount === undefined || amount === '') {
+    return '0.00';
+  }
+  return parseFloat(amount).toFixed(2);
 }
 
 // ========== TEST FUNCTIONS ==========
