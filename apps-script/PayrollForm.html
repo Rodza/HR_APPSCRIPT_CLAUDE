@@ -396,6 +396,7 @@
         var allEmployees = [];
         var selectedEmployee = null;
         var currentCalculation = null;
+        var isPopulatingForm = false; // Flag to prevent multiple calculatePreview calls during form population
 
         // ===== EMPLOYEE FUNCTIONS (GLOBAL FOR INLINE HANDLERS) =====
 
@@ -481,6 +482,12 @@
         }
 
         function calculatePreview() {
+            // Skip calculation if we're currently populating the form
+            if (isPopulatingForm) {
+                console.log('Skipping calculatePreview - form is being populated');
+                return;
+            }
+
             if (!selectedEmployee) {
                 // Clear preview
                 document.getElementById('previewStandardTime').textContent = 'R0.00';
@@ -649,26 +656,52 @@
         }
 
         function populateForm(payslip) {
-            document.getElementById('recordNumber').value = payslip.RECORDNUMBER;
-            document.getElementById('employeeName').value = payslip['EMPLOYEE NAME'];
-            onEmployeeChange();
+            console.log('populateForm called with payslip:', payslip.RECORDNUMBER);
 
-            document.getElementById('weekEnding').value = formatDateForInput(payslip.WEEKENDING);
-            document.getElementById('hours').value = payslip.HOURS || 0;
-            document.getElementById('minutes').value = payslip.MINUTES || 0;
-            document.getElementById('overtimeHours').value = payslip.OVERTIMEHOURS || 0;
-            document.getElementById('overtimeMinutes').value = payslip.OVERTIMEMINUTES || 0;
-            document.getElementById('leavePay').value = payslip['LEAVE PAY'] || 0;
-            document.getElementById('bonusPay').value = payslip['BONUS PAY'] || 0;
-            document.getElementById('otherIncome').value = payslip.OTHERINCOME || 0;
-            document.getElementById('otherDeductions').value = payslip['OTHER DEDUCTIONS'] || 0;
-            document.getElementById('otherDeductionsText').value = payslip['OTHER DEDUCTIONS TEXT'] || '';
-            document.getElementById('loanDeductionThisWeek').value = payslip.LoanDeductionThisWeek || 0;
-            document.getElementById('newLoanThisWeek').value = payslip.NewLoanThisWeek || 0;
-            document.getElementById('loanDisbursementType').value = payslip.LoanDisbursementType || 'Separate';
-            document.getElementById('notes').value = payslip.NOTES || '';
+            // Set flag to prevent multiple calculatePreview calls
+            isPopulatingForm = true;
 
-            calculatePreview();
+            try {
+                document.getElementById('recordNumber').value = payslip.RECORDNUMBER;
+                document.getElementById('employeeName').value = payslip['EMPLOYEE NAME'];
+
+                // Manually set selectedEmployee since we're populating
+                selectedEmployee = allEmployees.find(emp => emp.REFNAME === payslip['EMPLOYEE NAME']);
+
+                if (selectedEmployee) {
+                    console.log('selectedEmployee found:', selectedEmployee.REFNAME);
+
+                    // Update read-only fields
+                    document.getElementById('employer').value = selectedEmployee.EMPLOYER;
+                    document.getElementById('employmentStatus').value = selectedEmployee['EMPLOYMENT STATUS'];
+                    document.getElementById('hourlyRate').value = formatCurrency(selectedEmployee['HOURLY RATE']);
+
+                    // Load loan balance
+                    loadLoanBalance(selectedEmployee.id);
+                } else {
+                    console.error('selectedEmployee not found for:', payslip['EMPLOYEE NAME']);
+                }
+
+                document.getElementById('weekEnding').value = formatDateForInput(payslip.WEEKENDING);
+                document.getElementById('hours').value = payslip.HOURS || 0;
+                document.getElementById('minutes').value = payslip.MINUTES || 0;
+                document.getElementById('overtimeHours').value = payslip.OVERTIMEHOURS || 0;
+                document.getElementById('overtimeMinutes').value = payslip.OVERTIMEMINUTES || 0;
+                document.getElementById('leavePay').value = payslip['LEAVE PAY'] || 0;
+                document.getElementById('bonusPay').value = payslip['BONUS PAY'] || 0;
+                document.getElementById('otherIncome').value = payslip.OTHERINCOME || 0;
+                document.getElementById('otherDeductions').value = payslip['OTHER DEDUCTIONS'] || 0;
+                document.getElementById('otherDeductionsText').value = payslip['OTHER DEDUCTIONS TEXT'] || '';
+                document.getElementById('loanDeductionThisWeek').value = payslip.LoanDeductionThisWeek || 0;
+                document.getElementById('newLoanThisWeek').value = payslip.NewLoanThisWeek || 0;
+                document.getElementById('loanDisbursementType').value = payslip.LoanDisbursementType || 'Separate';
+                document.getElementById('notes').value = payslip.NOTES || '';
+            } finally {
+                // Clear flag and trigger calculation once
+                isPopulatingForm = false;
+                console.log('Form populated, calling calculatePreview');
+                calculatePreview();
+            }
         }
 
         function formatDateForInput(dateValue) {
