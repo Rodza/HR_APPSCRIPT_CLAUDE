@@ -291,6 +291,10 @@
             google.script.run
                 .withSuccessHandler(function(result) {
                     hideLoading();
+                    if (!result) {
+                        showError('Authorization required or server returned no response. Please try again.');
+                        return;
+                    }
                     if (result.success) {
                         populateForm(result.data);
                     } else {
@@ -363,6 +367,10 @@
             google.script.run
                 .withSuccessHandler(function(result) {
                     hideLoading();
+                    if (!result) {
+                        showError('Authorization required or server returned no response. Please try again.');
+                        return;
+                    }
                     if (result.success) {
                         showSuccess('Settings saved successfully');
                         loadCurrentSettings(); // Reload to show saved values
@@ -385,6 +393,10 @@
             google.script.run
                 .withSuccessHandler(function(result) {
                     hideLoading();
+                    if (!result) {
+                        showError('Authorization required or server returned no response. Please try again.');
+                        return;
+                    }
                     if (result.success) {
                         showSuccess('Settings reset to defaults');
                         loadCurrentSettings();
@@ -405,6 +417,10 @@
             google.script.run
                 .withSuccessHandler(function(result) {
                     hideLoading();
+                    if (!result) {
+                        showError('Authorization required or server returned no response. Please try again.');
+                        return;
+                    }
                     if (result.success) {
                         // Copy to clipboard
                         const jsonString = result.data;
@@ -454,6 +470,10 @@
             google.script.run
                 .withSuccessHandler(function(result) {
                     hideLoading();
+                    if (!result) {
+                        showError('Authorization required or server returned no response. Please try again.');
+                        return;
+                    }
                     if (result.success) {
                         importModal.hide();
                         showSuccess('Settings imported successfully');
