@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <style>
+        .settings-section {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .settings-section h6 {
+            color: #495057;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-label {
+            font-weight: 500;
+            margin-bottom: 5px;
+        }
+        .help-text {
+            font-size: 0.875rem;
+            color: #6c757d;
+        }
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5><i class="fas fa-cog"></i> Timesheet Processing Settings</h5>
+            <button class="btn btn-secondary btn-sm" onclick="loadCurrentSettings()">
+                <i class="fas fa-sync-alt"></i> Refresh
+            </button>
+        </div>
+        <div class="card-body">
+            <!-- Alert for changes -->
+            <div id="alertContainer"></div>
+
+            <form id="settingsForm">
+                <!-- Standard Times Section -->
+                <div class="settings-section">
+                    <h6><i class="fas fa-clock"></i> Standard Work Times</h6>
+
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label class="form-label">Standard Start Time</label>
+                                <input type="time" class="form-control" id="standardStartTime" required>
+                                <small class="help-text">Normal work day start time</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label class="form-label">Standard End Time</label>
+                                <input type="time" class="form-control" id="standardEndTime" required>
+                                <small class="help-text">Normal work day end time</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label class="form-label">Friday End Time</label>
+                                <input type="time" class="form-control" id="fridayEndTime" required>
+                                <small class="help-text">Special Friday end time</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Buffers & Grace Periods Section -->
+                <div class="settings-section">
+                    <h6><i class="fas fa-clock"></i> Buffers & Grace Periods</h6>
+
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label class="form-label">Grace Minutes</label>
+                                <input type="number" class="form-control" id="graceMinutes" min="0" max="60" required>
+                                <small class="help-text">Late clock-in tolerance (minutes)</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label class="form-label">End Buffer Minutes</label>
+                                <input type="number" class="form-control" id="endBufferMinutes" min="0" max="60" required>
+                                <small class="help-text">Early clock-out tolerance (minutes)</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label class="form-label">Lunch Buffer Minutes</label>
+                                <input type="number" class="form-control" id="lunchBufferMinutes" min="0" max="60" required>
+                                <small class="help-text">Buffer around lunch time (minutes)</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Lunch Rules Section -->
+                <div class="settings-section">
+                    <h6><i class="fas fa-utensils"></i> Lunch Break Rules</h6>
+
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="form-group">
+                                <label class="form-label">Min Lunch Minutes</label>
+                                <input type="number" class="form-control" id="minLunchMinutes" min="0" max="120" required>
+                                <small class="help-text">Minimum lunch duration</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-group">
+                                <label class="form-label">Max Lunch Minutes</label>
+                                <input type="number" class="form-control" id="maxLunchMinutes" min="0" max="120" required>
+                                <small class="help-text">Maximum lunch duration</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-group">
+                                <label class="form-label">Standard Lunch Minutes</label>
+                                <input type="number" class="form-control" id="standardLunchMinutes" min="0" max="120" required>
+                                <small class="help-text">Standard lunch deduction</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-group">
+                                <label class="form-label">Late Morning Threshold</label>
+                                <input type="time" class="form-control" id="lateMorningThreshold" required>
+                                <small class="help-text">Late arrival lunch assumption</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="applyLunchOnFriday">
+                                <label class="form-check-label" for="applyLunchOnFriday">
+                                    Apply lunch deduction on Fridays
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Other Rules Section -->
+                <div class="settings-section">
+                    <h6><i class="fas fa-ruler"></i> Other Rules</h6>
+
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label class="form-label">Daily Bathroom Threshold</label>
+                                <input type="number" class="form-control" id="dailyBathroomThreshold" min="0" max="240" required>
+                                <small class="help-text">Daily limit (minutes)</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label class="form-label">Early Change Threshold</label>
+                                <input type="number" class="form-control" id="earlyChangeThreshold" min="0" max="60" required>
+                                <small class="help-text">Early to work allowance (minutes)</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label class="form-label">Long Bathroom Threshold</label>
+                                <input type="number" class="form-control" id="longBathroomThreshold" min="0" max="120" required>
+                                <small class="help-text">Long break warning (minutes)</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="projectIncompleteDays">
+                                <label class="form-check-label" for="projectIncompleteDays">
+                                    Project incomplete days (use standard times for missing clock-ins/outs)
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="action-buttons">
+                    <button type="button" class="btn btn-warning" onclick="resetToDefaults()">
+                        <i class="fas fa-undo"></i> Reset to Defaults
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="exportSettings()">
+                        <i class="fas fa-download"></i> Export
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="importSettings()">
+                        <i class="fas fa-upload"></i> Import
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Save Settings
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Import Modal -->
+    <div class="modal fade" id="importModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Import Settings</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Paste JSON Configuration</label>
+                        <textarea class="form-control" id="importJson" rows="10" placeholder='{
+  "standardStartTime": "07:30",
+  "standardEndTime": "16:30",
+  ...
+}'></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="executeImport()">Import</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let importModal;
+
+        // Load current settings on page load
+        loadCurrentSettings();
+
+        function loadCurrentSettings() {
+            showLoading();
+
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    hideLoading();
+                    if (result.success) {
+                        populateForm(result.data);
+                    } else {
+                        showError('Failed to load settings: ' + result.error);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    hideLoading();
+                    showError('Error loading settings: ' + error.message);
+                })
+                .getTimeConfig();
+        }
+
+        function populateForm(config) {
+            // Standard times
+            document.getElementById('standardStartTime').value = config.standardStartTime || '07:30';
+            document.getElementById('standardEndTime').value = config.standardEndTime || '16:30';
+            document.getElementById('fridayEndTime').value = config.fridayEndTime || '13:00';
+
+            // Buffers
+            document.getElementById('graceMinutes').value = config.graceMinutes || 5;
+            document.getElementById('endBufferMinutes').value = config.endBufferMinutes || 5;
+            document.getElementById('lunchBufferMinutes').value = config.lunchBufferMinutes || 5;
+
+            // Lunch rules
+            document.getElementById('minLunchMinutes').value = config.minLunchMinutes || 20;
+            document.getElementById('maxLunchMinutes').value = config.maxLunchMinutes || 35;
+            document.getElementById('standardLunchMinutes').value = config.standardLunchMinutes || 30;
+            document.getElementById('lateMorningThreshold').value = config.lateMorningThreshold || '11:00';
+            document.getElementById('applyLunchOnFriday').checked = config.applyLunchOnFriday || false;
+
+            // Other rules
+            document.getElementById('dailyBathroomThreshold').value = config.dailyBathroomThreshold || 30;
+            document.getElementById('earlyChangeThreshold').value = config.earlyChangeThreshold || 10;
+            document.getElementById('longBathroomThreshold').value = config.longBathroomThreshold || 15;
+            document.getElementById('projectIncompleteDays').checked = config.projectIncompleteDays !== false;
+        }
+
+        function getFormData() {
+            return {
+                standardStartTime: document.getElementById('standardStartTime').value,
+                standardEndTime: document.getElementById('standardEndTime').value,
+                fridayEndTime: document.getElementById('fridayEndTime').value,
+                graceMinutes: parseFloat(document.getElementById('graceMinutes').value),
+                endBufferMinutes: parseFloat(document.getElementById('endBufferMinutes').value),
+                lunchBufferMinutes: parseFloat(document.getElementById('lunchBufferMinutes').value),
+                minLunchMinutes: parseFloat(document.getElementById('minLunchMinutes').value),
+                maxLunchMinutes: parseFloat(document.getElementById('maxLunchMinutes').value),
+                standardLunchMinutes: parseFloat(document.getElementById('standardLunchMinutes').value),
+                lateMorningThreshold: document.getElementById('lateMorningThreshold').value,
+                applyLunchOnFriday: document.getElementById('applyLunchOnFriday').checked,
+                dailyBathroomThreshold: parseFloat(document.getElementById('dailyBathroomThreshold').value),
+                earlyChangeThreshold: parseFloat(document.getElementById('earlyChangeThreshold').value),
+                longBathroomThreshold: parseFloat(document.getElementById('longBathroomThreshold').value),
+                projectIncompleteDays: document.getElementById('projectIncompleteDays').checked
+            };
+        }
+
+        // Form submission
+        document.getElementById('settingsForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            saveSettings();
+        });
+
+        function saveSettings() {
+            const formData = getFormData();
+
+            showLoading();
+
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    hideLoading();
+                    if (result.success) {
+                        showSuccess('Settings saved successfully');
+                        loadCurrentSettings(); // Reload to show saved values
+                    } else {
+                        showError('Failed to save settings: ' + result.error);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    hideLoading();
+                    showError('Error saving settings: ' + error.message);
+                })
+                .updateTimeConfig(formData);
+        }
+
+        function resetToDefaults() {
+            if (!confirm('Reset all settings to default values? This cannot be undone.')) return;
+
+            showLoading();
+
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    hideLoading();
+                    if (result.success) {
+                        showSuccess('Settings reset to defaults');
+                        loadCurrentSettings();
+                    } else {
+                        showError('Failed to reset settings: ' + result.error);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    hideLoading();
+                    showError('Error resetting settings: ' + error.message);
+                })
+                .resetTimeConfig();
+        }
+
+        function exportSettings() {
+            showLoading();
+
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    hideLoading();
+                    if (result.success) {
+                        // Copy to clipboard
+                        const jsonString = result.data;
+                        navigator.clipboard.writeText(jsonString).then(function() {
+                            showSuccess('Settings exported to clipboard');
+                        }).catch(function(err) {
+                            // Fallback: show in alert
+                            alert('Settings JSON:\n\n' + jsonString);
+                        });
+                    } else {
+                        showError('Failed to export settings: ' + result.error);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    hideLoading();
+                    showError('Error exporting settings: ' + error.message);
+                })
+                .exportTimeConfig();
+        }
+
+        function importSettings() {
+            if (!importModal) {
+                importModal = new bootstrap.Modal(document.getElementById('importModal'));
+            }
+            document.getElementById('importJson').value = '';
+            importModal.show();
+        }
+
+        function executeImport() {
+            const jsonString = document.getElementById('importJson').value.trim();
+
+            if (!jsonString) {
+                showError('Please paste JSON configuration');
+                return;
+            }
+
+            // Validate JSON
+            try {
+                JSON.parse(jsonString);
+            } catch (e) {
+                showError('Invalid JSON format: ' + e.message);
+                return;
+            }
+
+            showLoading();
+
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    hideLoading();
+                    if (result.success) {
+                        importModal.hide();
+                        showSuccess('Settings imported successfully');
+                        loadCurrentSettings();
+                    } else {
+                        showError('Failed to import settings: ' + result.error);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    hideLoading();
+                    showError('Error importing settings: ' + error.message);
+                })
+                .importTimeConfig(jsonString);
+        }
+
+        function showSuccess(message) {
+            const alert = `
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    <i class="fas fa-check-circle"></i> ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            `;
+            document.getElementById('alertContainer').innerHTML = alert;
+
+            // Auto-dismiss after 5 seconds
+            setTimeout(function() {
+                const alertEl = document.querySelector('.alert');
+                if (alertEl) {
+                    alertEl.remove();
+                }
+            }, 5000);
+        }
+
+        function showError(message) {
+            const alert = `
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="fas fa-exclamation-triangle"></i> ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            `;
+            document.getElementById('alertContainer').innerHTML = alert;
+        }
+    </script>
+</body>
+</html>
