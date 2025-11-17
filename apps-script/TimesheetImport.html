@@ -226,32 +226,27 @@
             showLoading();
             uploadArea.innerHTML = '<i class="fas fa-spinner fa-spin fa-3x text-primary mb-3"></i><h5>Processing...</h5>';
 
-            // Read file as blob
+            // Read file as base64
             const reader = new FileReader();
 
             reader.onload = function(e) {
-                // Convert to proper format for Apps Script
+                // Extract base64 data (remove data:...;base64, prefix)
                 const base64Data = e.target.result.split(',')[1];
-                const blob = Utilities.newBlob(
-                    Utilities.base64Decode(base64Data),
-                    file.type,
-                    file.name
-                );
 
-                // Import with no override initially
-                executeImport(blob, file.name, false);
+                // Send to server with metadata
+                executeImport(base64Data, file.name, file.type, false);
             };
 
             reader.readAsDataURL(file);
         }
 
-        function executeImport(blob, filename, override) {
+        function executeImport(base64Data, filename, mimeType, override) {
             showLoading();
 
             google.script.run
                 .withSuccessHandler(handleImportResponse)
                 .withFailureHandler(handleImportError)
-                .importClockData(blob, filename, override);
+                .importClockDataFromBase64(base64Data, filename, mimeType, override);
         }
 
         function handleImportResponse(result) {
@@ -329,13 +324,7 @@
 
             reader.onload = function(e) {
                 const base64Data = e.target.result.split(',')[1];
-                const blob = Utilities.newBlob(
-                    Utilities.base64Decode(base64Data),
-                    currentFile.type,
-                    currentFilename
-                );
-
-                executeImport(blob, currentFilename, true);
+                executeImport(base64Data, currentFilename, currentFile.type, true);
             };
 
             reader.readAsDataURL(currentFile);
@@ -350,13 +339,7 @@
 
             reader.onload = function(e) {
                 const base64Data = e.target.result.split(',')[1];
-                const blob = Utilities.newBlob(
-                    Utilities.base64Decode(base64Data),
-                    currentFile.type,
-                    currentFilename
-                );
-
-                executeImport(blob, currentFilename, true);
+                executeImport(base64Data, currentFilename, currentFile.type, true);
             };
 
             reader.readAsDataURL(currentFile);
