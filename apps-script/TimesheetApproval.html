@@ -209,20 +209,20 @@
 
                 return `
                     <tr>
-                        <td><strong>${escapeHtml(ts['EMPLOYEE NAME'] || '')}</strong></td>
+                        <td><strong>${escapeHtml(ts.EMPLOYEE_NAME || '')}</strong></td>
                         <td>${escapeHtml(ts.EMPLOYEE_CLOCK_REF || '-')}</td>
-                        <td>${formatDate(ts.WEEKENDING)}</td>
+                        <td>${formatDate(ts.WEEK_ENDING)}</td>
                         <td class="text-end">${ts.CALCULATED_TOTAL_HOURS || 0}</td>
                         <td class="text-end">${ts.CALCULATED_TOTAL_MINUTES || 0}</td>
-                        <td class="text-end">${ts.HOURS || 0}</td>
-                        <td class="text-end">${ts.MINUTES || 0}</td>
-                        <td class="text-end">${ts.OVERTIMEHOURS || 0}</td>
-                        <td class="text-end">${ts.OVERTIMEMINUTES || 0}</td>
+                        <td class="text-end">${ts.STANDARD_HOURS || 0}</td>
+                        <td class="text-end">${ts.STANDARD_MINUTES || 0}</td>
+                        <td class="text-end">${ts.OVERTIME_HOURS || 0}</td>
+                        <td class="text-end">${ts.OVERTIME_MINUTES || 0}</td>
                         <td class="text-end">${ts.LUNCH_DEDUCTION_MIN || 0}</td>
                         <td class="text-end">${ts.BATHROOM_TIME_MIN || 0}</td>
                         <td>${warningBadge}</td>
                         <td><span class="badge ${statusClass}">${ts.STATUS}</span></td>
-                        <td><small>${formatDate(ts.IMPORTED_DATE)}</small></td>
+                        <td><small>${formatDate(ts.CREATED_DATE)}</small></td>
                         <td class="action-buttons">
                             ${isPending ? `
                                 <button class="btn btn-sm btn-info" onclick="editTimesheet('${ts.ID}')" title="Edit">
@@ -247,13 +247,13 @@
 
             let filtered = allTimesheets.filter(ts => {
                 const matchesSearch = !searchText ||
-                    (ts['EMPLOYEE NAME'] && ts['EMPLOYEE NAME'].toLowerCase().includes(searchText));
+                    (ts.EMPLOYEE_NAME && ts.EMPLOYEE_NAME.toLowerCase().includes(searchText));
 
                 let matchesDate = true;
                 if (weekEnding) {
                     try {
                         // Parse both dates to compare just the date part (ignore time)
-                        const tsDate = new Date(ts.WEEKENDING);
+                        const tsDate = new Date(ts.WEEK_ENDING);
                         const filterDate = new Date(weekEnding);
 
                         // Compare dates only (YYYY-MM-DD)
@@ -278,11 +278,11 @@
             if (!timesheet) return;
 
             document.getElementById('editTimesheetId').value = timesheetId;
-            document.getElementById('editEmployee').value = timesheet['EMPLOYEE NAME'];
-            document.getElementById('editHours').value = timesheet.HOURS || 0;
-            document.getElementById('editMinutes').value = timesheet.MINUTES || 0;
-            document.getElementById('editOTHours').value = timesheet.OVERTIMEHOURS || 0;
-            document.getElementById('editOTMinutes').value = timesheet.OVERTIMEMINUTES || 0;
+            document.getElementById('editEmployee').value = timesheet.EMPLOYEE_NAME;
+            document.getElementById('editHours').value = timesheet.STANDARD_HOURS || 0;
+            document.getElementById('editMinutes').value = timesheet.STANDARD_MINUTES || 0;
+            document.getElementById('editOTHours').value = timesheet.OVERTIME_HOURS || 0;
+            document.getElementById('editOTMinutes').value = timesheet.OVERTIME_MINUTES || 0;
             document.getElementById('editNotes').value = timesheet.NOTES || '';
 
             if (!editModal) {

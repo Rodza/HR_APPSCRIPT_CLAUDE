@@ -622,13 +622,13 @@ function listPendingTimesheets(filters) {
       }
 
       if (filters.employeeName) {
-        records = records.filter(r => r['EMPLOYEE NAME'] === filters.employeeName);
+        records = records.filter(r => r.EMPLOYEE_NAME === filters.employeeName);
       }
 
       if (filters.weekEnding) {
         const filterWeekEnding = parseDate(filters.weekEnding);
         records = records.filter(r => {
-          const recordWeekEnding = parseDate(r['WEEKENDING']);
+          const recordWeekEnding = parseDate(r.WEEK_ENDING);
           return recordWeekEnding.getTime() === filterWeekEnding.getTime();
         });
       }
@@ -636,14 +636,14 @@ function listPendingTimesheets(filters) {
 
     // Sort by week ending (descending), then employee name
     records.sort((a, b) => {
-      const dateA = parseDate(a['WEEKENDING']);
-      const dateB = parseDate(b['WEEKENDING']);
+      const dateA = parseDate(a.WEEK_ENDING);
+      const dateB = parseDate(b.WEEK_ENDING);
 
       if (dateA.getTime() !== dateB.getTime()) {
         return dateB - dateA;  // Descending
       }
 
-      return a['EMPLOYEE NAME'].localeCompare(b['EMPLOYEE NAME']);
+      return a.EMPLOYEE_NAME.localeCompare(b.EMPLOYEE_NAME);
     });
 
     Logger.log('✅ Found ' + records.length + ' pending timesheets');
