@@ -43,28 +43,37 @@ var DEFAULT_TIME_CONFIG = {
  * Get current time processing configuration
  * Loads from PropertiesService or returns defaults if not set
  *
- * @returns {Object} Current time configuration
+ * @returns {Object} Result with success flag and configuration data
  */
 function getTimeConfig() {
   try {
     var props = PropertiesService.getScriptProperties();
     var configString = props.getProperty('TIME_CONFIG');
 
+    var config;
     if (configString) {
       // Parse stored configuration
-      var config = JSON.parse(configString);
+      config = JSON.parse(configString);
 
       // Merge with defaults to ensure all properties exist
-      return mergeWithDefaults(config);
+      config = mergeWithDefaults(config);
+    } else {
+      // Return defaults if no config stored
+      config = JSON.parse(JSON.stringify(DEFAULT_TIME_CONFIG));
     }
 
-    // Return defaults if no config stored
-    return JSON.parse(JSON.stringify(DEFAULT_TIME_CONFIG));
+    return {
+      success: true,
+      data: config
+    };
 
   } catch (error) {
     Logger.log('⚠️ Error loading time config: ' + error.message);
     Logger.log('Returning default configuration');
-    return JSON.parse(JSON.stringify(DEFAULT_TIME_CONFIG));
+    return {
+      success: true,
+      data: JSON.parse(JSON.stringify(DEFAULT_TIME_CONFIG))
+    };
   }
 }
 
@@ -288,7 +297,11 @@ function validateTimeConfig(config) {
  */
 function exportTimeConfig() {
   try {
-    var config = getTimeConfig();
+    var configResult = getTimeConfig();
+    if (!configResult.success) {
+      throw new Error('Failed to load configuration');
+    }
+    var config = configResult.data;
 
     return {
       success: true,
@@ -392,8 +405,11 @@ function test_timeConfig() {
   Logger.log('\n========== TEST: TIME CONFIG ==========');
 
   // Test 1: Get default config
-  var config = getTimeConfig();
-  Logger.log('Current config: ' + JSON.stringify(config));
+  var configResult = getTimeConfig();
+  Logger.log('Get config result: ' + (configResult.success ? 'SUCCESS' : 'FAILED'));
+  if (configResult.success) {
+    Logger.log('Current config: ' + JSON.stringify(configResult.data));
+  }
 
   // Test 2: Update config
   var newConfig = {

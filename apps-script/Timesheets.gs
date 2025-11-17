@@ -1333,7 +1333,11 @@ function processRawClockData(importId) {
     });
 
     // Process each employee
-    const config = getTimeConfig();
+    const configResult = getTimeConfig();
+    const config = configResult.success ? configResult.data : null;
+    if (!config) {
+      throw new Error('Failed to load time configuration');
+    }
     let timesheetsCreated = 0;
 
     for (const empId in byEmployee) {
