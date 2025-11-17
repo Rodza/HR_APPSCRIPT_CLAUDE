@@ -17,6 +17,67 @@
  * Employee Name, Week Ending, Standard Hours, Standard Minutes, Overtime Hours, Overtime Minutes, Notes
  */
 
+// ==================== SETUP AND INITIALIZATION ====================
+
+/**
+ * Setup PENDING_TIMESHEETS sheet if it doesn't exist
+ * Run this manually from Script Editor if the sheet is missing
+ */
+function setupPendingTimesheetsSheet() {
+  try {
+    Logger.log('========== SETUP PENDING_TIMESHEETS SHEET ==========');
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = null;
+
+    // Check if sheet already exists
+    const sheets = ss.getSheets();
+    for (let i = 0; i < sheets.length; i++) {
+      if (sheets[i].getName() === 'PENDING_TIMESHEETS') {
+        sheet = sheets[i];
+        Logger.log('✓ PENDING_TIMESHEETS sheet already exists');
+        break;
+      }
+    }
+
+    // Create if doesn't exist
+    if (!sheet) {
+      Logger.log('Creating PENDING_TIMESHEETS sheet...');
+      sheet = ss.insertSheet('PENDING_TIMESHEETS');
+      Logger.log('✓ Sheet created');
+    }
+
+    // Set up headers from Config.gs
+    const headers = PENDING_TIMESHEETS_COLUMNS;
+    Logger.log('Setting up ' + headers.length + ' column headers...');
+
+    const headerRange = sheet.getRange(1, 1, 1, headers.length);
+    headerRange.setValues([headers]);
+    headerRange.setFontWeight('bold');
+    headerRange.setBackground('#f3f3f3');
+
+    // Freeze header row
+    sheet.setFrozenRows(1);
+
+    // Auto-resize columns
+    for (let i = 1; i <= headers.length; i++) {
+      sheet.autoResizeColumn(i);
+    }
+
+    Logger.log('✓ PENDING_TIMESHEETS sheet setup complete!');
+    Logger.log('Sheet now has ' + headers.length + ' columns');
+    Logger.log('Headers: ' + headers.join(', '));
+    Logger.log('========== SETUP COMPLETE ==========');
+
+    return { success: true, message: 'PENDING_TIMESHEETS sheet created successfully' };
+
+  } catch (error) {
+    Logger.log('❌ ERROR: ' + error.message);
+    Logger.log('Stack: ' + error.stack);
+    return { success: false, error: error.message };
+  }
+}
+
 // ==================== IMPORT EXCEL TIMESHEET ====================
 
 /**
