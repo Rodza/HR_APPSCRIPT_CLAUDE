@@ -36,15 +36,11 @@
                             <option value="Scorpio Abrasives">Scorpio Abrasives</option>
                         </select>
                     </div>
-                    <div class="col-md-2">
-                        <input type="date" class="form-control" id="filterWeekEnding"
-                               placeholder="Week ending" onchange="filterPayslips()">
-                    </div>
-                    <div class="col-md-2">
+                    <div class="col-md-3">
                         <input type="date" class="form-control" id="filterStartDate"
                                placeholder="From date" onchange="filterPayslips()">
                     </div>
-                    <div class="col-md-2">
+                    <div class="col-md-3">
                         <input type="date" class="form-control" id="filterEndDate"
                                placeholder="To date" onchange="filterPayslips()">
                     </div>
@@ -269,7 +265,6 @@
             window.filterPayslips = function() {
                 const searchText = document.getElementById('searchEmployee').value.toLowerCase();
                 const employer = document.getElementById('filterEmployer').value;
-                const weekEnding = document.getElementById('filterWeekEnding').value;
                 const startDate = document.getElementById('filterStartDate').value;
                 const endDate = document.getElementById('filterEndDate').value;
 
@@ -278,13 +273,6 @@
                     (p['EMPLOYEE NAME'] && p['EMPLOYEE NAME'].toLowerCase().includes(searchText));
 
                 const matchesEmployer = !employer || p.EMPLOYER === employer;
-
-                let matchesWeekEnding = true;
-                if (weekEnding) {
-                    const pDate = new Date(p.WEEKENDING);
-                    const filterDate = new Date(weekEnding);
-                    matchesWeekEnding = pDate.getTime() === filterDate.getTime();
-                }
 
                 let matchesDateRange = true;
                 if (startDate || endDate) {
@@ -297,7 +285,7 @@
                     }
                 }
 
-                    return matchesSearch && matchesEmployer && matchesWeekEnding && matchesDateRange;
+                    return matchesSearch && matchesEmployer && matchesDateRange;
                 });
 
                 displayPayslips(filtered);
@@ -306,7 +294,6 @@
             window.clearFilters = function() {
             document.getElementById('searchEmployee').value = '';
             document.getElementById('filterEmployer').value = '';
-            document.getElementById('filterWeekEnding').value = '';
                 document.getElementById('filterStartDate').value = '';
                 document.getElementById('filterEndDate').value = '';
                 filterPayslips();
