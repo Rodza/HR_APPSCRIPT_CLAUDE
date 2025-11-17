@@ -677,6 +677,33 @@ function checkDuplicatePendingTimesheet(employeeName, weekEnding) {
 // ==================== CLOCK-IN IMPORT FUNCTIONS ====================
 
 /**
+ * Import clock-in data from base64 encoded file (client-side wrapper)
+ * Converts base64 data to blob and calls importClockData
+ *
+ * @param {string} base64Data - Base64 encoded file data
+ * @param {string} filename - Original filename
+ * @param {string} mimeType - File MIME type
+ * @param {boolean} override - Override warnings and import anyway
+ * @returns {Object} Result with success flag and import details
+ */
+function importClockDataFromBase64(base64Data, filename, mimeType, override) {
+  try {
+    Logger.log('📥 Converting base64 to blob: ' + filename);
+
+    // Decode base64 and create blob (server-side Utilities API)
+    const bytes = Utilities.base64Decode(base64Data);
+    const fileBlob = Utilities.newBlob(bytes, mimeType, filename);
+
+    // Call the main import function
+    return importClockData(fileBlob, filename, override);
+
+  } catch (error) {
+    Logger.log('❌ ERROR in importClockDataFromBase64: ' + error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
  * Import clock-in data from Excel file
  * This function processes raw clock-in data and validates against employee records
  *
