@@ -40,17 +40,20 @@
         <div class="card-body">
             <!-- Instructions -->
             <div class="alert alert-info">
-                <h6><i class="fas fa-info-circle"></i> Excel Format Required:</h6>
+                <h6><i class="fas fa-info-circle"></i> Clock-In System Export Format:</h6>
                 <p class="mb-0">
-                    <strong>Columns:</strong> EmployeeName, ClockInRef, WeekEnding, PunchDate, DeviceName, PunchTime, Department
+                    <strong>Upload the "Transaction Reports" Excel file directly from your clock-in system.</strong>
                 </p>
                 <p class="mb-0 mt-2">
-                    <strong>Example:</strong>
+                    <strong>Expected Columns:</strong> Person ID, Person Name, Department, Type, Source, Punch Time, Time Zone, Verification Mode, Mobile Punch, Device SN, Device Name, Upload Time
                 </p>
-                <pre class="mb-0 mt-1 p-2 bg-light">John Doe, 1234, 2025-11-23, 2025-11-17, Clock In, 2025-11-17 07:28:00, Production</pre>
+                <p class="mb-0 mt-2">
+                    <strong>Example Data:</strong>
+                </p>
+                <pre class="mb-0 mt-1 p-2 bg-light">1016, Evan Joe Nelson, SA Grinding, Normal, Access Device, 2025-11-14 07:33:34, +02:00, Face, , NYU7251801747, Clock In, 2025-11-14 07:35:39</pre>
                 <p class="mb-0 mt-2">
                     <small class="text-muted">
-                        <strong>Note:</strong> ClockInRef must match employee records. Week ending should be Saturday.
+                        <strong>Note:</strong> Person ID must match the CLOCK-IN REF NUMBER in the EMPLOYEE DETAILS sheet. Week ending will be calculated automatically from the punch dates.
                     </small>
                 </p>
             </div>

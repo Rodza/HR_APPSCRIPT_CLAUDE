@@ -839,26 +839,79 @@ function parseClockDataExcel(fileBlob) {
     DriveApp.getFileById(fileId).setTrashed(true);
     DriveApp.getFileById(importedFile.id).setTrashed(true);
 
-    // Expected columns: EmployeeName, ClockInRef, WeekEnding, PunchDate, DeviceName, PunchTime, Department
-    const headers = data[0];
+    // Actual clock-in system export format:
+    // Row 1: "Transaction Reports" (title header - skip)
+    // Row 2: Column headers - Person ID, Person Name, Department, Type, Source, Punch Time, Time Zone, Verification Mode, Mobile Punch, Device SN, Device Name, Upload Time
+    // Row 3+: Data rows
+
+    // Determine starting row (skip title row if present)
+    let headerRow = 0;
+    let dataStartRow = 1;
+
+    // Check if first row is a title (single cell or "Transaction Reports")
+    if (data.length > 0 && (String(data[0][0]).toLowerCase().indexOf('transaction') >= 0 || data[0].length === 1)) {
+      headerRow = 1;
+      dataStartRow = 2;
+      Logger.log('📋 Detected title row, using row 2 as headers');
+    }
+
+    const headers = data[headerRow];
     Logger.log('📋 Headers: ' + headers.join(', '));
+
+    // Find column indices (case-insensitive)
+    const colMap = {};
+    for (let i = 0; i < headers.length; i++) {
+      const header = String(headers[i]).trim().toLowerCase();
+      if (header.indexOf('person id') >= 0) colMap.personId = i;
+      else if (header.indexOf('person name') >= 0) colMap.personName = i;
+      else if (header.indexOf('department') >= 0) colMap.department = i;
+      else if (header.indexOf('punch time') >= 0) colMap.punchTime = i;
+      else if (header.indexOf('device name') >= 0) colMap.deviceName = i;
+      else if (header.indexOf('device sn') >= 0) colMap.deviceSn = i;
+      else if (header.indexOf('type') >= 0) colMap.type = i;
+      else if (header.indexOf('source') >= 0) colMap.source = i;
+    }
+
+    Logger.log('📋 Column mapping: ' + JSON.stringify(colMap));
 
     const records = [];
 
-    for (let i = 1; i < data.length; i++) {
+    for (let i = dataStartRow; i < data.length; i++) {
       const row = data[i];
 
-      // Skip empty rows
-      if (!row[0]) continue;
+      // Skip empty rows (check Person ID column)
+      if (!row[colMap.personId] || String(row[colMap.personId]).trim() === '') continue;
+
+      // Parse Punch Time which contains both date and time: "2025-11-14 07:33:34"
+      const punchTimeValue = row[colMap.punchTime];
+      let punchDateTime;
+
+      if (punchTimeValue instanceof Date) {
+        punchDateTime = punchTimeValue;
+      } else if (typeof punchTimeValue === 'string') {
+        // Parse "YYYY-MM-DD HH:MM:SS" format
+        punchDateTime = new Date(punchTimeValue);
+      } else if (typeof punchTimeValue === 'number') {
+        // Excel serial date
+        punchDateTime = parseExcelDate(punchTimeValue);
+      } else {
+        Logger.log('⚠️ Row ' + (i + 1) + ': Invalid punch time format: ' + punchTimeValue);
+        continue;
+      }
+
+      // Extract date and time components
+      const punchDate = new Date(punchDateTime.getFullYear(), punchDateTime.getMonth(), punchDateTime.getDate());
 
       const record = {
-        EmployeeName: row[0],
-        ClockInRef: String(row[1] || '').trim(),
-        WeekEnding: parseExcelDate(row[2]),
-        PunchDate: parseExcelDate(row[3]),
-        DeviceName: row[4] || '',
-        PunchTime: parseExcelDate(row[5]),
-        Department: row[6] || ''
+        ClockInRef: String(row[colMap.personId] || '').trim(),
+        EmployeeName: String(row[colMap.personName] || '').trim(),
+        Department: String(row[colMap.department] || '').trim(),
+        PunchDate: punchDate,
+        PunchTime: punchDateTime,
+        DeviceName: String(row[colMap.deviceName] || '').trim(),
+        DeviceSN: colMap.deviceSn !== undefined ? String(row[colMap.deviceSn] || '').trim() : '',
+        Type: colMap.type !== undefined ? String(row[colMap.type] || '').trim() : '',
+        Source: colMap.source !== undefined ? String(row[colMap.source] || '').trim() : ''
       };
 
       records.push(record);
@@ -869,6 +922,7 @@ function parseClockDataExcel(fileBlob) {
 
   } catch (error) {
     Logger.log('❌ ERROR in parseClockDataExcel: ' + error.message);
+    Logger.log('Stack: ' + error.stack);
     return { success: false, error: error.message };
   }
 }
