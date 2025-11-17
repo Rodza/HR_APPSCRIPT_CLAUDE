@@ -1408,32 +1408,33 @@ function createEnhancedPendingTimesheet(data) {
 
     const id = generateFullUUID();
 
+    // Match column order in PendingTimesheets sheet header
     const rowData = [
-      id,
-      data.rawDataImportId || '',
-      data.employeeId || '',
-      data.employeeName,
-      data.employeeClockRef || '',
-      data.weekEnding,
-      data.calculatedTotalHours || 0,
-      data.calculatedTotalMinutes || 0,
-      data.hours || 0,
-      data.minutes || 0,
-      data.overtimeHours || 0,
-      data.overtimeMinutes || 0,
-      data.lunchDeductionMin || 0,
-      data.bathroomTimeMin || 0,
-      data.reconDetails || '',
-      data.warnings || '[]',
-      data.notes || '',
-      'Pending',
-      getCurrentUser(),
-      new Date(),
-      '',
-      '',
-      '',
-      false,
-      ''
+      id,                              // ID
+      data.rawDataImportId || '',      // RAW_DATA_IMPORT_ID
+      data.employeeId || '',           // EMPLOYEE_ID
+      data.employeeName,               // EMPLOYEE_NAME
+      data.employeeClockRef || '',     // EMPLOYEE_CLOCK_REF
+      data.weekEnding,                 // WEEK_ENDING
+      data.calculatedTotalHours || 0,  // CALCULATED_TOTAL_HOURS
+      data.calculatedTotalMinutes || 0,// CALCULATED_TOTAL_MINUTES
+      data.hours || 0,                 // STANDARD_HOURS
+      data.minutes || 0,               // STANDARD_MINUTES
+      data.overtimeHours || 0,         // OVERTIME_HOURS
+      data.overtimeMinutes || 0,       // OVERTIME_MINUTES
+      data.lunchDeductionMin || 0,     // LUNCH_DEDUCTION_MIN
+      data.bathroomTimeMin || 0,       // BATHROOM_TIME_MIN
+      data.reconDetails || '',         // RECON_DETAILS
+      data.warnings || '[]',           // WARNINGS
+      'Pending',                       // STATUS ← MOVED HERE (col 17)
+      new Date(),                      // CREATED_DATE ← MOVED HERE (col 18)
+      getCurrentUser(),                // CREATED_BY ← MOVED HERE (col 19)
+      '',                              // REVIEWED_DATE (col 20)
+      '',                              // REVIEWED_BY (col 21)
+      '',                              // PAYSLIP_ID (col 22)
+      data.notes || '',                // NOTES ← MOVED HERE (col 23)
+      false,                           // IS_LOCKED (col 24)
+      ''                               // LOCKED_DATE (col 25)
     ];
 
     pendingSheet.appendRow(rowData);
