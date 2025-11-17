@@ -23,13 +23,17 @@
         .import-results {
             margin-top: 20px;
         }
+        .unmatched-table {
+            max-height: 300px;
+            overflow-y: auto;
+        }
     </style>
 </head>
 <body>
     <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
-            <h5><i class="fas fa-file-upload"></i> Import Timesheets from Excel</h5>
-            <button class="btn btn-secondary btn-sm" onclick="loadModule('timesheets')">
+            <h5><i class="fas fa-file-upload"></i> Import Clock-In Data</h5>
+            <button class="btn btn-secondary btn-sm" onclick="loadModule('timesheetApproval')">
                 <i class="fas fa-list"></i> View Pending Timesheets
             </button>
         </div>
@@ -38,10 +42,16 @@
             <div class="alert alert-info">
                 <h6><i class="fas fa-info-circle"></i> Excel Format Required:</h6>
                 <p class="mb-0">
-                    <strong>Columns:</strong> Employee Name, Week Ending, Standard Hours, Standard Minutes, Overtime Hours, Overtime Minutes, Notes
+                    <strong>Columns:</strong> EmployeeName, ClockInRef, WeekEnding, PunchDate, DeviceName, PunchTime, Department
                 </p>
-                <p class="mb-0">
-                    <strong>Example:</strong> Archie Patrick, 2025-10-17, 39, 30, 0, 0, On time all week
+                <p class="mb-0 mt-2">
+                    <strong>Example:</strong>
+                </p>
+                <pre class="mb-0 mt-1 p-2 bg-light">John Doe, 1234, 2025-11-23, 2025-11-17, Clock In, 2025-11-17 07:28:00, Production</pre>
+                <p class="mb-0 mt-2">
+                    <small class="text-muted">
+                        <strong>Note:</strong> ClockInRef must match employee records. Week ending should be Saturday.
+                    </small>
                 </p>
             </div>
 
@@ -53,26 +63,19 @@
                 <input type="file" id="excelFile" accept=".xlsx,.xls" style="display: none;" onchange="handleFileSelect(event)">
             </div>
 
-            <!-- Preview/Results -->
+            <!-- Import Results -->
             <div id="importResults" class="import-results" style="display: none;">
                 <div class="alert alert-success">
                     <h6><i class="fas fa-check-circle"></i> Import Complete!</h6>
                     <p class="mb-0">
                         <strong>Total Records:</strong> <span id="totalRecords">0</span><br>
-                        <strong>Successfully Imported:</strong> <span id="successCount">0</span><br>
-                        <strong>Errors:</strong> <span id="errorCount">0</span>
+                        <strong>Matched Employees:</strong> <span id="matchedCount">0</span><br>
+                        <strong>Timesheets Created:</strong> <span id="timesheetsCreated">0</span>
                     </p>
                 </div>
 
-                <div id="errorList" style="display: none;">
-                    <div class="alert alert-warning">
-                        <h6><i class="fas fa-exclamation-triangle"></i> Import Errors:</h6>
-                        <ul id="errorItems"></ul>
-                    </div>
-                </div>
-
                 <div class="d-flex gap-2">
-                    <button class="btn btn-primary" onclick="loadModule('timesheets')">
+                    <button class="btn btn-primary" onclick="openApproval()">
                         <i class="fas fa-arrow-right"></i> Go to Pending Timesheets
                     </button>
                     <button class="btn btn-secondary" onclick="resetImport()">
@@ -83,9 +86,97 @@
         </div>
     </div>
 
+    <!-- Unmatched Employees Modal -->
+    <div class="modal fade" id="unmatchedModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title"><i class="fas fa-exclamation-triangle"></i> Unmatched Employees Found</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-warning">
+                        <strong>Warning:</strong> The following clock references were not found in the employee table.
+                        These employees will not have timesheets created.
+                    </div>
+
+                    <div class="unmatched-table">
+                        <table class="table table-sm table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Clock Ref</th>
+                                    <th>Employee Name</th>
+                                    <th>Transaction Count</th>
+                                </tr>
+                            </thead>
+                            <tbody id="unmatchedTableBody"></tbody>
+                        </table>
+                    </div>
+
+                    <div class="mt-3">
+                        <p class="mb-2"><strong>Options:</strong></p>
+                        <ul>
+                            <li><strong>Cancel:</strong> Fix employee records and re-import</li>
+                            <li><strong>Continue Anyway:</strong> Import data for matched employees only (unmatched will be skipped)</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times"></i> Cancel Import
+                    </button>
+                    <button type="button" class="btn btn-warning" onclick="overrideAndImport()">
+                        <i class="fas fa-exclamation-triangle"></i> Continue Anyway
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Duplicate Import Modal -->
+    <div class="modal fade" id="duplicateModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-info text-white">
+                    <h5 class="modal-title"><i class="fas fa-clone"></i> Duplicate Import Detected</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <strong>This file has already been imported:</strong>
+                    </div>
+
+                    <p class="mb-2">
+                        <strong>Week Ending:</strong> <span id="dupWeekEnding"></span><br>
+                        <strong>Previous Import:</strong> <span id="dupImportDate"></span>
+                    </p>
+
+                    <div class="mt-3">
+                        <p class="mb-2"><strong>Options:</strong></p>
+                        <ul>
+                            <li><strong>Cancel:</strong> Keep existing import</li>
+                            <li><strong>Replace:</strong> Delete old import and create new one</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times"></i> Cancel
+                    </button>
+                    <button type="button" class="btn btn-primary" onclick="replaceAndImport()">
+                        <i class="fas fa-sync"></i> Replace Import
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         // Drag and drop handlers
         const uploadArea = document.getElementById('uploadArea');
+        let currentFile = null;
+        let currentFilename = '';
+        let unmatchedModal, duplicateModal;
 
         uploadArea.addEventListener('dragover', function(e) {
             e.preventDefault();
@@ -124,53 +215,58 @@
                 return;
             }
 
+            // Store file info
+            currentFile = file;
+            currentFilename = file.name;
+
             // Show loading
             showLoading();
             uploadArea.innerHTML = '<i class="fas fa-spinner fa-spin fa-3x text-primary mb-3"></i><h5>Processing...</h5>';
 
-            // Read file
+            // Read file as blob
             const reader = new FileReader();
 
             reader.onload = function(e) {
-                const fileData = e.target.result;
-                const blob = Utilities.newBlob(fileData, file.type, file.name);
+                // Convert to proper format for Apps Script
+                const base64Data = e.target.result.split(',')[1];
+                const blob = Utilities.newBlob(
+                    Utilities.base64Decode(base64Data),
+                    file.type,
+                    file.name
+                );
 
-                // Send to server for processing
-                google.script.run
-                    .withSuccessHandler(handleImportSuccess)
-                    .withFailureHandler(handleImportError)
-                    .importTimesheetExcel(blob);
+                // Import with no override initially
+                executeImport(blob, file.name, false);
             };
 
             reader.readAsDataURL(file);
         }
 
-        function handleImportSuccess(result) {
+        function executeImport(blob, filename, override) {
+            showLoading();
+
+            google.script.run
+                .withSuccessHandler(handleImportResponse)
+                .withFailureHandler(handleImportError)
+                .importClockData(blob, filename, override);
+        }
+
+        function handleImportResponse(result) {
             hideLoading();
 
             if (result.success) {
-                const data = result.data;
-
-                document.getElementById('totalRecords').textContent = data.totalRecords;
-                document.getElementById('successCount').textContent = data.successCount;
-                document.getElementById('errorCount').textContent = data.errorCount;
-
-                // Show errors if any
-                if (data.errorCount > 0 && data.errors && data.errors.length > 0) {
-                    const errorList = document.getElementById('errorItems');
-                    errorList.innerHTML = data.errors.map(err =>
-                        `<li>${err}</li>`
-                    ).join('');
-                    document.getElementById('errorList').style.display = 'block';
-                }
-
-                document.getElementById('importResults').style.display = 'block';
-                uploadArea.style.display = 'none';
-
-                showSuccess('Import completed: ' + data.successCount + ' records imported');
+                // Success - show results
+                displaySuccessResults(result.data);
             } else {
-                showError('Import failed: ' + result.error);
-                resetImport();
+                // Handle specific errors
+                if (result.error === 'UNMATCHED_EMPLOYEES') {
+                    showUnmatchedWarning(result.data);
+                } else if (result.error === 'DUPLICATE_IMPORT') {
+                    showDuplicateWarning(result.data);
+                } else {
+                    showError('Import failed: ' + result.error);
+                    resetImport();
+                }
             }
         }
 
@@ -180,9 +276,91 @@
             resetImport();
         }
 
+        function displaySuccessResults(data) {
+            document.getElementById('totalRecords').textContent = data.totalRecords;
+            document.getElementById('matchedCount').textContent = data.matchedEmployees;
+            document.getElementById('timesheetsCreated').textContent = data.timesheetsCreated;
+
+            document.getElementById('importResults').style.display = 'block';
+            uploadArea.style.display = 'none';
+
+            showSuccess('Import completed: ' + data.timesheetsCreated + ' timesheets created');
+        }
+
+        function showUnmatchedWarning(data) {
+            // Populate unmatched table
+            const tbody = document.getElementById('unmatchedTableBody');
+            tbody.innerHTML = data.unmatchedDetails.map(detail => `
+                <tr>
+                    <td><strong>${detail.clockRef}</strong></td>
+                    <td>${detail.employeeName}</td>
+                    <td><span class="badge bg-secondary">${detail.transactionCount}</span></td>
+                </tr>
+            `).join('');
+
+            // Show modal
+            if (!unmatchedModal) {
+                unmatchedModal = new bootstrap.Modal(document.getElementById('unmatchedModal'));
+            }
+            unmatchedModal.show();
+        }
+
+        function showDuplicateWarning(data) {
+            // Populate duplicate info
+            document.getElementById('dupWeekEnding').textContent = formatDate(new Date(data.existingImportDate));
+            document.getElementById('dupImportDate').textContent = formatDate(new Date(data.existingImportDate));
+
+            // Show modal
+            if (!duplicateModal) {
+                duplicateModal = new bootstrap.Modal(document.getElementById('duplicateModal'));
+            }
+            duplicateModal.show();
+        }
+
+        function overrideAndImport() {
+            // Close modal
+            unmatchedModal.hide();
+
+            // Re-read file and import with override
+            const reader = new FileReader();
+
+            reader.onload = function(e) {
+                const base64Data = e.target.result.split(',')[1];
+                const blob = Utilities.newBlob(
+                    Utilities.base64Decode(base64Data),
+                    currentFile.type,
+                    currentFilename
+                );
+
+                executeImport(blob, currentFilename, true);
+            };
+
+            reader.readAsDataURL(currentFile);
+        }
+
+        function replaceAndImport() {
+            // Close modal
+            duplicateModal.hide();
+
+            // Re-read file and import with override
+            const reader = new FileReader();
+
+            reader.onload = function(e) {
+                const base64Data = e.target.result.split(',')[1];
+                const blob = Utilities.newBlob(
+                    Utilities.base64Decode(base64Data),
+                    currentFile.type,
+                    currentFilename
+                );
+
+                executeImport(blob, currentFilename, true);
+            };
+
+            reader.readAsDataURL(currentFile);
+        }
+
         function resetImport() {
             document.getElementById('importResults').style.display = 'none';
-            document.getElementById('errorList').style.display = 'none';
             uploadArea.style.display = 'block';
             uploadArea.innerHTML = `
                 <i class="fas fa-cloud-upload-alt fa-3x text-secondary mb-3"></i>
@@ -190,6 +368,29 @@
                 <p class="text-muted">Excel files (.xlsx, .xls) only</p>
             `;
             document.getElementById('excelFile').value = '';
+            currentFile = null;
+            currentFilename = '';
+        }
+
+        function openApproval() {
+            // Load the approval module
+            if (typeof loadModule === 'function') {
+                loadModule('timesheetApproval');
+            } else {
+                // Fallback: reload sidebar
+                google.script.run.showTimesheetApproval();
+            }
+        }
+
+        function formatDate(date) {
+            if (!(date instanceof Date)) {
+                date = new Date(date);
+            }
+            return date.toLocaleDateString('en-ZA', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+            });
         }
     </script>
 </body>

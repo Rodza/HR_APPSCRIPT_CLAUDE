@@ -288,17 +288,90 @@ function getClientConfig() {
   return {
     user: getCurrentUser(),
     isAdmin: isAdmin(),
-    version: '1.2.0-payroll-enabled', // Version identifier to track deployment
-    lastUpdate: '2025-11-15T00:00:00Z',
+    version: '1.3.0-timesheet-integration', // Version identifier to track deployment
+    lastUpdate: '2025-11-17T00:00:00Z',
     features: {
       employees: true,
       leave: true,
       loans: true,
       timesheets: true,
+      timesheetIntegration: true,  // NEW - Clock-in integration
       payroll: true,  // ENABLED - Fixed module loading
       reports: true
     }
   };
+}
+
+// ============================================================================
+// TIMESHEET MODULE FUNCTIONS
+// ============================================================================
+
+/**
+ * Show timesheet import interface
+ * Opens sidebar for importing clock-in data
+ */
+function showTimesheetImport() {
+  try {
+    var html = HtmlService.createHtmlOutputFromFile('TimesheetImport')
+      .setTitle('Import Clock Data')
+      .setWidth(800);
+    SpreadsheetApp.getUi().showSidebar(html);
+  } catch (error) {
+    SpreadsheetApp.getUi().alert('Error: ' + error.toString());
+  }
+}
+
+/**
+ * Show timesheet approval dashboard
+ * Opens sidebar for reviewing and approving timesheets
+ */
+function showTimesheetApproval() {
+  try {
+    var html = HtmlService.createHtmlOutputFromFile('TimesheetApproval')
+      .setTitle('Timesheet Approval')
+      .setWidth(1000);
+    SpreadsheetApp.getUi().showSidebar(html);
+  } catch (error) {
+    SpreadsheetApp.getUi().alert('Error: ' + error.toString());
+  }
+}
+
+/**
+ * Show timesheet settings interface
+ * Opens sidebar for configuring time processing rules
+ */
+function showTimesheetSettings() {
+  try {
+    var html = HtmlService.createHtmlOutputFromFile('TimesheetSettings')
+      .setTitle('Timesheet Settings')
+      .setWidth(900);
+    SpreadsheetApp.getUi().showSidebar(html);
+  } catch (error) {
+    SpreadsheetApp.getUi().alert('Error: ' + error.toString());
+  }
+}
+
+/**
+ * Create custom menu on spreadsheet open
+ * Adds HR System menu with all modules
+ */
+function onOpen() {
+  var ui = SpreadsheetApp.getUi();
+
+  // Create main menu
+  var menu = ui.createMenu('HR System');
+
+  // Add Timesheets submenu
+  menu.addSubMenu(ui.createMenu('Timesheets')
+    .addItem('Import Clock Data', 'showTimesheetImport')
+    .addItem('Pending Approval', 'showTimesheetApproval')
+    .addSeparator()
+    .addItem('Settings', 'showTimesheetSettings'));
+
+  // Add other submenus (if you want to add more later)
+  // menu.addSubMenu(ui.createMenu('Reports')...);
+
+  menu.addToUi();
 }
 
 /**
@@ -308,19 +381,28 @@ function getClientConfig() {
  */
 function getVersion() {
   return {
-    version: '1.2.0-payroll-enabled',
-    lastUpdate: '2025-11-15T00:00:00Z',
+    version: '1.3.0-timesheet-integration',
+    lastUpdate: '2025-11-17T00:00:00Z',
     hasFixedSheetMapping: true,
     hasLoggingFunctions: true,
     hasFormatResponse: true,
     hasPayrollModule: true,
+    hasTimesheetIntegration: true,
     payrollFeatures: {
       createPayslip: true,
       calculatePayslipPreview: true,
       fieldMapping: true,
       moduleLoading: true
     },
-    deploymentStatus: 'Payroll module fully enabled and functional'
+    timesheetFeatures: {
+      clockInImport: true,
+      timesheetProcessor: true,
+      configurableRules: true,
+      duplicateDetection: true,
+      employeeValidation: true,
+      settingsInterface: true
+    },
+    deploymentStatus: 'Payroll + Timesheet Integration fully enabled'
   };
 }
 
