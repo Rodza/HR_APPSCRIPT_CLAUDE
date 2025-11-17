@@ -17,6 +17,67 @@
  * Employee Name, Week Ending, Standard Hours, Standard Minutes, Overtime Hours, Overtime Minutes, Notes
  */
 
+// ==================== SETUP AND INITIALIZATION ====================
+
+/**
+ * Setup PENDING_TIMESHEETS sheet if it doesn't exist
+ * Run this manually from Script Editor if the sheet is missing
+ */
+function setupPendingTimesheetsSheet() {
+  try {
+    Logger.log('========== SETUP PENDING_TIMESHEETS SHEET ==========');
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = null;
+
+    // Check if sheet already exists
+    const sheets = ss.getSheets();
+    for (let i = 0; i < sheets.length; i++) {
+      if (sheets[i].getName() === 'PENDING_TIMESHEETS') {
+        sheet = sheets[i];
+        Logger.log('✓ PENDING_TIMESHEETS sheet already exists');
+        break;
+      }
+    }
+
+    // Create if doesn't exist
+    if (!sheet) {
+      Logger.log('Creating PENDING_TIMESHEETS sheet...');
+      sheet = ss.insertSheet('PENDING_TIMESHEETS');
+      Logger.log('✓ Sheet created');
+    }
+
+    // Set up headers from Config.gs
+    const headers = PENDING_TIMESHEETS_COLUMNS;
+    Logger.log('Setting up ' + headers.length + ' column headers...');
+
+    const headerRange = sheet.getRange(1, 1, 1, headers.length);
+    headerRange.setValues([headers]);
+    headerRange.setFontWeight('bold');
+    headerRange.setBackground('#f3f3f3');
+
+    // Freeze header row
+    sheet.setFrozenRows(1);
+
+    // Auto-resize columns
+    for (let i = 1; i <= headers.length; i++) {
+      sheet.autoResizeColumn(i);
+    }
+
+    Logger.log('✓ PENDING_TIMESHEETS sheet setup complete!');
+    Logger.log('Sheet now has ' + headers.length + ' columns');
+    Logger.log('Headers: ' + headers.join(', '));
+    Logger.log('========== SETUP COMPLETE ==========');
+
+    return { success: true, message: 'PENDING_TIMESHEETS sheet created successfully' };
+
+  } catch (error) {
+    Logger.log('❌ ERROR: ' + error.message);
+    Logger.log('Stack: ' + error.stack);
+    return { success: false, error: error.message };
+  }
+}
+
 // ==================== IMPORT EXCEL TIMESHEET ====================
 
 /**
@@ -514,19 +575,50 @@ function listPendingTimesheets(filters) {
       throw new Error('PendingTimesheets sheet not found');
     }
 
+    Logger.log('📋 Using sheet: ' + pendingSheet.getName());
+
     const data = pendingSheet.getDataRange().getValues();
+    Logger.log('📊 Total rows in sheet: ' + data.length);
+
+    if (data.length === 0) {
+      Logger.log('⚠️ Sheet is completely empty!');
+      return { success: true, data: [] };
+    }
+
     const headers = data[0];
+    Logger.log('📋 Headers (' + headers.length + '): ' + headers.join(', '));
 
     // Convert all rows to objects
     let records = [];
     for (let i = 1; i < data.length; i++) {
-      records.push(buildObjectFromRow(data[i], headers));
+      const row = data[i];
+      // Skip completely empty rows
+      if (row.every(cell => !cell || cell === '')) {
+        Logger.log('  Row ' + (i + 1) + ': Empty, skipping');
+        continue;
+      }
+      records.push(buildObjectFromRow(row, headers));
+    }
+
+    Logger.log('📊 Total records before filtering: ' + records.length);
+
+    if (records.length > 0) {
+      Logger.log('📋 Sample record (first): ' + JSON.stringify(records[0]));
     }
 
     // Apply filters if provided
     if (filters) {
       if (filters.status) {
-        records = records.filter(r => r['STATUS'] === filters.status);
+        Logger.log('🔍 Filtering by STATUS: ' + filters.status);
+        const beforeCount = records.length;
+        records = records.filter(r => {
+          const match = r['STATUS'] === filters.status;
+          if (!match && beforeCount < 5) {
+            Logger.log('  Record STATUS "' + r['STATUS'] + '" does not match "' + filters.status + '"');
+          }
+          return match;
+        });
+        Logger.log('  After STATUS filter: ' + records.length + ' records (was ' + beforeCount + ')');
       }
 
       if (filters.employeeName) {
