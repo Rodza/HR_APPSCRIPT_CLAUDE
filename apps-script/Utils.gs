@@ -286,8 +286,18 @@ function getSheets() {
       console.log('  Processing sheet:', sheet.getName(), '(normalized:', sheetName + ')');
 
       // Map to expected keys - ORDER MATTERS! Most specific first
+      // Check for clock-in imports (most specific first)
+      if (sheetName.indexOf('clockinimports') >= 0 || sheetName.indexOf('clock_in_imports') >= 0) {
+        sheets.clockImports = sheet;
+        console.log('    ✓ Mapped to: clockImports');
+      }
+      // Check for raw clock data
+      else if (sheetName.indexOf('rawclockdata') >= 0 || sheetName.indexOf('raw_clock_data') >= 0 || sheetName.indexOf('clockdata') >= 0) {
+        sheets.rawClockData = sheet;
+        console.log('    ✓ Mapped to: rawClockData');
+      }
       // Check loans BEFORE employee to avoid conflict
-      if (sheetName.indexOf('loan') >= 0) {
+      else if (sheetName.indexOf('loan') >= 0) {
         sheets.loans = sheet;
         console.log('    ✓ Mapped to: loans');
       }
