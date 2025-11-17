@@ -1,13 +1,176 @@
 /**
  * Code.gs - Main entry point for HR System Web App
- * 
+ *
  * Handles web app initialization and HTML serving
  */
+
+// ============================================================================
+// AUTHORIZATION CHECK FUNCTIONS
+// ============================================================================
+
+/**
+ * Check if app has all required OAuth permissions
+ * Run this function from Apps Script Editor to verify authorization
+ *
+ * @returns {Object} Status of each permission
+ */
+function checkAuthorization() {
+  console.log('========== CHECKING AUTHORIZATION ==========');
+
+  var results = {
+    spreadsheets: false,
+    documents: false,
+    drive: false,
+    allAuthorized: false
+  };
+
+  try {
+    // Test Spreadsheet access
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    console.log('✅ Spreadsheet access: OK - ' + ss.getName());
+    results.spreadsheets = true;
+  } catch (e) {
+    console.error('❌ Spreadsheet access: FAILED - ' + e.message);
+  }
+
+  try {
+    // Test Document access (required for PDF generation)
+    var testDoc = DocumentApp.create('AUTH_TEST_' + new Date().getTime());
+    console.log('✅ Document access: OK - Created test doc');
+
+    // Clean up test doc
+    try {
+      DriveApp.getFileById(testDoc.getId()).setTrashed(true);
+      console.log('✅ Drive access: OK - Cleaned up test doc');
+      results.documents = true;
+      results.drive = true;
+    } catch (e) {
+      console.error('❌ Drive access: FAILED - ' + e.message);
+      results.documents = true; // Doc creation worked at least
+    }
+  } catch (e) {
+    console.error('❌ Document access: FAILED - ' + e.message);
+    console.error('   This permission is required for PDF generation');
+    console.error('   Run forceAuthorization() to grant permissions');
+  }
+
+  results.allAuthorized = results.spreadsheets && results.documents && results.drive;
+
+  if (results.allAuthorized) {
+    console.log('\n🎉 ALL PERMISSIONS GRANTED - App is fully authorized!');
+  } else {
+    console.log('\n⚠️ MISSING PERMISSIONS - Run forceAuthorization() to fix');
+  }
+
+  console.log('========== AUTHORIZATION CHECK COMPLETE ==========');
+  return results;
+}
+
+/**
+ * Force OAuth authorization for all required scopes
+ *
+ * HOW TO USE:
+ * 1. In Apps Script Editor, select this function from dropdown
+ * 2. Click Run button
+ * 3. When prompted, click "Review Permissions"
+ * 4. Select your Google account
+ * 5. Click "Advanced" if you see a warning
+ * 6. Click "Go to [Your Project] (unsafe)" - this is YOUR script, it's safe!
+ * 7. Review the permissions:
+ *    - View and manage spreadsheets
+ *    - View and manage documents
+ *    - View and manage Drive files
+ * 8. Click "Allow"
+ *
+ * After authorization, redeploy your web app:
+ * - Deploy → Manage deployments → Edit → New version → Deploy
+ */
+function forceAuthorization() {
+  console.log('========== FORCING AUTHORIZATION ==========');
+  console.log('This function will request all required OAuth permissions...\n');
+
+  try {
+    // 1. Test Spreadsheet access
+    console.log('Step 1: Testing Spreadsheet access...');
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    console.log('✅ Spreadsheet: ' + ss.getName());
+
+    // 2. Test Document access (THIS TRIGGERS AUTHORIZATION)
+    console.log('\nStep 2: Testing Document access...');
+    var doc = DocumentApp.create('AUTH_TEST_' + new Date().getTime());
+    console.log('✅ Document created: ' + doc.getId());
+
+    // 3. Test Drive access
+    console.log('\nStep 3: Testing Drive access...');
+    var file = DriveApp.getFileById(doc.getId());
+    file.setTrashed(true);
+    console.log('✅ Drive access confirmed - Test file deleted');
+
+    console.log('\n🎉 AUTHORIZATION SUCCESSFUL!');
+    console.log('\nNext steps:');
+    console.log('1. Deploy → Manage deployments');
+    console.log('2. Click edit (pencil icon) on your deployment');
+    console.log('3. Select "New version"');
+    console.log('4. Click "Deploy"');
+    console.log('5. Test PDF generation in your web app');
+    console.log('\n========== AUTHORIZATION COMPLETE ==========');
+
+    return { success: true, message: 'All permissions granted successfully!' };
+
+  } catch (error) {
+    console.error('\n❌ AUTHORIZATION FAILED!');
+    console.error('Error: ' + error.message);
+    console.error('\nTroubleshooting:');
+    console.error('1. Make sure appsscript.json includes all OAuth scopes');
+    console.error('2. Check Project Settings → OAuth Scopes');
+    console.error('3. Try revoking access at: https://myaccount.google.com/permissions');
+    console.error('4. Run this function again');
+    console.log('\n========== AUTHORIZATION FAILED ==========');
+
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Quick diagnostic - shows which permissions are missing
+ * Run this first to see what needs to be authorized
+ */
+function diagnoseAuthorization() {
+  console.log('========== AUTHORIZATION DIAGNOSTIC ==========\n');
+
+  console.log('Required OAuth Scopes:');
+  console.log('1. https://www.googleapis.com/auth/spreadsheets');
+  console.log('2. https://www.googleapis.com/auth/documents');
+  console.log('3. https://www.googleapis.com/auth/drive.file');
+  console.log('4. https://www.googleapis.com/auth/script.external_request\n');
+
+  console.log('Checking current authorization status...\n');
+  var status = checkAuthorization();
+
+  console.log('\n========== RECOMMENDATIONS ==========');
+  if (!status.allAuthorized) {
+    console.log('⚠️ Action Required: Run forceAuthorization() to grant permissions');
+    console.log('\nSteps:');
+    console.log('1. Select "forceAuthorization" from function dropdown');
+    console.log('2. Click Run');
+    console.log('3. Follow the authorization prompts');
+  } else {
+    console.log('✅ All permissions are granted!');
+    console.log('✅ PDF generation should work');
+  }
+  console.log('========== DIAGNOSTIC COMPLETE ==========');
+
+  return status;
+}
+
+// ============================================================================
+// WEB APP ENTRY POINTS
+// ============================================================================
 
 /**
  * Main entry point for GET requests
  * This function is called when someone visits the web app URL
- * 
+ *
  * @returns {HtmlOutput} The main dashboard HTML
  */
 function doGet() {
