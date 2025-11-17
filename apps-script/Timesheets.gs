@@ -514,19 +514,50 @@ function listPendingTimesheets(filters) {
       throw new Error('PendingTimesheets sheet not found');
     }
 
+    Logger.log('📋 Using sheet: ' + pendingSheet.getName());
+
     const data = pendingSheet.getDataRange().getValues();
+    Logger.log('📊 Total rows in sheet: ' + data.length);
+
+    if (data.length === 0) {
+      Logger.log('⚠️ Sheet is completely empty!');
+      return { success: true, data: [] };
+    }
+
     const headers = data[0];
+    Logger.log('📋 Headers (' + headers.length + '): ' + headers.join(', '));
 
     // Convert all rows to objects
     let records = [];
     for (let i = 1; i < data.length; i++) {
-      records.push(buildObjectFromRow(data[i], headers));
+      const row = data[i];
+      // Skip completely empty rows
+      if (row.every(cell => !cell || cell === '')) {
+        Logger.log('  Row ' + (i + 1) + ': Empty, skipping');
+        continue;
+      }
+      records.push(buildObjectFromRow(row, headers));
+    }
+
+    Logger.log('📊 Total records before filtering: ' + records.length);
+
+    if (records.length > 0) {
+      Logger.log('📋 Sample record (first): ' + JSON.stringify(records[0]));
     }
 
     // Apply filters if provided
     if (filters) {
       if (filters.status) {
-        records = records.filter(r => r['STATUS'] === filters.status);
+        Logger.log('🔍 Filtering by STATUS: ' + filters.status);
+        const beforeCount = records.length;
+        records = records.filter(r => {
+          const match = r['STATUS'] === filters.status;
+          if (!match && beforeCount < 5) {
+            Logger.log('  Record STATUS "' + r['STATUS'] + '" does not match "' + filters.status + '"');
+          }
+          return match;
+        });
+        Logger.log('  After STATUS filter: ' + records.length + ' records (was ' + beforeCount + ')');
       }
 
       if (filters.employeeName) {
