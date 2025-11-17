@@ -325,21 +325,45 @@ function lockRawClockData(importId) {
 
 ## 📊 EXPECTED EXCEL FORMAT
 
-### Clock-In Data Excel Format
+### Clock-In System Export Format
+
+**Export the "Transaction Reports" directly from your clock-in system.**
+
+The Excel file should have:
+- **Row 1**: Title header "Transaction Reports" (automatically detected and skipped)
+- **Row 2**: Column headers
+- **Row 3+**: Transaction data
+
+**Required Columns:**
 ```
-EmployeeName | ClockInRef | WeekEnding | PunchDate | DeviceName | PunchTime | Department
-John Doe     | 1234       | 2025-11-23 | 2025-11-17| Clock In   | 2025-11-17 07:28:00 | Production
-John Doe     | 1234       | 2025-11-23 | 2025-11-17| Clock Out  | 2025-11-17 16:32:00 | Production
+Person ID | Person Name | Department | Type | Source | Punch Time | Time Zone | Verification Mode | Mobile Punch | Device SN | Device Name | Upload Time
+```
+
+**Example Data:**
+```
+1016 | Evan Joe Nelson | SA Grinding | Normal | Access Device | 2025-11-14 07:33:34 | +02:00 | Face | | NYU7251801747 | Clock In | 2025-11-14 07:35:39
+1016 | Evan Joe Nelson | SA Grinding | Normal | Access Device | 2025-11-14 16:32:15 | +02:00 | Face | | NYU7251801747 | Clock In | 2025-11-14 16:34:20
 ```
 
 **Column Definitions:**
-- **EmployeeName**: Employee name (used for unmatched reporting)
-- **ClockInRef**: Clock-in card number (must match EMPLOYEE DETAILS.ClockInRef)
-- **WeekEnding**: Week ending date (Saturday)
-- **PunchDate**: Date of the punch
-- **DeviceName**: Device type (Clock In, Clock Out, Bathroom Entry, Bathroom Exit)
-- **PunchTime**: Exact timestamp of punch
-- **Department**: Department name (optional)
+- **Person ID**: Clock-in card number (must match EMPLOYEE DETAILS.CLOCK-IN REF NUMBER)
+- **Person Name**: Employee name (used for unmatched employee reporting)
+- **Department**: Department name
+- **Type**: Transaction type (Normal, etc.)
+- **Source**: Source device type (Access Device, etc.)
+- **Punch Time**: Combined date and time in format "YYYY-MM-DD HH:MM:SS"
+- **Time Zone**: Timezone offset (e.g., +02:00)
+- **Verification Mode**: Authentication method (Face, Card, PIN, etc.)
+- **Mobile Punch**: Mobile punch indicator (usually empty)
+- **Device SN**: Device serial number
+- **Device Name**: Device location/name (e.g., "Clock In")
+- **Upload Time**: When the transaction was uploaded to server
+
+**Important Notes:**
+- Week ending is automatically calculated from punch dates (Saturday)
+- All columns from the clock-in system export will be preserved
+- Person ID must match the CLOCK-IN REF NUMBER column in EMPLOYEE DETAILS sheet
+- The system will warn if any Person IDs don't match existing employees
 
 ---
 
@@ -354,13 +378,21 @@ HOURLY RATE: 100
 ```
 
 ### Test Clock Data Excel
-Create Excel with:
+Create Excel with the clock-in system format:
+
+**Row 1:** Transaction Reports
+
+**Row 2 (Headers):**
 ```
-EmployeeName,ClockInRef,WeekEnding,PunchDate,DeviceName,PunchTime,Department
-Test Employee,TEST001,2025-11-23,2025-11-18,Clock In,2025-11-18 07:25:00,Test
-Test Employee,TEST001,2025-11-23,2025-11-18,Clock Out,2025-11-18 12:05:00,Test
-Test Employee,TEST001,2025-11-23,2025-11-18,Clock In,2025-11-18 12:35:00,Test
-Test Employee,TEST001,2025-11-23,2025-11-18,Clock Out,2025-11-18 16:35:00,Test
+Person ID | Person Name | Department | Type | Source | Punch Time | Time Zone | Verification Mode | Mobile Punch | Device SN | Device Name | Upload Time
+```
+
+**Row 3-6 (Data):**
+```
+TEST001 | Test Employee | Test Dept | Normal | Access Device | 2025-11-18 07:25:00 | +02:00 | Face |  | TEST001 | Clock In | 2025-11-18 07:26:00
+TEST001 | Test Employee | Test Dept | Normal | Access Device | 2025-11-18 12:05:00 | +02:00 | Face |  | TEST001 | Clock In | 2025-11-18 12:06:00
+TEST001 | Test Employee | Test Dept | Normal | Access Device | 2025-11-18 12:35:00 | +02:00 | Face |  | TEST001 | Clock In | 2025-11-18 12:36:00
+TEST001 | Test Employee | Test Dept | Normal | Access Device | 2025-11-18 16:35:00 | +02:00 | Face |  | TEST001 | Clock In | 2025-11-18 16:36:00
 ```
 
 **Expected Result:**
