@@ -316,10 +316,16 @@ function getSheets() {
         sheets.leave = sheet;
         console.log('    ✓ Mapped to: leave');
       }
-      // Check pending/timesheets
-      else if (sheetName.indexOf('pending') >= 0 || sheetName.indexOf('timesheet') >= 0) {
-        sheets.pending = sheet;
-        console.log('    ✓ Mapped to: pending');
+      // Check pending timesheets - MUST be specific! Exclude recon/details sheets
+      else if ((sheetName.indexOf('pending') >= 0 && sheetName.indexOf('timesheet') >= 0) &&
+               sheetName.indexOf('recon') < 0 && sheetName.indexOf('detail') < 0) {
+        // Only map if not already set, OR if this is the preferred PENDING_TIMESHEETS sheet
+        if (!sheets.pending || sheetName === 'pending_timesheets') {
+          sheets.pending = sheet;
+          console.log('    ✓ Mapped to: pending (timesheet table)');
+        } else {
+          console.log('    - Skipped: pending already mapped to preferred sheet');
+        }
       } else {
         console.log('    - Not mapped (no matching key)');
       }
