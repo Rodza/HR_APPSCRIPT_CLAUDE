@@ -59,22 +59,28 @@
 
             <!-- Table -->
             <div class="table-responsive">
-                <table class="table table-hover">
-                    <thead>
+                <table class="table table-hover table-sm">
+                    <thead class="table-light">
                         <tr>
                             <th>Employee</th>
+                            <th>Clock Ref</th>
                             <th>Week Ending</th>
+                            <th>Calc Hours</th>
+                            <th>Calc Mins</th>
                             <th>Hours</th>
-                            <th>Minutes</th>
+                            <th>Mins</th>
                             <th>OT Hours</th>
-                            <th>OT Minutes</th>
-                            <th>Notes</th>
+                            <th>OT Mins</th>
+                            <th>Lunch (min)</th>
+                            <th>Bathroom (min)</th>
+                            <th>Warnings</th>
                             <th>Status</th>
+                            <th>Import Date</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody id="timesheetsTableBody">
-                        <tr><td colspan="9" class="text-center">Loading...</td></tr>
+                        <tr><td colspan="15" class="text-center">Loading...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -172,7 +178,7 @@
             const tbody = document.getElementById('timesheetsTableBody');
 
             if (timesheets.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="9" class="text-center">No timesheets found</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="15" class="text-center">No timesheets found</td></tr>';
                 return;
             }
 
@@ -182,16 +188,41 @@
 
                 const isPending = ts.STATUS === 'Pending';
 
+                // Parse warnings if JSON string
+                let warningCount = 0;
+                let warningText = '';
+                try {
+                    if (ts.WARNINGS) {
+                        const warnings = typeof ts.WARNINGS === 'string' ? JSON.parse(ts.WARNINGS) : ts.WARNINGS;
+                        if (Array.isArray(warnings)) {
+                            warningCount = warnings.length;
+                            warningText = warnings.join('; ');
+                        }
+                    }
+                } catch (e) {
+                    warningText = ts.WARNINGS || '';
+                }
+
+                const warningBadge = warningCount > 0
+                    ? `<span class="badge bg-warning text-dark" title="${escapeHtml(warningText)}">${warningCount}</span>`
+                    : '-';
+
                 return `
                     <tr>
-                        <td><strong>${ts['EMPLOYEE NAME'] || ''}</strong></td>
+                        <td><strong>${escapeHtml(ts['EMPLOYEE NAME'] || '')}</strong></td>
+                        <td>${escapeHtml(ts.EMPLOYEE_CLOCK_REF || '-')}</td>
                         <td>${formatDate(ts.WEEKENDING)}</td>
-                        <td>${ts.HOURS || 0}</td>
-                        <td>${ts.MINUTES || 0}</td>
-                        <td>${ts.OVERTIMEHOURS || 0}</td>
-                        <td>${ts.OVERTIMEMINUTES || 0}</td>
-                        <td><small>${ts.NOTES || '-'}</small></td>
+                        <td class="text-end">${ts.CALCULATED_TOTAL_HOURS || 0}</td>
+                        <td class="text-end">${ts.CALCULATED_TOTAL_MINUTES || 0}</td>
+                        <td class="text-end">${ts.HOURS || 0}</td>
+                        <td class="text-end">${ts.MINUTES || 0}</td>
+                        <td class="text-end">${ts.OVERTIMEHOURS || 0}</td>
+                        <td class="text-end">${ts.OVERTIMEMINUTES || 0}</td>
+                        <td class="text-end">${ts.LUNCH_DEDUCTION_MIN || 0}</td>
+                        <td class="text-end">${ts.BATHROOM_TIME_MIN || 0}</td>
+                        <td>${warningBadge}</td>
                         <td><span class="badge ${statusClass}">${ts.STATUS}</span></td>
+                        <td><small>${formatDate(ts.IMPORTED_DATE)}</small></td>
                         <td class="action-buttons">
                             ${isPending ? `
                                 <button class="btn btn-sm btn-info" onclick="editTimesheet('${ts.ID}')" title="Edit">
@@ -220,9 +251,20 @@
 
                 let matchesDate = true;
                 if (weekEnding) {
-                    const tsDate = new Date(ts.WEEKENDING);
-                    const filterDate = new Date(weekEnding);
-                    matchesDate = tsDate.getTime() === filterDate.getTime();
+                    try {
+                        // Parse both dates to compare just the date part (ignore time)
+                        const tsDate = new Date(ts.WEEKENDING);
+                        const filterDate = new Date(weekEnding);
+
+                        // Compare dates only (YYYY-MM-DD)
+                        const tsDateStr = formatDate(tsDate);
+                        const filterDateStr = formatDate(filterDate);
+
+                        matchesDate = tsDateStr === filterDateStr;
+                    } catch (e) {
+                        console.error('Date filter error:', e);
+                        matchesDate = false;
+                    }
                 }
 
                 return matchesSearch && matchesDate;
@@ -322,6 +364,66 @@
                     showError('Error: ' + error.message);
                 })
                 .rejectTimesheet(timesheetId, reason);
+        }
+
+        // ==================== UTILITY FUNCTIONS ====================
+
+        /**
+         * Format date for display
+         * Handles Date objects, date strings, and invalid dates
+         */
+        function formatDate(dateValue) {
+            if (!dateValue) return '-';
+
+            try {
+                let date;
+                if (dateValue instanceof Date) {
+                    date = dateValue;
+                } else if (typeof dateValue === 'string' || typeof dateValue === 'number') {
+                    date = new Date(dateValue);
+                } else {
+                    return '-';
+                }
+
+                // Check if date is valid
+                if (isNaN(date.getTime())) {
+                    return '-';
+                }
+
+                // Format as YYYY-MM-DD
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+
+                return `${year}-${month}-${day}`;
+            } catch (e) {
+                console.error('Date formatting error:', e, dateValue);
+                return '-';
+            }
+        }
+
+        /**
+         * Escape HTML to prevent XSS
+         */
+        function escapeHtml(text) {
+            if (!text) return '';
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return String(text).replace(/[&<>"']/g, function(m) { return map[m]; });
+        }
+
+        /**
+         * Format time duration
+         */
+        function formatDuration(hours, minutes) {
+            const h = parseInt(hours) || 0;
+            const m = parseInt(minutes) || 0;
+            return h + 'h ' + m + 'm';
         }
 
         // Load timesheets on page load

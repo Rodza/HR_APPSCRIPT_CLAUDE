@@ -848,23 +848,53 @@ function parseClockDataExcel(fileBlob) {
   try {
     Logger.log('📖 Parsing clock data Excel file...');
 
-    // Convert Excel to Google Sheets
+    // Convert Excel to Google Sheets using Drive API REST endpoint
     const file = DriveApp.createFile(fileBlob);
     const fileId = file.getId();
 
-    const resource = {
-      title: fileBlob.getName(),
-      mimeType: MimeType.GOOGLE_SHEETS
-    };
+    try {
+      // Use Drive API v3 via UrlFetchApp (no advanced service needed)
+      const accessToken = ScriptApp.getOAuthToken();
+      const copyUrl = 'https://www.googleapis.com/drive/v3/files/' + fileId + '/copy';
 
-    const importedFile = Drive.Files.copy(resource, fileId);
-    const spreadsheet = SpreadsheetApp.openById(importedFile.id);
-    const sheet = spreadsheet.getSheets()[0];
-    const data = sheet.getDataRange().getValues();
+      const copyPayload = {
+        name: fileBlob.getName() + '_converted',
+        mimeType: 'application/vnd.google-apps.spreadsheet'
+      };
 
-    // Clean up temporary files
-    DriveApp.getFileById(fileId).setTrashed(true);
-    DriveApp.getFileById(importedFile.id).setTrashed(true);
+      const copyOptions = {
+        method: 'post',
+        contentType: 'application/json',
+        headers: {
+          'Authorization': 'Bearer ' + accessToken
+        },
+        payload: JSON.stringify(copyPayload),
+        muteHttpExceptions: true
+      };
+
+      const copyResponse = UrlFetchApp.fetch(copyUrl, copyOptions);
+      const copyResult = JSON.parse(copyResponse.getContentText());
+
+      if (!copyResult.id) {
+        throw new Error('Failed to convert Excel to Sheets: ' + copyResponse.getContentText());
+      }
+
+      const convertedFileId = copyResult.id;
+
+      // Open the converted spreadsheet
+      const spreadsheet = SpreadsheetApp.openById(convertedFileId);
+      const sheet = spreadsheet.getSheets()[0];
+      const data = sheet.getDataRange().getValues();
+
+      // Clean up temporary files
+      DriveApp.getFileById(fileId).setTrashed(true);
+      DriveApp.getFileById(convertedFileId).setTrashed(true);
+
+    } catch (conversionError) {
+      // Clean up on error
+      try { DriveApp.getFileById(fileId).setTrashed(true); } catch (e) {}
+      throw new Error('Excel conversion failed: ' + conversionError.message);
+    }
 
     // Actual clock-in system export format:
     // Row 1: "Transaction Reports" (title header - skip)
