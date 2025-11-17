@@ -939,52 +939,56 @@ function importClockData(fileBlob, filename, override) {
 function parseClockDataExcel(fileBlob) {
   try {
     Logger.log('📖 Parsing clock data Excel file...');
+    Logger.log('📄 File name: ' + fileBlob.getName());
+    Logger.log('📦 File type: ' + fileBlob.getContentType());
 
-    // Convert Excel to Google Sheets using Drive API REST endpoint
+    // Convert Excel to Google Sheets using Drive Advanced Service
     const file = DriveApp.createFile(fileBlob);
     const fileId = file.getId();
+    Logger.log('📁 Created temp file with ID: ' + fileId);
+
+    let data;
+    let convertedFileId;
 
     try {
-      // Use Drive API v3 via UrlFetchApp (no advanced service needed)
-      const accessToken = ScriptApp.getOAuthToken();
-      const copyUrl = 'https://www.googleapis.com/drive/v3/files/' + fileId + '/copy';
+      // Use Drive Advanced Service (v3) - now enabled in appsscript.json
+      Logger.log('🔄 Converting Excel to Google Sheets using Drive API v3...');
 
-      const copyPayload = {
+      const resource = {
         name: fileBlob.getName() + '_converted',
-        mimeType: 'application/vnd.google-apps.spreadsheet'
+        mimeType: MimeType.GOOGLE_SHEETS
       };
 
-      const copyOptions = {
-        method: 'post',
-        contentType: 'application/json',
-        headers: {
-          'Authorization': 'Bearer ' + accessToken
-        },
-        payload: JSON.stringify(copyPayload),
-        muteHttpExceptions: true
-      };
+      const importedFile = Drive.Files.copy(resource, fileId);
+      convertedFileId = importedFile.id;
 
-      const copyResponse = UrlFetchApp.fetch(copyUrl, copyOptions);
-      const copyResult = JSON.parse(copyResponse.getContentText());
-
-      if (!copyResult.id) {
-        throw new Error('Failed to convert Excel to Sheets: ' + copyResponse.getContentText());
-      }
-
-      const convertedFileId = copyResult.id;
+      Logger.log('✅ Conversion successful! Converted file ID: ' + convertedFileId);
 
       // Open the converted spreadsheet
       const spreadsheet = SpreadsheetApp.openById(convertedFileId);
       const sheet = spreadsheet.getSheets()[0];
-      const data = sheet.getDataRange().getValues();
+      data = sheet.getDataRange().getValues();
+
+      Logger.log('📊 Retrieved ' + data.length + ' rows from converted sheet');
 
       // Clean up temporary files
+      Logger.log('🗑️ Cleaning up temporary files...');
       DriveApp.getFileById(fileId).setTrashed(true);
       DriveApp.getFileById(convertedFileId).setTrashed(true);
+      Logger.log('✅ Cleanup complete');
 
     } catch (conversionError) {
+      Logger.log('❌ ERROR during Excel conversion: ' + conversionError.message);
+      Logger.log('Stack: ' + conversionError.stack);
+
       // Clean up on error
-      try { DriveApp.getFileById(fileId).setTrashed(true); } catch (e) {}
+      try {
+        Logger.log('🗑️ Cleaning up temp file on error...');
+        DriveApp.getFileById(fileId).setTrashed(true);
+      } catch (e) {
+        Logger.log('⚠️ Could not clean up temp file: ' + e.message);
+      }
+
       throw new Error('Excel conversion failed: ' + conversionError.message);
     }
 
