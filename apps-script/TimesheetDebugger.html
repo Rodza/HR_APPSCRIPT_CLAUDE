@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            padding: 20px;
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+        }
+        .debug-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .test-section {
+            background-color: #2d2d2d;
+            border: 1px solid #3e3e3e;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #4fc3f7;
+            border-bottom: 1px solid #3e3e3e;
+            padding-bottom: 10px;
+        }
+        button {
+            background-color: #4caf50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button.danger {
+            background-color: #f44336;
+        }
+        button.danger:hover {
+            background-color: #da190b;
+        }
+        .log-output {
+            background-color: #1e1e1e;
+            border: 1px solid #3e3e3e;
+            padding: 10px;
+            margin-top: 10px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-size: 12px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .success {
+            color: #4caf50;
+        }
+        .error {
+            color: #f44336;
+        }
+        .warning {
+            color: #ff9800;
+        }
+        .info {
+            color: #2196f3;
+        }
+        .timestamp {
+            color: #888;
+            font-size: 11px;
+        }
+        .result-box {
+            background-color: #252526;
+            border-left: 3px solid #4fc3f7;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        .result-box.success {
+            border-left-color: #4caf50;
+        }
+        .result-box.error {
+            border-left-color: #f44336;
+        }
+        .json-view {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #1e1e1e;
+            border-radius: 3px;
+            overflow-x: auto;
+        }
+        .controls {
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #2d2d2d;
+            border-radius: 5px;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+        .status-indicator.ready {
+            background-color: #4caf50;
+        }
+        .status-indicator.busy {
+            background-color: #ff9800;
+        }
+        .status-indicator.error {
+            background-color: #f44336;
+        }
+    </style>
+</head>
+<body>
+    <div class="debug-container">
+        <h1>🔍 Timesheet Module Debugger</h1>
+        <p class="info">This tool helps diagnose "Authorization required or server returned no response" errors.</p>
+
+        <div class="controls">
+            <h3>Status: <span class="status-indicator ready" id="statusIndicator"></span><span id="statusText">Ready</span></h3>
+            <button onclick="clearAllLogs()">Clear Logs</button>
+            <button onclick="runAllTests()">Run All Tests</button>
+            <button class="danger" onclick="exportLogs()">Export Debug Log</button>
+        </div>
+
+        <!-- Test 1: Ping Test -->
+        <div class="test-section">
+            <h3>Test 1: Basic Server Connection (Ping)</h3>
+            <p>Tests if the server can respond at all.</p>
+            <button onclick="testPing()">Run Ping Test</button>
+            <div id="pingLog" class="log-output"></div>
+        </div>
+
+        <!-- Test 2: getTimeConfig -->
+        <div class="test-section">
+            <h3>Test 2: getTimeConfig() Function</h3>
+            <p>Tests the function that loads timesheet configuration.</p>
+            <button onclick="testGetTimeConfig()">Run getTimeConfig Test</button>
+            <div id="getTimeConfigLog" class="log-output"></div>
+        </div>
+
+        <!-- Test 3: updateTimeConfig -->
+        <div class="test-section">
+            <h3>Test 3: updateTimeConfig() Function</h3>
+            <p>Tests the function that updates timesheet configuration.</p>
+            <button onclick="testUpdateTimeConfig()">Run updateTimeConfig Test</button>
+            <div id="updateTimeConfigLog" class="log-output"></div>
+        </div>
+
+        <!-- Test 4: listPendingTimesheets -->
+        <div class="test-section">
+            <h3>Test 4: listPendingTimesheets() Function</h3>
+            <p>Tests the function that retrieves pending timesheets.</p>
+            <button onclick="testListPendingTimesheets()">Run listPendingTimesheets Test</button>
+            <div id="listPendingTimesheetsLog" class="log-output"></div>
+        </div>
+
+        <!-- Test 5: Server-Side Diagnostics -->
+        <div class="test-section">
+            <h3>Test 5: Comprehensive Server Diagnostics</h3>
+            <p>Runs all diagnostic tests on the server side.</p>
+            <button onclick="testServerDiagnostics()">Run Server Diagnostics</button>
+            <div id="serverDiagnosticsLog" class="log-output"></div>
+        </div>
+
+        <!-- Test 6: Response Format Test -->
+        <div class="test-section">
+            <h3>Test 6: Various Response Formats</h3>
+            <p>Tests how the client handles different response formats.</p>
+            <button onclick="testResponseFormats()">Test Response Formats</button>
+            <div id="responseFormatsLog" class="log-output"></div>
+        </div>
+
+        <!-- Master Log -->
+        <div class="test-section">
+            <h3>Master Debug Log</h3>
+            <div id="masterLog" class="log-output"></div>
+        </div>
+    </div>
+
+    <script>
+        var masterLogEntries = [];
+
+        function setStatus(status, text) {
+            var indicator = document.getElementById('statusIndicator');
+            var statusText = document.getElementById('statusText');
+            indicator.className = 'status-indicator ' + status;
+            statusText.textContent = text;
+        }
+
+        function log(elementId, message, type) {
+            type = type || 'info';
+            var timestamp = new Date().toISOString();
+            var logElement = document.getElementById(elementId);
+
+            var colorClass = type;
+            var icon = type === 'success' ? '✅' : type === 'error' ? '❌' : type === 'warning' ? '⚠️' : 'ℹ️';
+
+            var logEntry = '<span class="timestamp">[' + timestamp + ']</span> ' +
+                          '<span class="' + colorClass + '">' + icon + ' ' + message + '</span>';
+
+            logElement.innerHTML += logEntry + '\n';
+            logElement.scrollTop = logElement.scrollHeight;
+
+            // Also add to master log
+            masterLogEntries.push({
+                timestamp: timestamp,
+                test: elementId,
+                type: type,
+                message: message
+            });
+
+            var masterLog = document.getElementById('masterLog');
+            masterLog.innerHTML += logEntry + '\n';
+            masterLog.scrollTop = masterLog.scrollHeight;
+        }
+
+        function logObject(elementId, label, obj) {
+            var logElement = document.getElementById(elementId);
+            var masterLog = document.getElementById('masterLog');
+
+            var jsonString = JSON.stringify(obj, null, 2);
+            var entry = '<div class="json-view"><strong>' + label + ':</strong>\n' + jsonString + '</div>';
+
+            logElement.innerHTML += entry;
+            masterLog.innerHTML += entry;
+        }
+
+        function clearLog(elementId) {
+            document.getElementById(elementId).innerHTML = '';
+        }
+
+        function clearAllLogs() {
+            var logs = ['pingLog', 'getTimeConfigLog', 'updateTimeConfigLog',
+                       'listPendingTimesheetsLog', 'serverDiagnosticsLog',
+                       'responseFormatsLog', 'masterLog'];
+            logs.forEach(clearLog);
+            masterLogEntries = [];
+            log('masterLog', 'All logs cleared', 'info');
+        }
+
+        // ==================== TEST 1: PING ====================
+
+        function testPing() {
+            clearLog('pingLog');
+            log('pingLog', 'Starting ping test...', 'info');
+            setStatus('busy', 'Testing...');
+
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    log('pingLog', 'Success handler called', 'success');
+                    log('pingLog', 'Result type: ' + typeof result, 'info');
+                    log('pingLog', 'Result is null: ' + (result === null), 'info');
+                    log('pingLog', 'Result is undefined: ' + (result === undefined), 'info');
+
+                    if (!result) {
+                        log('pingLog', 'ERROR: Server returned null/undefined', 'error');
+                        setStatus('error', 'Error');
+                        return;
+                    }
+
+                    logObject('pingLog', 'Full Response', result);
+
+                    if (result.success) {
+                        log('pingLog', 'PING successful! Server is responding.', 'success');
+                        log('pingLog', 'Message: ' + result.data.message, 'success');
+                        setStatus('ready', 'Ready');
+                    } else {
+                        log('pingLog', 'Server returned success=false', 'error');
+                        setStatus('error', 'Error');
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    log('pingLog', 'Failure handler called', 'error');
+                    log('pingLog', 'Error: ' + error.message, 'error');
+                    logObject('pingLog', 'Error Object', error);
+                    setStatus('error', 'Error');
+                })
+                .pingTest();
+        }
+
+        // ==================== TEST 2: getTimeConfig ====================
+
+        function testGetTimeConfig() {
+            clearLog('getTimeConfigLog');
+            log('getTimeConfigLog', 'Starting getTimeConfig test...', 'info');
+            setStatus('busy', 'Testing...');
+
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    log('getTimeConfigLog', 'Success handler called', 'success');
+                    log('getTimeConfigLog', 'Result type: ' + typeof result, 'info');
+                    log('getTimeConfigLog', 'Result is null: ' + (result === null), 'info');
+                    log('getTimeConfigLog', 'Result is undefined: ' + (result === undefined), 'info');
+
+                    if (!result) {
+                        log('getTimeConfigLog', 'ERROR: Server returned null/undefined - THIS IS THE PROBLEM!', 'error');
+                        log('getTimeConfigLog', 'This is why you see "Authorization required" error', 'error');
+                        setStatus('error', 'Error');
+                        return;
+                    }
+
+                    logObject('getTimeConfigLog', 'Full Response', result);
+
+                    if (!result.hasOwnProperty('success')) {
+                        log('getTimeConfigLog', 'ERROR: Response missing "success" property', 'error');
+                        log('getTimeConfigLog', 'Response keys: ' + Object.keys(result).join(', '), 'info');
+                        setStatus('error', 'Error');
+                        return;
+                    }
+
+                    if (!result.hasOwnProperty('data')) {
+                        log('getTimeConfigLog', 'ERROR: Response missing "data" property', 'error');
+                        setStatus('error', 'Error');
+                        return;
+                    }
+
+                    if (result.success) {
+                        log('getTimeConfigLog', 'SUCCESS: getTimeConfig returned correct format', 'success');
+                        log('getTimeConfigLog', 'Config has ' + Object.keys(result.data).length + ' properties', 'success');
+                        setStatus('ready', 'Ready');
+                    } else {
+                        log('getTimeConfigLog', 'Server returned success=false', 'warning');
+                        log('getTimeConfigLog', 'Error: ' + result.error, 'warning');
+                        setStatus('error', 'Error');
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    log('getTimeConfigLog', 'Failure handler called', 'error');
+                    log('getTimeConfigLog', 'Error: ' + error.message, 'error');
+                    log('getTimeConfigLog', 'This could indicate a permissions or authorization issue', 'error');
+                    logObject('getTimeConfigLog', 'Error Object', error);
+                    setStatus('error', 'Error');
+                })
+                .getTimeConfig();
+        }
+
+        // ==================== TEST 3: updateTimeConfig ====================
+
+        function testUpdateTimeConfig() {
+            clearLog('updateTimeConfigLog');
+            log('updateTimeConfigLog', 'Starting updateTimeConfig test...', 'info');
+            setStatus('busy', 'Testing...');
+
+            var testConfig = {
+                standardStartTime: '07:30',
+                graceMinutes: 5
+            };
+
+            log('updateTimeConfigLog', 'Sending test config...', 'info');
+            logObject('updateTimeConfigLog', 'Test Config', testConfig);
+
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    log('updateTimeConfigLog', 'Success handler called', 'success');
+
+                    if (!result) {
+                        log('updateTimeConfigLog', 'ERROR: Server returned null/undefined', 'error');
+                        setStatus('error', 'Error');
+                        return;
+                    }
+
+                    logObject('updateTimeConfigLog', 'Full Response', result);
+
+                    if (result.success) {
+                        log('updateTimeConfigLog', 'SUCCESS: Config updated', 'success');
+                        setStatus('ready', 'Ready');
+                    } else {
+                        log('updateTimeConfigLog', 'Update failed: ' + result.error, 'error');
+                        setStatus('error', 'Error');
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    log('updateTimeConfigLog', 'Failure handler called', 'error');
+                    log('updateTimeConfigLog', 'Error: ' + error.message, 'error');
+                    setStatus('error', 'Error');
+                })
+                .updateTimeConfig(testConfig);
+        }
+
+        // ==================== TEST 4: listPendingTimesheets ====================
+
+        function testListPendingTimesheets() {
+            clearLog('listPendingTimesheetsLog');
+            log('listPendingTimesheetsLog', 'Starting listPendingTimesheets test...', 'info');
+            setStatus('busy', 'Testing...');
+
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    log('listPendingTimesheetsLog', 'Success handler called', 'success');
+
+                    if (!result) {
+                        log('listPendingTimesheetsLog', 'ERROR: Server returned null/undefined', 'error');
+                        setStatus('error', 'Error');
+                        return;
+                    }
+
+                    logObject('listPendingTimesheetsLog', 'Full Response', result);
+
+                    if (result.success) {
+                        var count = result.data ? result.data.length : 0;
+                        log('listPendingTimesheetsLog', 'SUCCESS: Retrieved ' + count + ' timesheets', 'success');
+                        setStatus('ready', 'Ready');
+                    } else {
+                        log('listPendingTimesheetsLog', 'Query failed: ' + result.error, 'error');
+                        setStatus('error', 'Error');
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    log('listPendingTimesheetsLog', 'Failure handler called', 'error');
+                    log('listPendingTimesheetsLog', 'Error: ' + error.message, 'error');
+                    setStatus('error', 'Error');
+                })
+                .listPendingTimesheets({});
+        }
+
+        // ==================== TEST 5: Server Diagnostics ====================
+
+        function testServerDiagnostics() {
+            clearLog('serverDiagnosticsLog');
+            log('serverDiagnosticsLog', 'Running comprehensive server diagnostics...', 'info');
+            log('serverDiagnosticsLog', 'This may take 10-30 seconds...', 'warning');
+            setStatus('busy', 'Running diagnostics...');
+
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    log('serverDiagnosticsLog', 'Diagnostics complete!', 'success');
+
+                    if (!result) {
+                        log('serverDiagnosticsLog', 'ERROR: Server returned null/undefined', 'error');
+                        setStatus('error', 'Error');
+                        return;
+                    }
+
+                    logObject('serverDiagnosticsLog', 'Full Diagnostic Results', result);
+
+                    if (result.success && result.data) {
+                        var summary = result.data.summary;
+                        log('serverDiagnosticsLog', '========== SUMMARY ==========', 'info');
+                        log('serverDiagnosticsLog', 'Total Tests: ' + summary.total, 'info');
+                        log('serverDiagnosticsLog', 'Passed: ' + summary.passed, 'success');
+                        log('serverDiagnosticsLog', 'Failed: ' + summary.failed, summary.failed > 0 ? 'error' : 'success');
+                        log('serverDiagnosticsLog', 'Warnings: ' + summary.warnings, summary.warnings > 0 ? 'warning' : 'success');
+
+                        // Log each test result
+                        log('serverDiagnosticsLog', '========== TEST DETAILS ==========', 'info');
+                        result.data.tests.forEach(function(test) {
+                            var status = test.status === 'PASSED' ? 'success' :
+                                        test.status === 'FAILED' ? 'error' : 'warning';
+                            log('serverDiagnosticsLog', test.test + ': ' + test.status, status);
+                            if (test.error) {
+                                log('serverDiagnosticsLog', '  Error: ' + test.error, 'error');
+                            }
+                            if (test.warning) {
+                                log('serverDiagnosticsLog', '  Warning: ' + test.warning, 'warning');
+                            }
+                        });
+
+                        setStatus('ready', 'Ready');
+                    } else {
+                        log('serverDiagnosticsLog', 'Diagnostics failed', 'error');
+                        setStatus('error', 'Error');
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    log('serverDiagnosticsLog', 'Failure handler called', 'error');
+                    log('serverDiagnosticsLog', 'Error: ' + error.message, 'error');
+                    setStatus('error', 'Error');
+                })
+                .runTimesheetDiagnostics();
+        }
+
+        // ==================== TEST 6: Response Formats ====================
+
+        function testResponseFormats() {
+            clearLog('responseFormatsLog');
+            log('responseFormatsLog', 'Testing various response formats...', 'info');
+            setStatus('busy', 'Testing...');
+
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    log('responseFormatsLog', 'Success handler called', 'success');
+
+                    if (!result) {
+                        log('responseFormatsLog', 'Result is null/undefined', 'error');
+                        setStatus('error', 'Error');
+                        return;
+                    }
+
+                    logObject('responseFormatsLog', 'Full Response', result);
+
+                    if (result.success) {
+                        log('responseFormatsLog', 'Testing data types...', 'info');
+                        var data = result.data;
+
+                        log('responseFormatsLog', 'test1_null: ' + data.test1_null + ' (type: ' + typeof data.test1_null + ')', 'info');
+                        log('responseFormatsLog', 'test2_undefined: ' + data.test2_undefined + ' (type: ' + typeof data.test2_undefined + ')', 'info');
+                        log('responseFormatsLog', 'test3_emptyObject: ' + JSON.stringify(data.test3_emptyObject), 'info');
+                        log('responseFormatsLog', 'test4_emptyArray: ' + JSON.stringify(data.test4_emptyArray), 'info');
+                        log('responseFormatsLog', 'test5_string: ' + data.test5_string, 'info');
+                        log('responseFormatsLog', 'test6_number: ' + data.test6_number, 'info');
+                        log('responseFormatsLog', 'test7_boolean: ' + data.test7_boolean, 'info');
+                        log('responseFormatsLog', 'test8_nestedObject: ' + JSON.stringify(data.test8_nestedObject), 'info');
+
+                        log('responseFormatsLog', 'All format tests passed', 'success');
+                        setStatus('ready', 'Ready');
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    log('responseFormatsLog', 'Failure handler called', 'error');
+                    log('responseFormatsLog', 'Error: ' + error.message, 'error');
+                    setStatus('error', 'Error');
+                })
+                .testVariousResponseFormats();
+        }
+
+        // ==================== RUN ALL TESTS ====================
+
+        function runAllTests() {
+            log('masterLog', '========== RUNNING ALL TESTS ==========', 'info');
+            log('masterLog', 'This will run all diagnostic tests sequentially', 'info');
+
+            setTimeout(function() { testPing(); }, 100);
+            setTimeout(function() { testGetTimeConfig(); }, 2000);
+            setTimeout(function() { testUpdateTimeConfig(); }, 4000);
+            setTimeout(function() { testListPendingTimesheets(); }, 6000);
+            setTimeout(function() { testResponseFormats(); }, 8000);
+            setTimeout(function() { testServerDiagnostics(); }, 10000);
+        }
+
+        // ==================== EXPORT LOGS ====================
+
+        function exportLogs() {
+            var logText = '='.repeat(60) + '\n';
+            logText += 'TIMESHEET DEBUGGER EXPORT\n';
+            logText += 'Generated: ' + new Date().toISOString() + '\n';
+            logText += '='.repeat(60) + '\n\n';
+
+            masterLogEntries.forEach(function(entry) {
+                logText += '[' + entry.timestamp + '] ';
+                logText += '[' + entry.test + '] ';
+                logText += '[' + entry.type.toUpperCase() + '] ';
+                logText += entry.message + '\n';
+            });
+
+            // Create a downloadable text file
+            var blob = new Blob([logText], { type: 'text/plain' });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = 'timesheet-debug-log-' + Date.now() + '.txt';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            log('masterLog', 'Debug log exported', 'success');
+        }
+
+        // ==================== AUTO-RUN ON LOAD ====================
+
+        window.onload = function() {
+            log('masterLog', 'Timesheet Debugger loaded', 'success');
+            log('masterLog', 'Ready to run diagnostics', 'info');
+            log('masterLog', 'Click "Run All Tests" to begin comprehensive testing', 'info');
+        };
+    </script>
+</body>
+</html>
