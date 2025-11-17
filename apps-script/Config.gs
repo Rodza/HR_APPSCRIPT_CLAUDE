@@ -270,8 +270,86 @@ var EXPECTED_SHEET_NAMES = {
   loans: ['EmployeeLoans', 'loantransactions', 'loans'],
   empdetails: ['EMPDETAILS', 'employeedetails', 'employees'],
   leave: ['LEAVE', 'leaverecords'],
-  pending: ['PendingTimesheets', 'pendingtimesheets', 'timeapproval']
+  pending: ['PendingTimesheets', 'pendingtimesheets', 'timeapproval'],
+  rawClockData: ['RAW_CLOCK_DATA', 'rawclockdata', 'clockdata'],
+  clockImports: ['CLOCK_IN_IMPORTS', 'clockinimports', 'clockimports']
 };
+
+// ==================== DATABASE TABLE STRUCTURES ====================
+
+/**
+ * RAW_CLOCK_DATA table columns
+ * Stores permanent record of all clock-in transactions
+ */
+var RAW_CLOCK_DATA_COLUMNS = [
+  'ID',                      // UUID, auto-generated unique identifier
+  'IMPORT_ID',               // Links to CLOCK_IN_IMPORTS.IMPORT_ID
+  'EMPLOYEE_CLOCK_REF',      // Clock-in card number from device
+  'EMPLOYEE_NAME',           // Resolved from EMPLOYEE DETAILS
+  'EMPLOYEE_ID',             // Links to EMPLOYEE DETAILS.id
+  'WEEK_ENDING',             // Week ending date
+  'PUNCH_DATE',              // Date of clock punch
+  'DEVICE_NAME',             // Clock In/Bathroom Entry/Exit
+  'PUNCH_TIME',              // Actual punch timestamp
+  'DEPARTMENT',              // From clock-in data
+  'STATUS',                  // Draft/Reviewed/Approved/Locked
+  'CREATED_DATE',            // When record was imported
+  'LOCKED_DATE',             // When record was locked
+  'LOCKED_BY'                // User who locked record
+];
+
+/**
+ * CLOCK_IN_IMPORTS table columns
+ * Tracks import batches and prevents duplicates
+ */
+var CLOCK_IN_IMPORTS_COLUMNS = [
+  'IMPORT_ID',               // UUID, unique import batch identifier
+  'IMPORT_DATE',             // When import was performed
+  'WEEK_ENDING',             // Week ending date for this batch
+  'FILENAME',                // Original uploaded file name
+  'FILE_HASH',               // Hash of file content (duplicate detection)
+  'TOTAL_RECORDS',           // Count of records in import
+  'MATCHED_EMPLOYEES',       // Successfully matched employees
+  'UNMATCHED_REFS',          // JSON array of unmatched ClockInRefs
+  'STATUS',                  // Active/Replaced/Archived
+  'IMPORTED_BY',             // User email who imported
+  'OVERRIDE_APPLIED',        // If user overrode warnings
+  'REPLACED_BY_IMPORT_ID',   // If replaced, links to new import
+  'REPLACED_DATE',           // When this import was replaced
+  'NOTES'                    // Import notes or override reason
+];
+
+/**
+ * Enhanced PENDING_TIMESHEETS table columns
+ * Staging area for timesheet approval workflow
+ */
+var PENDING_TIMESHEETS_COLUMNS = [
+  'ID',                             // UUID, unique timesheet identifier
+  'RAW_DATA_IMPORT_ID',             // Links to CLOCK_IN_IMPORTS.IMPORT_ID
+  'EMPLOYEE_ID',                    // Links to EMPLOYEE DETAILS.id
+  'EMPLOYEE NAME',                  // From EMPLOYEE DETAILS (keep original format for compatibility)
+  'EMPLOYEE_CLOCK_REF',             // Clock-in reference number
+  'WEEKENDING',                     // Week ending date (keep original format for compatibility)
+  'CALCULATED_TOTAL_HOURS',        // System calculated total hours
+  'CALCULATED_TOTAL_MINUTES',      // System calculated total minutes
+  'HOURS',                          // Standard hours (manual entry) - keep for compatibility
+  'MINUTES',                        // Standard minutes (manual entry) - keep for compatibility
+  'OVERTIMEHOURS',                  // Overtime hours (manual entry) - keep for compatibility
+  'OVERTIMEMINUTES',                // Overtime minutes (manual entry) - keep for compatibility
+  'LUNCH_DEDUCTION_MIN',            // Calculated lunch deduction
+  'BATHROOM_TIME_MIN',              // Total bathroom time
+  'RECON_DETAILS',                  // JSON with full reconciliation data
+  'WARNINGS',                       // JSON array of any warnings
+  'NOTES',                          // Manual notes/adjustments reason - keep for compatibility
+  'STATUS',                         // Pending/Approved/Rejected - keep for compatibility
+  'IMPORTED_BY',                    // User who created - keep for compatibility (was IMPORTED_BY)
+  'IMPORTED_DATE',                  // When timesheet was created - keep for compatibility (was IMPORTED_DATE)
+  'REVIEWED_BY',                    // User who reviewed - keep for compatibility
+  'REVIEWED_DATE',                  // When approved/rejected - keep for compatibility
+  'PAYSLIP_ID',                     // Links to MASTERSALARY.RECORDNUMBER
+  'IS_LOCKED',                      // True once payslip generated
+  'LOCKED_DATE'                     // When record was locked
+];
 
 // ==================== ERROR MESSAGES ====================
 

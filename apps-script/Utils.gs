@@ -701,6 +701,239 @@ function sanitizeForWeb(obj) {
 }
 
 // ============================================================================
+// TIMESHEET UTILITIES
+// ============================================================================
+
+/**
+ * Generate hash of file content for duplicate detection
+ *
+ * @param {string} content - File content or data to hash
+ * @returns {string} MD5 hash of content
+ */
+function generateImportHash(content) {
+  try {
+    // Convert to string if not already
+    var dataString = typeof content === 'string' ? content : JSON.stringify(content);
+
+    // Generate MD5 hash
+    var hash = Utilities.computeDigest(
+      Utilities.DigestAlgorithm.MD5,
+      dataString,
+      Utilities.Charset.UTF_8
+    );
+
+    // Convert to hex string
+    var hashString = hash.map(function(byte) {
+      var v = (byte < 0) ? 256 + byte : byte;
+      return ('0' + v.toString(16)).slice(-2);
+    }).join('');
+
+    return hashString;
+
+  } catch (error) {
+    logError('Failed to generate import hash', error);
+    return '';
+  }
+}
+
+/**
+ * Format duration in minutes to readable string
+ *
+ * @param {number} minutes - Duration in minutes
+ * @param {boolean} [verbose=false] - Use verbose format (e.g., "2 hours 30 minutes")
+ * @returns {string} Formatted duration
+ */
+function formatDuration(minutes, verbose) {
+  if (minutes === null || minutes === undefined || minutes === '') {
+    return '0h 0m';
+  }
+
+  var totalMinutes = Math.abs(parseFloat(minutes));
+  if (isNaN(totalMinutes)) {
+    return '0h 0m';
+  }
+
+  var hours = Math.floor(totalMinutes / 60);
+  var mins = Math.round(totalMinutes % 60);
+
+  if (verbose) {
+    var parts = [];
+    if (hours > 0) {
+      parts.push(hours + (hours === 1 ? ' hour' : ' hours'));
+    }
+    if (mins > 0 || hours === 0) {
+      parts.push(mins + (mins === 1 ? ' minute' : ' minutes'));
+    }
+    return parts.join(' ');
+  }
+
+  return hours + 'h ' + mins + 'm';
+}
+
+/**
+ * Parse Excel date serial number to JavaScript Date
+ *
+ * @param {number|Date|string} value - Excel serial number, Date object, or date string
+ * @returns {Date} JavaScript Date object
+ */
+function parseExcelDate(value) {
+  // Already a Date
+  if (value instanceof Date) {
+    return value;
+  }
+
+  // Excel serial number (days since 1900-01-01)
+  if (typeof value === 'number') {
+    // Excel incorrectly treats 1900 as a leap year
+    var excelEpoch = new Date(1899, 11, 30); // December 30, 1899
+    var milliseconds = value * 24 * 60 * 60 * 1000;
+    return new Date(excelEpoch.getTime() + milliseconds);
+  }
+
+  // String - try to parse
+  if (typeof value === 'string') {
+    var parsed = new Date(value);
+    if (!isNaN(parsed.getTime())) {
+      return parsed;
+    }
+  }
+
+  throw new Error('Cannot parse date value: ' + value);
+}
+
+/**
+ * Get week ending date (Saturday) for a given date
+ *
+ * @param {Date|string} date - Date to get week ending for
+ * @returns {Date} Saturday of that week
+ */
+function getWeekEnding(date) {
+  var d = parseDate(date);
+
+  // Get day of week (0 = Sunday, 6 = Saturday)
+  var dayOfWeek = d.getDay();
+
+  // Calculate days until Saturday
+  var daysUntilSaturday = (6 - dayOfWeek + 7) % 7;
+
+  // If already Saturday, use current date
+  if (daysUntilSaturday === 0 && dayOfWeek === 6) {
+    return d;
+  }
+
+  // Add days to get to Saturday
+  var saturday = new Date(d);
+  saturday.setDate(d.getDate() + daysUntilSaturday);
+
+  return saturday;
+}
+
+/**
+ * Get week starting date (Sunday) for a given date
+ *
+ * @param {Date|string} date - Date to get week starting for
+ * @returns {Date} Sunday of that week
+ */
+function getWeekStarting(date) {
+  var d = parseDate(date);
+
+  // Get day of week (0 = Sunday, 6 = Saturday)
+  var dayOfWeek = d.getDay();
+
+  // Calculate days back to Sunday
+  var daysBackToSunday = dayOfWeek;
+
+  // If already Sunday, use current date
+  if (daysBackToSunday === 0) {
+    return d;
+  }
+
+  // Subtract days to get to Sunday
+  var sunday = new Date(d);
+  sunday.setDate(d.getDate() - daysBackToSunday);
+
+  return sunday;
+}
+
+/**
+ * Check if a date is a Friday
+ *
+ * @param {Date|string} date - Date to check
+ * @returns {boolean} True if Friday
+ */
+function isFriday(date) {
+  var d = parseDate(date);
+  return d.getDay() === 5;
+}
+
+/**
+ * Get unique values from array
+ *
+ * @param {Array} array - Array to get unique values from
+ * @returns {Array} Array with unique values only
+ */
+function getUniqueValues(array) {
+  var seen = {};
+  var result = [];
+
+  for (var i = 0; i < array.length; i++) {
+    var value = array[i];
+    var key = JSON.stringify(value);
+
+    if (!seen[key]) {
+      seen[key] = true;
+      result.push(value);
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Parse CSV string to array of objects
+ *
+ * @param {string} csvString - CSV data as string
+ * @param {boolean} [hasHeaders=true] - First row contains headers
+ * @returns {Array} Array of objects
+ */
+function parseCSV(csvString, hasHeaders) {
+  if (hasHeaders === undefined) hasHeaders = true;
+
+  var lines = csvString.split('\n');
+  var headers = [];
+  var result = [];
+
+  if (hasHeaders && lines.length > 0) {
+    headers = lines[0].split(',').map(function(h) {
+      return h.trim();
+    });
+  }
+
+  var startIndex = hasHeaders ? 1 : 0;
+
+  for (var i = startIndex; i < lines.length; i++) {
+    var line = lines[i].trim();
+    if (!line) continue;
+
+    var values = line.split(',').map(function(v) {
+      return v.trim();
+    });
+
+    if (hasHeaders) {
+      var obj = {};
+      for (var j = 0; j < headers.length; j++) {
+        obj[headers[j]] = values[j] || '';
+      }
+      result.push(obj);
+    } else {
+      result.push(values);
+    }
+  }
+
+  return result;
+}
+
+// ============================================================================
 // EXPORT UTILITIES FOR TESTING
 // ============================================================================
 
@@ -712,7 +945,12 @@ if (typeof module !== 'undefined' && module.exports) {
     isValidPhoneNumber: isValidPhoneNumber,
     formatPhoneNumber: formatPhoneNumber,
     formatDate: formatDate,
+    formatDuration: formatDuration,
     generateId: generateId,
+    generateImportHash: generateImportHash,
+    parseExcelDate: parseExcelDate,
+    getWeekEnding: getWeekEnding,
+    getWeekStarting: getWeekStarting,
     logFunctionStart: logFunctionStart,
     logFunctionEnd: logFunctionEnd,
     logSuccess: logSuccess,
