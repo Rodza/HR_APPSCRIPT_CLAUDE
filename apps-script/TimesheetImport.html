@@ -295,6 +295,13 @@
         function handleImportResponse(result) {
             hideLoading();
 
+            // Check if result is null (can happen during OAuth authorization)
+            if (!result) {
+                showError('Authorization required or server returned no response. Please try again.');
+                resetImport();
+                return;
+            }
+
             if (result.success) {
                 // Success - show results
                 displaySuccessResults(result.data);

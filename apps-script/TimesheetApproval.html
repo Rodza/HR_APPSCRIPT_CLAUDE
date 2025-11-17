@@ -203,6 +203,10 @@
             google.script.run
                 .withSuccessHandler(function(result) {
                     hideLoading();
+                    if (!result) {
+                        showError('Authorization required or server returned no response. Please try again.');
+                        return;
+                    }
                     if (result.success) {
                         allTimesheets = result.data;
                         filterTimesheets();
@@ -349,6 +353,10 @@
             google.script.run
                 .withSuccessHandler(function(result) {
                     hideLoading();
+                    if (!result) {
+                        showError('Authorization required or server returned no response. Please try again.');
+                        return;
+                    }
                     if (result.success) {
                         showSuccess('Timesheet updated successfully');
                         editModal.hide();
@@ -372,6 +380,10 @@
             google.script.run
                 .withSuccessHandler(function(result) {
                     hideLoading();
+                    if (!result) {
+                        showError('Authorization required or server returned no response. Please try again.');
+                        return;
+                    }
                     if (result.success) {
                         showSuccess('Timesheet approved! Payslip #' + result.data.payslipRecordNumber + ' created.');
                         loadTimesheets();
@@ -395,6 +407,10 @@
             google.script.run
                 .withSuccessHandler(function(result) {
                     hideLoading();
+                    if (!result) {
+                        showError('Authorization required or server returned no response. Please try again.');
+                        return;
+                    }
                     if (result.success) {
                         showSuccess('Timesheet rejected');
                         loadTimesheets();
