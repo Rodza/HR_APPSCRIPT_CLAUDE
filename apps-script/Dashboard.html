@@ -326,6 +326,15 @@
                 case 'timesheets':
                     loadTimesheetsModule();
                     break;
+                case 'timesheetApproval':
+                    loadTimesheetApprovalModule();
+                    break;
+                case 'timesheetImport':
+                    loadTimesheetImportModule();
+                    break;
+                case 'timesheetSettings':
+                    loadTimesheetSettingsModule();
+                    break;
                 case 'payroll':
                     loadPayrollModule();
                     break;
@@ -651,6 +660,54 @@
                 })
                 .withFailureHandler(handleError)
                 .include('TimesheetApproval');
+        }
+
+        function loadTimesheetApprovalModule() {
+            google.script.run
+                .withSuccessHandler(function(html) {
+                    if (html) {
+                        const contentArea = document.getElementById('contentArea');
+                        contentArea.innerHTML = html;
+                        executeModuleScripts(contentArea);
+                    } else {
+                        showError('Failed to load Timesheet Approval module');
+                    }
+                    hideLoading();
+                })
+                .withFailureHandler(handleError)
+                .include('TimesheetApproval');
+        }
+
+        function loadTimesheetImportModule() {
+            google.script.run
+                .withSuccessHandler(function(html) {
+                    if (html) {
+                        const contentArea = document.getElementById('contentArea');
+                        contentArea.innerHTML = html;
+                        executeModuleScripts(contentArea);
+                    } else {
+                        showError('Failed to load Timesheet Import module');
+                    }
+                    hideLoading();
+                })
+                .withFailureHandler(handleError)
+                .include('TimesheetImport');
+        }
+
+        function loadTimesheetSettingsModule() {
+            google.script.run
+                .withSuccessHandler(function(html) {
+                    if (html) {
+                        const contentArea = document.getElementById('contentArea');
+                        contentArea.innerHTML = html;
+                        executeModuleScripts(contentArea);
+                    } else {
+                        showError('Failed to load Timesheet Settings module');
+                    }
+                    hideLoading();
+                })
+                .withFailureHandler(handleError)
+                .include('TimesheetSettings');
         }
 
         function loadPayrollModule() {
