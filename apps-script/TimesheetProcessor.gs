@@ -690,7 +690,12 @@ function test_timesheetProcessor() {
     }
   ];
 
-  var config = getTimeConfig();
+  var configResult = getTimeConfig();
+  if (!configResult.success) {
+    Logger.log('❌ Failed to get config');
+    return;
+  }
+  var config = configResult.data;
 
   // Test processing
   var result = processClockData(testClockData, config);
