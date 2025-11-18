@@ -622,13 +622,13 @@ function listPendingTimesheets(filters) {
       }
 
       if (filters.employeeName) {
-        records = records.filter(r => r.EMPLOYEE_NAME === filters.employeeName);
+        records = records.filter(r => r['EMPLOYEE NAME'] === filters.employeeName);  // ✅ Fixed: Use bracket notation
       }
 
       if (filters.weekEnding) {
         const filterWeekEnding = parseDate(filters.weekEnding);
         records = records.filter(r => {
-          const recordWeekEnding = parseDate(r.WEEK_ENDING);
+          const recordWeekEnding = parseDate(r.WEEKENDING);  // ✅ Fixed: WEEKENDING not WEEK_ENDING
           return recordWeekEnding.getTime() === filterWeekEnding.getTime();
         });
       }
@@ -636,14 +636,14 @@ function listPendingTimesheets(filters) {
 
     // Sort by week ending (descending), then employee name
     records.sort((a, b) => {
-      const dateA = parseDate(a.WEEK_ENDING);
-      const dateB = parseDate(b.WEEK_ENDING);
+      const dateA = parseDate(a.WEEKENDING);  // ✅ Fixed: WEEKENDING not WEEK_ENDING
+      const dateB = parseDate(b.WEEKENDING);  // ✅ Fixed: WEEKENDING not WEEK_ENDING
 
       if (dateA.getTime() !== dateB.getTime()) {
         return dateB - dateA;  // Descending
       }
 
-      return a.EMPLOYEE_NAME.localeCompare(b.EMPLOYEE_NAME);
+      return a['EMPLOYEE NAME'].localeCompare(b['EMPLOYEE NAME']);  // ✅ Fixed: Use bracket notation for space
     });
 
     Logger.log('✅ Found ' + records.length + ' pending timesheets');
@@ -1456,33 +1456,33 @@ function createEnhancedPendingTimesheet(data) {
 
     const id = generateFullUUID();
 
-    // Match column order in PendingTimesheets sheet header
+    // Match column order in PendingTimesheets sheet header (Config.gs:326-351)
     const rowData = [
-      id,                              // ID
-      data.rawDataImportId || '',      // RAW_DATA_IMPORT_ID
-      data.employeeId || '',           // EMPLOYEE_ID
-      data.employeeName,               // EMPLOYEE_NAME
-      data.employeeClockRef || '',     // EMPLOYEE_CLOCK_REF
-      data.weekEnding,                 // WEEK_ENDING
-      data.calculatedTotalHours || 0,  // CALCULATED_TOTAL_HOURS
-      data.calculatedTotalMinutes || 0,// CALCULATED_TOTAL_MINUTES
-      data.hours || 0,                 // STANDARD_HOURS
-      data.minutes || 0,               // STANDARD_MINUTES
-      data.overtimeHours || 0,         // OVERTIME_HOURS
-      data.overtimeMinutes || 0,       // OVERTIME_MINUTES
-      data.lunchDeductionMin || 0,     // LUNCH_DEDUCTION_MIN
-      data.bathroomTimeMin || 0,       // BATHROOM_TIME_MIN
-      data.reconDetails || '',         // RECON_DETAILS
-      data.warnings || '[]',           // WARNINGS
-      'Pending',                       // STATUS ← MOVED HERE (col 17)
-      new Date(),                      // CREATED_DATE ← MOVED HERE (col 18)
-      getCurrentUser(),                // CREATED_BY ← MOVED HERE (col 19)
-      '',                              // REVIEWED_DATE (col 20)
-      '',                              // REVIEWED_BY (col 21)
-      '',                              // PAYSLIP_ID (col 22)
-      data.notes || '',                // NOTES ← MOVED HERE (col 23)
-      false,                           // IS_LOCKED (col 24)
-      ''                               // LOCKED_DATE (col 25)
+      id,                              // 1. ID
+      data.rawDataImportId || '',      // 2. RAW_DATA_IMPORT_ID
+      data.employeeId || '',           // 3. EMPLOYEE_ID
+      data.employeeName,               // 4. EMPLOYEE NAME
+      data.employeeClockRef || '',     // 5. EMPLOYEE_CLOCK_REF
+      data.weekEnding,                 // 6. WEEKENDING
+      data.calculatedTotalHours || 0,  // 7. CALCULATED_TOTAL_HOURS
+      data.calculatedTotalMinutes || 0,// 8. CALCULATED_TOTAL_MINUTES
+      data.hours || 0,                 // 9. HOURS
+      data.minutes || 0,               // 10. MINUTES
+      data.overtimeHours || 0,         // 11. OVERTIMEHOURS
+      data.overtimeMinutes || 0,       // 12. OVERTIMEMINUTES
+      data.lunchDeductionMin || 0,     // 13. LUNCH_DEDUCTION_MIN
+      data.bathroomTimeMin || 0,       // 14. BATHROOM_TIME_MIN
+      data.reconDetails || '',         // 15. RECON_DETAILS
+      data.warnings || '[]',           // 16. WARNINGS
+      data.notes || '',                // 17. NOTES ✅ Fixed position
+      'Pending',                       // 18. STATUS ✅ Fixed position
+      getCurrentUser(),                // 19. IMPORTED_BY ✅ Fixed position
+      new Date(),                      // 20. IMPORTED_DATE ✅ Fixed position
+      '',                              // 21. REVIEWED_BY ✅ Fixed position
+      '',                              // 22. REVIEWED_DATE ✅ Fixed position
+      '',                              // 23. PAYSLIP_ID ✅ Fixed position
+      false,                           // 24. IS_LOCKED
+      ''                               // 25. LOCKED_DATE
     ];
 
     pendingSheet.appendRow(rowData);
