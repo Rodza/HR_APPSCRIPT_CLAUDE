@@ -309,10 +309,15 @@
 
             hideLoading();
 
-            // Check if result is null (can happen during OAuth authorization)
+            // Check if result is null (can happen during OAuth authorization or rate limiting)
             if (!result) {
                 console.error('ERROR: Result is null or undefined!');
-                showError('Authorization required or server returned no response. Please try again.');
+                console.error('This usually means:');
+                console.error('1. HTTP 429 rate limit (too many requests)');
+                console.error('2. Network timeout');
+                console.error('3. Authorization issue');
+                console.error('Check Network tab in DevTools for HTTP status code');
+                showError('Server returned no response. Possible causes: Rate limit (HTTP 429), network timeout, or authorization issue. Wait a few minutes and try again.');
                 resetImport();
                 return;
             }
@@ -344,7 +349,15 @@
             console.error('Error stack:', error.stack);
 
             hideLoading();
-            showError('Error importing file: ' + error.message);
+
+            // Check for rate limit error
+            if (error.message && error.message.includes('429')) {
+                showError('Rate limit exceeded (HTTP 429). Google is blocking requests because too many were made too quickly. Please wait 5-10 minutes and try again.');
+            } else if (error.message && error.message.includes('NetworkError')) {
+                showError('Network error: ' + error.message + '. This may be due to rate limiting. Wait a few minutes and try again.');
+            } else {
+                showError('Error importing file: ' + error.message);
+            }
             resetImport();
         }
 
