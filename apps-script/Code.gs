@@ -452,6 +452,55 @@ function runFixRawClockDataHeaders() {
 }
 
 /**
+ * Fix PendingTimesheets wrong headers
+ */
+function runFixPendingTimesheetsHeaders() {
+  try {
+    var ui = SpreadsheetApp.getUi();
+
+    // Confirm with user
+    var response = ui.alert(
+      'Fix PendingTimesheets Headers',
+      'This will correct wrong column header names in PendingTimesheets sheet.\n\n' +
+      'Common issues:\n' +
+      '• EMPLOYEE_NAME → EMPLOYEE NAME (with space)\n' +
+      '• WEEK_ENDING → WEEKENDING (no underscore)\n' +
+      '• STANDARD_HOURS → HOURS\n' +
+      '• Column order mismatches\n\n' +
+      'Continue?',
+      ui.ButtonSet.YES_NO
+    );
+
+    if (response !== ui.Button.YES) {
+      return;
+    }
+
+    // Run fix
+    var result = fixPendingTimesheetsHeaders();
+
+    if (result.success) {
+      var message = 'Headers fixed!\n\n';
+      message += 'Corrected ' + result.corrected + ' header(s)\n\n';
+      if (result.mismatches && result.mismatches.length > 0) {
+        message += 'Fixed columns:\n';
+        result.mismatches.slice(0, 5).forEach(function(m) {
+          message += '• Col ' + m.position + ': "' + m.current + '" → "' + m.expected + '"\n';
+        });
+        if (result.mismatches.length > 5) {
+          message += '... and ' + (result.mismatches.length - 5) + ' more\n';
+        }
+      }
+      ui.alert('Success', message, ui.ButtonSet.OK);
+    } else {
+      ui.alert('Error', 'Fix failed: ' + result.error, ui.ButtonSet.OK);
+    }
+
+  } catch (error) {
+    SpreadsheetApp.getUi().alert('Error: ' + error.toString());
+  }
+}
+
+/**
  * Create custom menu on spreadsheet open
  * Adds HR System menu with all modules
  */
@@ -471,7 +520,8 @@ function onOpen() {
     .addItem('🔍 Debugger', 'showTimesheetDebugger')
     .addSeparator()
     .addItem('⚙️ Setup Sheets', 'runTimesheetSheetSetup')
-    .addItem('🔧 Fix RAW_CLOCK_DATA Headers', 'runFixRawClockDataHeaders'));
+    .addItem('🔧 Fix RAW_CLOCK_DATA Headers', 'runFixRawClockDataHeaders')
+    .addItem('🔧 Fix PendingTimesheets Headers', 'runFixPendingTimesheetsHeaders'));
 
   // Add other submenus (if you want to add more later)
   // menu.addSubMenu(ui.createMenu('Reports')...);
