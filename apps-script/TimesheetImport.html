@@ -284,8 +284,15 @@
         }
 
         function executeImport(base64Data, filename, mimeType, override) {
+            console.log('========== CLIENT: EXECUTE IMPORT ==========');
+            console.log('Filename:', filename);
+            console.log('MIME Type:', mimeType);
+            console.log('Override:', override);
+            console.log('Base64 length:', base64Data ? base64Data.length : 'NULL');
+
             showLoading();
 
+            console.log('Calling importClockDataFromBase64...');
             google.script.run
                 .withSuccessHandler(handleImportResponse)
                 .withFailureHandler(handleImportError)
@@ -293,14 +300,26 @@
         }
 
         function handleImportResponse(result) {
+            console.log('========== CLIENT: SUCCESS HANDLER ==========');
+            console.log('Result received');
+            console.log('Result type:', typeof result);
+            console.log('Result is null:', result === null);
+            console.log('Result is undefined:', result === undefined);
+            console.log('Result:', result);
+
             hideLoading();
 
             // Check if result is null (can happen during OAuth authorization)
             if (!result) {
+                console.error('ERROR: Result is null or undefined!');
                 showError('Authorization required or server returned no response. Please try again.');
                 resetImport();
                 return;
             }
+
+            console.log('Result.success:', result.success);
+            console.log('Result.error:', result.error);
+            console.log('Result.data:', result.data);
 
             if (result.success) {
                 // Success - show results
@@ -319,6 +338,11 @@
         }
 
         function handleImportError(error) {
+            console.log('========== CLIENT: FAILURE HANDLER ==========');
+            console.error('Error object:', error);
+            console.error('Error message:', error.message);
+            console.error('Error stack:', error.stack);
+
             hideLoading();
             showError('Error importing file: ' + error.message);
             resetImport();

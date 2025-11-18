@@ -500,10 +500,38 @@ function testAuthorizationStatus() {
 
     Logger.log('✅ PASSED: User authorized: ' + user);
 
+    // IMPORTANT: Also test Drive API access (needed for Excel import)
+    Logger.log('Testing Drive API access...');
+    try {
+      // Try to use Drive Advanced Service
+      var testFile = DriveApp.createFile('test', 'test');
+      var testFileId = testFile.getId();
+
+      // Try Drive API v3 (Advanced Service)
+      var driveFile = Drive.Files.get(testFileId);
+      Logger.log('✅ Drive API v3 access: OK');
+
+      // Clean up
+      DriveApp.getFileById(testFileId).setTrashed(true);
+    } catch (driveError) {
+      Logger.log('❌ CRITICAL: Drive API access FAILED');
+      Logger.log('   Error: ' + driveError.message);
+      Logger.log('   This is why Excel import fails!');
+      return {
+        test: testName,
+        status: 'FAILED',
+        error: 'Drive API not authorized: ' + driveError.message,
+        user: user,
+        critical: true,
+        solution: 'Enable Drive API in Advanced Services'
+      };
+    }
+
     return {
       test: testName,
       status: 'PASSED',
-      user: user
+      user: user,
+      driveApiEnabled: true
     };
 
   } catch (error) {
