@@ -780,17 +780,57 @@ function checkDuplicatePendingTimesheet(employeeName, weekEnding) {
  */
 function importClockDataFromBase64(base64Data, filename, mimeType, override) {
   try {
-    Logger.log('📥 Converting base64 to blob: ' + filename);
+    Logger.log('\n========== IMPORT CLOCK DATA FROM BASE64 ==========');
+    Logger.log('📥 Function called with:');
+    Logger.log('   Filename: ' + filename);
+    Logger.log('   MIME Type: ' + mimeType);
+    Logger.log('   Override: ' + override);
+    Logger.log('   Base64 length: ' + (base64Data ? base64Data.length : 'NULL'));
+
+    // Validate inputs
+    if (!base64Data) {
+      Logger.log('❌ ERROR: base64Data is null or undefined');
+      return { success: false, error: 'No file data provided' };
+    }
+
+    if (!filename) {
+      Logger.log('❌ ERROR: filename is null or undefined');
+      return { success: false, error: 'No filename provided' };
+    }
+
+    Logger.log('✅ Input validation passed');
+    Logger.log('🔄 Decoding base64...');
 
     // Decode base64 and create blob (server-side Utilities API)
     const bytes = Utilities.base64Decode(base64Data);
+    Logger.log('✅ Base64 decoded, bytes length: ' + bytes.length);
+
+    Logger.log('🔄 Creating blob...');
     const fileBlob = Utilities.newBlob(bytes, mimeType, filename);
+    Logger.log('✅ Blob created: ' + fileBlob.getName());
 
     // Call the main import function
-    return importClockData(fileBlob, filename, override);
+    Logger.log('🔄 Calling importClockData...');
+    const result = importClockData(fileBlob, filename, override);
+
+    Logger.log('✅ importClockData returned');
+    Logger.log('   Result type: ' + typeof result);
+    Logger.log('   Result is null: ' + (result === null));
+    Logger.log('   Result is undefined: ' + (result === undefined));
+
+    if (result) {
+      Logger.log('   Result.success: ' + result.success);
+      Logger.log('   Result has error: ' + (!!result.error));
+      Logger.log('   Result has data: ' + (!!result.data));
+    }
+
+    Logger.log('========== IMPORT CLOCK DATA FROM BASE64 COMPLETE ==========\n');
+    return result;
 
   } catch (error) {
     Logger.log('❌ ERROR in importClockDataFromBase64: ' + error.message);
+    Logger.log('   Stack: ' + error.stack);
+    Logger.log('========== IMPORT CLOCK DATA FROM BASE64 FAILED ==========\n');
     return { success: false, error: error.message };
   }
 }
