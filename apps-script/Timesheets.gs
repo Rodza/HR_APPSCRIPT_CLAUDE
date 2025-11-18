@@ -30,20 +30,21 @@ function setupPendingTimesheetsSheet() {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     let sheet = null;
 
-    // Check if sheet already exists
+    // Check if sheet already exists (try both names for compatibility)
     const sheets = ss.getSheets();
     for (let i = 0; i < sheets.length; i++) {
-      if (sheets[i].getName() === 'PENDING_TIMESHEETS') {
+      const sheetName = sheets[i].getName();
+      if (sheetName === 'PENDING_TIMESHEETS' || sheetName === 'PendingTimesheets') {
         sheet = sheets[i];
-        Logger.log('✓ PENDING_TIMESHEETS sheet already exists');
+        Logger.log('✓ Found existing sheet: ' + sheetName);
         break;
       }
     }
 
-    // Create if doesn't exist
+    // Create if doesn't exist (use PendingTimesheets for compatibility)
     if (!sheet) {
-      Logger.log('Creating PENDING_TIMESHEETS sheet...');
-      sheet = ss.insertSheet('PENDING_TIMESHEETS');
+      Logger.log('Creating PendingTimesheets sheet...');
+      sheet = ss.insertSheet('PendingTimesheets');
       Logger.log('✓ Sheet created');
     }
 
@@ -64,15 +65,258 @@ function setupPendingTimesheetsSheet() {
       sheet.autoResizeColumn(i);
     }
 
-    Logger.log('✓ PENDING_TIMESHEETS sheet setup complete!');
+    Logger.log('✓ PendingTimesheets sheet setup complete!');
     Logger.log('Sheet now has ' + headers.length + ' columns');
     Logger.log('Headers: ' + headers.join(', '));
     Logger.log('========== SETUP COMPLETE ==========');
 
-    return { success: true, message: 'PENDING_TIMESHEETS sheet created successfully' };
+    return { success: true, message: 'PendingTimesheets sheet created successfully' };
 
   } catch (error) {
     Logger.log('❌ ERROR: ' + error.message);
+    Logger.log('Stack: ' + error.stack);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Setup RAW_CLOCK_DATA sheet if it doesn't exist
+ * Run this manually from Script Editor if the sheet is missing
+ */
+function setupRawClockDataSheet() {
+  try {
+    Logger.log('========== SETUP RAW_CLOCK_DATA SHEET ==========');
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = null;
+
+    // Check if sheet already exists
+    const sheets = ss.getSheets();
+    for (let i = 0; i < sheets.length; i++) {
+      if (sheets[i].getName() === 'RAW_CLOCK_DATA') {
+        sheet = sheets[i];
+        Logger.log('✓ RAW_CLOCK_DATA sheet already exists');
+        break;
+      }
+    }
+
+    // Create if doesn't exist
+    if (!sheet) {
+      Logger.log('Creating RAW_CLOCK_DATA sheet...');
+      sheet = ss.insertSheet('RAW_CLOCK_DATA');
+      Logger.log('✓ Sheet created');
+    }
+
+    // Set up headers from Config.gs
+    const headers = RAW_CLOCK_DATA_COLUMNS;
+    Logger.log('Setting up ' + headers.length + ' column headers...');
+
+    const headerRange = sheet.getRange(1, 1, 1, headers.length);
+    headerRange.setValues([headers]);
+    headerRange.setFontWeight('bold');
+    headerRange.setBackground('#f3f3f3');
+
+    // Freeze header row
+    sheet.setFrozenRows(1);
+
+    // Auto-resize columns
+    for (let i = 1; i <= headers.length; i++) {
+      sheet.autoResizeColumn(i);
+    }
+
+    Logger.log('✓ RAW_CLOCK_DATA sheet setup complete!');
+    Logger.log('Sheet now has ' + headers.length + ' columns');
+    Logger.log('Headers: ' + headers.join(', '));
+    Logger.log('========== SETUP COMPLETE ==========');
+
+    return { success: true, message: 'RAW_CLOCK_DATA sheet created successfully' };
+
+  } catch (error) {
+    Logger.log('❌ ERROR: ' + error.message);
+    Logger.log('Stack: ' + error.stack);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Setup CLOCK_IN_IMPORTS sheet if it doesn't exist
+ * Run this manually from Script Editor if the sheet is missing
+ */
+function setupClockInImportsSheet() {
+  try {
+    Logger.log('========== SETUP CLOCK_IN_IMPORTS SHEET ==========');
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = null;
+
+    // Check if sheet already exists
+    const sheets = ss.getSheets();
+    for (let i = 0; i < sheets.length; i++) {
+      if (sheets[i].getName() === 'CLOCK_IN_IMPORTS') {
+        sheet = sheets[i];
+        Logger.log('✓ CLOCK_IN_IMPORTS sheet already exists');
+        break;
+      }
+    }
+
+    // Create if doesn't exist
+    if (!sheet) {
+      Logger.log('Creating CLOCK_IN_IMPORTS sheet...');
+      sheet = ss.insertSheet('CLOCK_IN_IMPORTS');
+      Logger.log('✓ Sheet created');
+    }
+
+    // Set up headers from Config.gs
+    const headers = CLOCK_IN_IMPORTS_COLUMNS;
+    Logger.log('Setting up ' + headers.length + ' column headers...');
+
+    const headerRange = sheet.getRange(1, 1, 1, headers.length);
+    headerRange.setValues([headers]);
+    headerRange.setFontWeight('bold');
+    headerRange.setBackground('#f3f3f3');
+
+    // Freeze header row
+    sheet.setFrozenRows(1);
+
+    // Auto-resize columns
+    for (let i = 1; i <= headers.length; i++) {
+      sheet.autoResizeColumn(i);
+    }
+
+    Logger.log('✓ CLOCK_IN_IMPORTS sheet setup complete!');
+    Logger.log('Sheet now has ' + headers.length + ' columns');
+    Logger.log('Headers: ' + headers.join(', '));
+    Logger.log('========== SETUP COMPLETE ==========');
+
+    return { success: true, message: 'CLOCK_IN_IMPORTS sheet created successfully' };
+
+  } catch (error) {
+    Logger.log('❌ ERROR: ' + error.message);
+    Logger.log('Stack: ' + error.stack);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Fix RAW_CLOCK_DATA headers if they're incomplete
+ * This function adds missing headers to existing sheet
+ */
+function fixRawClockDataHeaders() {
+  try {
+    Logger.log('========== FIX RAW_CLOCK_DATA HEADERS ==========');
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = null;
+
+    // Find the sheet
+    const sheets = ss.getSheets();
+    for (let i = 0; i < sheets.length; i++) {
+      if (sheets[i].getName() === 'RAW_CLOCK_DATA') {
+        sheet = sheets[i];
+        break;
+      }
+    }
+
+    if (!sheet) {
+      throw new Error('RAW_CLOCK_DATA sheet not found');
+    }
+
+    // Get current headers
+    const currentHeaderRange = sheet.getRange(1, 1, 1, sheet.getLastColumn());
+    const currentHeaders = currentHeaderRange.getValues()[0];
+    Logger.log('Current headers (' + currentHeaders.length + '): ' + currentHeaders.join(', '));
+
+    // Expected headers
+    const expectedHeaders = RAW_CLOCK_DATA_COLUMNS;
+    Logger.log('Expected headers (' + expectedHeaders.length + '): ' + expectedHeaders.join(', '));
+
+    if (currentHeaders.length === expectedHeaders.length) {
+      Logger.log('✓ Headers are already complete (' + currentHeaders.length + ' columns)');
+      return { success: true, message: 'Headers already correct' };
+    }
+
+    if (currentHeaders.length > expectedHeaders.length) {
+      throw new Error('Sheet has more columns than expected: ' + currentHeaders.length + ' > ' + expectedHeaders.length);
+    }
+
+    // Set all headers to correct values
+    Logger.log('🔧 Updating headers to correct values...');
+    const headerRange = sheet.getRange(1, 1, 1, expectedHeaders.length);
+    headerRange.setValues([expectedHeaders]);
+    headerRange.setFontWeight('bold');
+    headerRange.setBackground('#f3f3f3');
+
+    // Auto-resize all columns
+    for (let i = 1; i <= expectedHeaders.length; i++) {
+      sheet.autoResizeColumn(i);
+    }
+
+    SpreadsheetApp.flush();
+
+    Logger.log('✅ Headers fixed!');
+    Logger.log('   Before: ' + currentHeaders.length + ' columns');
+    Logger.log('   After: ' + expectedHeaders.length + ' columns');
+    Logger.log('   Missing headers added: ' + expectedHeaders.slice(currentHeaders.length).join(', '));
+    Logger.log('========== FIX COMPLETE ==========');
+
+    return {
+      success: true,
+      message: 'Headers fixed successfully',
+      before: currentHeaders.length,
+      after: expectedHeaders.length,
+      added: expectedHeaders.slice(currentHeaders.length)
+    };
+
+  } catch (error) {
+    Logger.log('❌ ERROR: ' + error.message);
+    Logger.log('Stack: ' + error.stack);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Setup ALL timesheet-related sheets at once
+ * Convenience function to set up all required sheets
+ */
+function setupAllTimesheetSheets() {
+  try {
+    Logger.log('\n========== SETUP ALL TIMESHEET SHEETS ==========\n');
+
+    const results = [];
+
+    // Setup RAW_CLOCK_DATA
+    Logger.log('1/3: Setting up RAW_CLOCK_DATA...');
+    const rawClockResult = setupRawClockDataSheet();
+    results.push({ sheet: 'RAW_CLOCK_DATA', result: rawClockResult });
+
+    // Setup CLOCK_IN_IMPORTS
+    Logger.log('\n2/3: Setting up CLOCK_IN_IMPORTS...');
+    const clockImportsResult = setupClockInImportsSheet();
+    results.push({ sheet: 'CLOCK_IN_IMPORTS', result: clockImportsResult });
+
+    // Setup PENDING_TIMESHEETS
+    Logger.log('\n3/3: Setting up PENDING_TIMESHEETS...');
+    const pendingResult = setupPendingTimesheetsSheet();
+    results.push({ sheet: 'PENDING_TIMESHEETS', result: pendingResult });
+
+    Logger.log('\n========== SETUP SUMMARY ==========');
+    results.forEach(function(item) {
+      const status = item.result.success ? '✅ SUCCESS' : '❌ FAILED';
+      Logger.log(status + ': ' + item.sheet);
+      if (!item.result.success) {
+        Logger.log('   Error: ' + item.result.error);
+      }
+    });
+    Logger.log('========== ALL SETUP COMPLETE ==========\n');
+
+    return {
+      success: true,
+      message: 'All sheets setup completed',
+      results: results
+    };
+
+  } catch (error) {
+    Logger.log('❌ ERROR in setupAllTimesheetSheets: ' + error.message);
     Logger.log('Stack: ' + error.stack);
     return { success: false, error: error.message };
   }
