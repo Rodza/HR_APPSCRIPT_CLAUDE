@@ -1075,7 +1075,22 @@ function listPendingTimesheets(filters) {
     Logger.log('✅ Found ' + records.length + ' pending timesheets');
     Logger.log('========== LIST PENDING TIMESHEETS COMPLETE ==========\n');
 
-    return { success: true, data: records };
+    // Serialize date fields to prevent "no response" error
+    const serializedRecords = records.map(record => {
+      const serialized = {};
+      for (const key in record) {
+        const value = record[key];
+        // Convert Date objects to ISO strings
+        if (value instanceof Date) {
+          serialized[key] = value.toISOString();
+        } else {
+          serialized[key] = value;
+        }
+      }
+      return serialized;
+    });
+
+    return { success: true, data: serializedRecords };
 
   } catch (error) {
     Logger.log('❌ ERROR in listPendingTimesheets: ' + error.message);
