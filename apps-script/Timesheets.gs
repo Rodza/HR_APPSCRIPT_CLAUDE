@@ -441,7 +441,35 @@ function checkPendingTimesheetsHeaders() {
 
     // Get current headers
     const currentHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    const expectedHeaders = PENDING_TIMESHEETS_COLUMNS;
+
+    // Expected headers from Config.gs (inlined to avoid dependency issues)
+    const expectedHeaders = [
+      'ID',
+      'RAW_DATA_IMPORT_ID',
+      'EMPLOYEE_ID',
+      'EMPLOYEE NAME',
+      'EMPLOYEE_CLOCK_REF',
+      'WEEKENDING',
+      'CALCULATED_TOTAL_HOURS',
+      'CALCULATED_TOTAL_MINUTES',
+      'HOURS',
+      'MINUTES',
+      'OVERTIMEHOURS',
+      'OVERTIMEMINUTES',
+      'LUNCH_DEDUCTION_MIN',
+      'BATHROOM_TIME_MIN',
+      'RECON_DETAILS',
+      'WARNINGS',
+      'NOTES',
+      'STATUS',
+      'IMPORTED_BY',
+      'IMPORTED_DATE',
+      'REVIEWED_BY',
+      'REVIEWED_DATE',
+      'PAYSLIP_ID',
+      'IS_LOCKED',
+      'LOCKED_DATE'
+    ];
 
     Logger.log('Total columns: ' + currentHeaders.length);
     Logger.log('Expected columns: ' + expectedHeaders.length);
