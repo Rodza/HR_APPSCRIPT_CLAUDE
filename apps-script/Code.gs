@@ -352,6 +352,21 @@ function showTimesheetSettings() {
 }
 
 /**
+ * Show Timesheet Debugger
+ * Opens a comprehensive debugging tool to diagnose authorization and server issues
+ */
+function showTimesheetDebugger() {
+  try {
+    var html = HtmlService.createHtmlOutputFromFile('TimesheetDebugger')
+      .setTitle('🔍 Timesheet Debugger')
+      .setWidth(1200);
+    SpreadsheetApp.getUi().showModelessDialog(html, 'Timesheet Debugger - Diagnostic Tool');
+  } catch (error) {
+    SpreadsheetApp.getUi().alert('Error loading debugger: ' + error.toString());
+  }
+}
+
+/**
  * Create custom menu on spreadsheet open
  * Adds HR System menu with all modules
  */
@@ -366,7 +381,9 @@ function onOpen() {
     .addItem('Import Clock Data', 'showTimesheetImport')
     .addItem('Pending Approval', 'showTimesheetApproval')
     .addSeparator()
-    .addItem('Settings', 'showTimesheetSettings'));
+    .addItem('Settings', 'showTimesheetSettings')
+    .addSeparator()
+    .addItem('🔍 Debugger', 'showTimesheetDebugger'));
 
   // Add other submenus (if you want to add more later)
   // menu.addSubMenu(ui.createMenu('Reports')...);
