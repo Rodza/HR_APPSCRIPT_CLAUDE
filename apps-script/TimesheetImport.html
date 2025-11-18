@@ -220,9 +220,9 @@
     <script>
         // Drag and drop handlers
         const uploadArea = document.getElementById('uploadArea');
-        let currentFile = null;
-        let currentFilename = '';
-        let unmatchedModal, duplicateModal;
+        var currentFile = null;
+        var currentFilename = '';
+        var unmatchedModal, duplicateModal;
 
         uploadArea.addEventListener('dragover', function(e) {
             e.preventDefault();
