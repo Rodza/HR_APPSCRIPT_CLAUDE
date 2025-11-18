@@ -413,6 +413,66 @@ function setupAllTimesheetSheets() {
   }
 }
 
+/**
+ * DIAGNOSTIC: Display current PendingTimesheets column headers
+ * Run this from Apps Script editor to see what headers are actually in the sheet
+ */
+function checkPendingTimesheetsHeaders() {
+  try {
+    Logger.log('\n========== CHECK PENDINGTIMESHEETS HEADERS ==========\n');
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = null;
+
+    // Find the sheet (try both names)
+    const sheets = ss.getSheets();
+    for (let i = 0; i < sheets.length; i++) {
+      const sheetName = sheets[i].getName();
+      if (sheetName === 'PENDING_TIMESHEETS' || sheetName === 'PendingTimesheets') {
+        sheet = sheets[i];
+        Logger.log('✓ Found sheet: ' + sheetName);
+        break;
+      }
+    }
+
+    if (!sheet) {
+      throw new Error('PendingTimesheets sheet not found');
+    }
+
+    // Get current headers
+    const currentHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const expectedHeaders = PENDING_TIMESHEETS_COLUMNS;
+
+    Logger.log('Total columns: ' + currentHeaders.length);
+    Logger.log('Expected columns: ' + expectedHeaders.length);
+    Logger.log('\n========== CURRENT HEADERS ==========');
+
+    for (let i = 0; i < currentHeaders.length; i++) {
+      const colNum = i + 1;
+      const current = currentHeaders[i];
+      const expected = expectedHeaders[i] || 'N/A';
+      const match = current === expected ? '✓' : '✗';
+
+      Logger.log(match + ' Column ' + colNum + ': "' + current + '"' +
+                 (current !== expected ? ' (Expected: "' + expected + '")' : ''));
+    }
+
+    Logger.log('\n========== EXPECTED HEADERS (Config.gs) ==========');
+    for (let i = 0; i < expectedHeaders.length; i++) {
+      Logger.log('Column ' + (i + 1) + ': ' + expectedHeaders[i]);
+    }
+
+    Logger.log('\n========== CHECK COMPLETE ==========\n');
+
+    return { success: true, currentHeaders: currentHeaders, expectedHeaders: expectedHeaders };
+
+  } catch (error) {
+    Logger.log('❌ ERROR: ' + error.message);
+    Logger.log('Stack: ' + error.stack);
+    return { success: false, error: error.message };
+  }
+}
+
 // ==================== IMPORT EXCEL TIMESHEET ====================
 
 /**
