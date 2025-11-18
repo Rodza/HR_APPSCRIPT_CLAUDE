@@ -1051,6 +1051,8 @@ function listPendingTimesheets(filters) {
       if (filters.weekEnding) {
         const filterWeekEnding = parseDate(filters.weekEnding);
         records = records.filter(r => {
+          // Skip records with empty WEEKENDING
+          if (!r.WEEKENDING) return false;
           const recordWeekEnding = parseDate(r.WEEKENDING);  // ✅ Fixed: WEEKENDING not WEEK_ENDING
           return recordWeekEnding.getTime() === filterWeekEnding.getTime();
         });
@@ -1059,8 +1061,9 @@ function listPendingTimesheets(filters) {
 
     // Sort by week ending (descending), then employee name
     records.sort((a, b) => {
-      const dateA = parseDate(a.WEEKENDING);  // ✅ Fixed: WEEKENDING not WEEK_ENDING
-      const dateB = parseDate(b.WEEKENDING);  // ✅ Fixed: WEEKENDING not WEEK_ENDING
+      // Handle empty WEEKENDING values - treat as oldest date
+      const dateA = a.WEEKENDING ? parseDate(a.WEEKENDING) : new Date(0);
+      const dateB = b.WEEKENDING ? parseDate(b.WEEKENDING) : new Date(0);
 
       if (dateA.getTime() !== dateB.getTime()) {
         return dateB - dateA;  // Descending
