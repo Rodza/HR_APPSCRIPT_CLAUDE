@@ -30,20 +30,21 @@ function setupPendingTimesheetsSheet() {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     let sheet = null;
 
-    // Check if sheet already exists
+    // Check if sheet already exists (try both names for compatibility)
     const sheets = ss.getSheets();
     for (let i = 0; i < sheets.length; i++) {
-      if (sheets[i].getName() === 'PENDING_TIMESHEETS') {
+      const sheetName = sheets[i].getName();
+      if (sheetName === 'PENDING_TIMESHEETS' || sheetName === 'PendingTimesheets') {
         sheet = sheets[i];
-        Logger.log('✓ PENDING_TIMESHEETS sheet already exists');
+        Logger.log('✓ Found existing sheet: ' + sheetName);
         break;
       }
     }
 
-    // Create if doesn't exist
+    // Create if doesn't exist (use PendingTimesheets for compatibility)
     if (!sheet) {
-      Logger.log('Creating PENDING_TIMESHEETS sheet...');
-      sheet = ss.insertSheet('PENDING_TIMESHEETS');
+      Logger.log('Creating PendingTimesheets sheet...');
+      sheet = ss.insertSheet('PendingTimesheets');
       Logger.log('✓ Sheet created');
     }
 
@@ -64,12 +65,12 @@ function setupPendingTimesheetsSheet() {
       sheet.autoResizeColumn(i);
     }
 
-    Logger.log('✓ PENDING_TIMESHEETS sheet setup complete!');
+    Logger.log('✓ PendingTimesheets sheet setup complete!');
     Logger.log('Sheet now has ' + headers.length + ' columns');
     Logger.log('Headers: ' + headers.join(', '));
     Logger.log('========== SETUP COMPLETE ==========');
 
-    return { success: true, message: 'PENDING_TIMESHEETS sheet created successfully' };
+    return { success: true, message: 'PendingTimesheets sheet created successfully' };
 
   } catch (error) {
     Logger.log('❌ ERROR: ' + error.message);
@@ -188,6 +189,83 @@ function setupClockInImportsSheet() {
     Logger.log('========== SETUP COMPLETE ==========');
 
     return { success: true, message: 'CLOCK_IN_IMPORTS sheet created successfully' };
+
+  } catch (error) {
+    Logger.log('❌ ERROR: ' + error.message);
+    Logger.log('Stack: ' + error.stack);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Fix RAW_CLOCK_DATA headers if they're incomplete
+ * This function adds missing headers to existing sheet
+ */
+function fixRawClockDataHeaders() {
+  try {
+    Logger.log('========== FIX RAW_CLOCK_DATA HEADERS ==========');
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = null;
+
+    // Find the sheet
+    const sheets = ss.getSheets();
+    for (let i = 0; i < sheets.length; i++) {
+      if (sheets[i].getName() === 'RAW_CLOCK_DATA') {
+        sheet = sheets[i];
+        break;
+      }
+    }
+
+    if (!sheet) {
+      throw new Error('RAW_CLOCK_DATA sheet not found');
+    }
+
+    // Get current headers
+    const currentHeaderRange = sheet.getRange(1, 1, 1, sheet.getLastColumn());
+    const currentHeaders = currentHeaderRange.getValues()[0];
+    Logger.log('Current headers (' + currentHeaders.length + '): ' + currentHeaders.join(', '));
+
+    // Expected headers
+    const expectedHeaders = RAW_CLOCK_DATA_COLUMNS;
+    Logger.log('Expected headers (' + expectedHeaders.length + '): ' + expectedHeaders.join(', '));
+
+    if (currentHeaders.length === expectedHeaders.length) {
+      Logger.log('✓ Headers are already complete (' + currentHeaders.length + ' columns)');
+      return { success: true, message: 'Headers already correct' };
+    }
+
+    if (currentHeaders.length > expectedHeaders.length) {
+      throw new Error('Sheet has more columns than expected: ' + currentHeaders.length + ' > ' + expectedHeaders.length);
+    }
+
+    // Set all headers to correct values
+    Logger.log('🔧 Updating headers to correct values...');
+    const headerRange = sheet.getRange(1, 1, 1, expectedHeaders.length);
+    headerRange.setValues([expectedHeaders]);
+    headerRange.setFontWeight('bold');
+    headerRange.setBackground('#f3f3f3');
+
+    // Auto-resize all columns
+    for (let i = 1; i <= expectedHeaders.length; i++) {
+      sheet.autoResizeColumn(i);
+    }
+
+    SpreadsheetApp.flush();
+
+    Logger.log('✅ Headers fixed!');
+    Logger.log('   Before: ' + currentHeaders.length + ' columns');
+    Logger.log('   After: ' + expectedHeaders.length + ' columns');
+    Logger.log('   Missing headers added: ' + expectedHeaders.slice(currentHeaders.length).join(', '));
+    Logger.log('========== FIX COMPLETE ==========');
+
+    return {
+      success: true,
+      message: 'Headers fixed successfully',
+      before: currentHeaders.length,
+      after: expectedHeaders.length,
+      added: expectedHeaders.slice(currentHeaders.length)
+    };
 
   } catch (error) {
     Logger.log('❌ ERROR: ' + error.message);

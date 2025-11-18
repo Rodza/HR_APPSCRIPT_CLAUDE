@@ -379,7 +379,7 @@ function runTimesheetSheetSetup() {
       'This will create the following sheets if they don\'t exist:\n\n' +
       '• RAW_CLOCK_DATA\n' +
       '• CLOCK_IN_IMPORTS\n' +
-      '• PENDING_TIMESHEETS\n\n' +
+      '• PendingTimesheets\n\n' +
       'Continue?',
       ui.ButtonSet.YES_NO
     );
@@ -408,6 +408,50 @@ function runTimesheetSheetSetup() {
 }
 
 /**
+ * Fix RAW_CLOCK_DATA missing headers
+ */
+function runFixRawClockDataHeaders() {
+  try {
+    var ui = SpreadsheetApp.getUi();
+
+    // Confirm with user
+    var response = ui.alert(
+      'Fix RAW_CLOCK_DATA Headers',
+      'This will add missing column headers to RAW_CLOCK_DATA sheet.\n\n' +
+      'Missing headers:\n' +
+      '• STATUS (column 11)\n' +
+      '• CREATED_DATE (column 12)\n' +
+      '• LOCKED_DATE (column 13)\n' +
+      '• LOCKED_BY (column 14)\n\n' +
+      'Continue?',
+      ui.ButtonSet.YES_NO
+    );
+
+    if (response !== ui.Button.YES) {
+      return;
+    }
+
+    // Run fix
+    var result = fixRawClockDataHeaders();
+
+    if (result.success) {
+      var message = 'Headers fixed!\n\n';
+      message += 'Before: ' + result.before + ' columns\n';
+      message += 'After: ' + result.after + ' columns\n\n';
+      if (result.added && result.added.length > 0) {
+        message += 'Added headers:\n• ' + result.added.join('\n• ');
+      }
+      ui.alert('Success', message, ui.ButtonSet.OK);
+    } else {
+      ui.alert('Error', 'Fix failed: ' + result.error, ui.ButtonSet.OK);
+    }
+
+  } catch (error) {
+    SpreadsheetApp.getUi().alert('Error: ' + error.toString());
+  }
+}
+
+/**
  * Create custom menu on spreadsheet open
  * Adds HR System menu with all modules
  */
@@ -426,7 +470,8 @@ function onOpen() {
     .addSeparator()
     .addItem('🔍 Debugger', 'showTimesheetDebugger')
     .addSeparator()
-    .addItem('⚙️ Setup Sheets', 'runTimesheetSheetSetup'));
+    .addItem('⚙️ Setup Sheets', 'runTimesheetSheetSetup')
+    .addItem('🔧 Fix RAW_CLOCK_DATA Headers', 'runFixRawClockDataHeaders'));
 
   // Add other submenus (if you want to add more later)
   // menu.addSubMenu(ui.createMenu('Reports')...);
