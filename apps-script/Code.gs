@@ -367,6 +367,47 @@ function showTimesheetDebugger() {
 }
 
 /**
+ * Run timesheet sheet setup - creates missing sheets with proper headers
+ */
+function runTimesheetSheetSetup() {
+  try {
+    var ui = SpreadsheetApp.getUi();
+
+    // Confirm with user
+    var response = ui.alert(
+      'Setup Timesheet Sheets',
+      'This will create the following sheets if they don\'t exist:\n\n' +
+      '• RAW_CLOCK_DATA\n' +
+      '• CLOCK_IN_IMPORTS\n' +
+      '• PENDING_TIMESHEETS\n\n' +
+      'Continue?',
+      ui.ButtonSet.YES_NO
+    );
+
+    if (response !== ui.Button.YES) {
+      return;
+    }
+
+    // Run setup
+    var result = setupAllTimesheetSheets();
+
+    if (result.success) {
+      var message = 'Setup complete!\n\n';
+      result.results.forEach(function(item) {
+        var status = item.result.success ? '✅' : '❌';
+        message += status + ' ' + item.sheet + '\n';
+      });
+      ui.alert('Success', message, ui.ButtonSet.OK);
+    } else {
+      ui.alert('Error', 'Setup failed: ' + result.error, ui.ButtonSet.OK);
+    }
+
+  } catch (error) {
+    SpreadsheetApp.getUi().alert('Error: ' + error.toString());
+  }
+}
+
+/**
  * Create custom menu on spreadsheet open
  * Adds HR System menu with all modules
  */
@@ -383,7 +424,9 @@ function onOpen() {
     .addSeparator()
     .addItem('Settings', 'showTimesheetSettings')
     .addSeparator()
-    .addItem('🔍 Debugger', 'showTimesheetDebugger'));
+    .addItem('🔍 Debugger', 'showTimesheetDebugger')
+    .addSeparator()
+    .addItem('⚙️ Setup Sheets', 'runTimesheetSheetSetup'));
 
   // Add other submenus (if you want to add more later)
   // menu.addSubMenu(ui.createMenu('Reports')...);
