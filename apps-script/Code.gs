@@ -501,6 +501,46 @@ function runFixPendingTimesheetsHeaders() {
 }
 
 /**
+ * Menu handler for checking PendingTimesheets headers
+ * Displays current vs expected headers
+ */
+function runCheckPendingTimesheetsHeaders() {
+  try {
+    var ui = SpreadsheetApp.getUi();
+
+    // Run diagnostic
+    var result = checkPendingTimesheetsHeaders();
+
+    if (result.success) {
+      var message = 'Check execution log for full details.\n\n';
+      message += 'Current columns: ' + result.currentHeaders.length + '\n';
+      message += 'Expected columns: ' + result.expectedHeaders.length + '\n\n';
+
+      var mismatches = 0;
+      for (var i = 0; i < result.currentHeaders.length; i++) {
+        if (result.currentHeaders[i] !== result.expectedHeaders[i]) {
+          mismatches++;
+        }
+      }
+
+      if (mismatches > 0) {
+        message += '⚠️ Found ' + mismatches + ' header mismatch(es)\n\n';
+        message += 'Check execution log (View → Logs) for details.';
+        ui.alert('Headers Need Fixing', message, ui.ButtonSet.OK);
+      } else {
+        message += '✅ All headers match!\n\n';
+        ui.alert('Headers Correct', message, ui.ButtonSet.OK);
+      }
+    } else {
+      ui.alert('Error', 'Check failed: ' + result.error, ui.ButtonSet.OK);
+    }
+
+  } catch (error) {
+    SpreadsheetApp.getUi().alert('Error: ' + error.toString());
+  }
+}
+
+/**
  * Create custom menu on spreadsheet open
  * Adds HR System menu with all modules
  */
@@ -521,7 +561,9 @@ function onOpen() {
     .addSeparator()
     .addItem('⚙️ Setup Sheets', 'runTimesheetSheetSetup')
     .addItem('🔧 Fix RAW_CLOCK_DATA Headers', 'runFixRawClockDataHeaders')
-    .addItem('🔧 Fix PendingTimesheets Headers', 'runFixPendingTimesheetsHeaders'));
+    .addItem('🔧 Fix PendingTimesheets Headers', 'runFixPendingTimesheetsHeaders')
+    .addSeparator()
+    .addItem('📋 Check PendingTimesheets Headers', 'runCheckPendingTimesheetsHeaders'));
 
   // Add other submenus (if you want to add more later)
   // menu.addSubMenu(ui.createMenu('Reports')...);
