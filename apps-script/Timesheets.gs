@@ -275,6 +275,97 @@ function fixRawClockDataHeaders() {
 }
 
 /**
+ * Fix PendingTimesheets headers to match Config.gs
+ * This function corrects wrong column header names
+ */
+function fixPendingTimesheetsHeaders() {
+  try {
+    Logger.log('========== FIX PENDINGTIMESHEETS HEADERS ==========');
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = null;
+
+    // Find the sheet (try both names)
+    const sheets = ss.getSheets();
+    for (let i = 0; i < sheets.length; i++) {
+      const sheetName = sheets[i].getName();
+      if (sheetName === 'PENDING_TIMESHEETS' || sheetName === 'PendingTimesheets') {
+        sheet = sheets[i];
+        Logger.log('✓ Found sheet: ' + sheetName);
+        break;
+      }
+    }
+
+    if (!sheet) {
+      throw new Error('PendingTimesheets sheet not found');
+    }
+
+    // Get current headers
+    const currentHeaderRange = sheet.getRange(1, 1, 1, sheet.getLastColumn());
+    const currentHeaders = currentHeaderRange.getValues()[0];
+    Logger.log('Current headers (' + currentHeaders.length + '): ' + currentHeaders.join(', '));
+
+    // Expected headers
+    const expectedHeaders = PENDING_TIMESHEETS_COLUMNS;
+    Logger.log('Expected headers (' + expectedHeaders.length + '): ' + expectedHeaders.join(', '));
+
+    // Check if headers match
+    let mismatchCount = 0;
+    const mismatches = [];
+    for (let i = 0; i < Math.min(currentHeaders.length, expectedHeaders.length); i++) {
+      if (currentHeaders[i] !== expectedHeaders[i]) {
+        mismatchCount++;
+        mismatches.push({
+          position: i + 1,
+          current: currentHeaders[i],
+          expected: expectedHeaders[i]
+        });
+      }
+    }
+
+    if (mismatchCount === 0 && currentHeaders.length === expectedHeaders.length) {
+      Logger.log('✓ Headers are already correct');
+      return { success: true, message: 'Headers already correct' };
+    }
+
+    Logger.log('🔧 Found ' + mismatchCount + ' header mismatches');
+    mismatches.forEach(function(m) {
+      Logger.log('   Column ' + m.position + ': "' + m.current + '" → "' + m.expected + '"');
+    });
+
+    // Set all headers to correct values
+    Logger.log('🔧 Updating headers to correct values...');
+    const headerRange = sheet.getRange(1, 1, 1, expectedHeaders.length);
+    headerRange.setValues([expectedHeaders]);
+    headerRange.setFontWeight('bold');
+    headerRange.setBackground('#f3f3f3');
+
+    // Auto-resize all columns
+    for (let i = 1; i <= expectedHeaders.length; i++) {
+      sheet.autoResizeColumn(i);
+    }
+
+    SpreadsheetApp.flush();
+
+    Logger.log('✅ Headers fixed!');
+    Logger.log('   Corrected ' + mismatchCount + ' header(s)');
+    Logger.log('========== FIX COMPLETE ==========');
+
+    return {
+      success: true,
+      message: 'Headers fixed successfully',
+      corrected: mismatchCount,
+      mismatches: mismatches
+    };
+
+  } catch (error) {
+    Logger.log('❌ ERROR: ' + error.message);
+    Logger.log('Stack: ' + error.stack);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
  * Setup ALL timesheet-related sheets at once
  * Convenience function to set up all required sheets
  */
