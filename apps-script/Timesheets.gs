@@ -1536,7 +1536,7 @@ function checkDuplicateImport(weekEnding, fileHash) {
         return {
           isDuplicate: true,
           existingImportId: row[importIdCol],
-          existingImportDate: row[importDateCol]
+          existingImportDate: formatDate(row[importDateCol])  // ✅ Convert Date to string for serialization
         };
       }
     }
