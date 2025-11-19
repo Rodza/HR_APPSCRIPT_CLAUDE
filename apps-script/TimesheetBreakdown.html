@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f7fa;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .header h1 { margin: 0 0 10px 0; }
+        .header p { margin: 0; opacity: 0.9; }
+
+        /* Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .stat-card .label { font-size: 12px; color: #666; margin-bottom: 5px; }
+        .stat-card .value { font-size: 24px; font-weight: bold; color: #333; }
+        .stat-card.warning .value { color: #f59e0b; }
+        .stat-card.error .value { color: #ef4444; }
+        .stat-card.success .value { color: #10b981; }
+
+        /* Employee Cards */
+        .employee-card {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+        .employee-header {
+            background: #f8fafc;
+            padding: 15px 20px;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .employee-name {
+            font-size: 18px;
+            font-weight: 600;
+            color: #1f2937;
+        }
+        .employee-total {
+            font-size: 14px;
+            color: #6b7280;
+        }
+        .employee-total strong {
+            color: #4f46e5;
+            font-size: 18px;
+        }
+        .employee-body { padding: 20px; }
+
+        /* Day Rows */
+        .day-row {
+            background: #f9fafb;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-left: 4px solid #4f46e5;
+        }
+        .day-row.friday { border-left-color: #8b5cf6; }
+        .day-row.warning { border-left-color: #f59e0b; }
+        .day-row.error { border-left-color: #ef4444; }
+
+        .day-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .day-date {
+            font-weight: 600;
+            color: #374151;
+        }
+        .day-paid {
+            font-weight: 600;
+            color: #4f46e5;
+        }
+
+        .day-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            font-size: 13px;
+        }
+        .detail-group { }
+        .detail-group h4 {
+            margin: 0 0 8px 0;
+            font-size: 12px;
+            color: #6b7280;
+            text-transform: uppercase;
+        }
+        .detail-item {
+            color: #374151;
+            margin-bottom: 4px;
+        }
+        .detail-item.adjusted {
+            color: #4f46e5;
+        }
+
+        /* Warnings */
+        .warning-item {
+            background: #fef3c7;
+            color: #92400e;
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            margin-top: 4px;
+        }
+
+        /* Badges */
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+        .badge-lunch { background: #dcfce7; color: #166534; }
+        .badge-no-lunch { background: #fee2e2; color: #991b1b; }
+        .badge-friday { background: #ede9fe; color: #5b21b6; }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #4f46e5;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Filters */
+        .filter-bar {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .filter-bar select, .filter-bar input {
+            padding: 8px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        .filter-bar label {
+            font-size: 13px;
+            color: #374151;
+            margin-right: 5px;
+        }
+
+        /* No Data */
+        .no-data {
+            text-align: center;
+            padding: 60px 20px;
+            color: #6b7280;
+        }
+        .no-data h3 { margin: 0 0 10px 0; color: #374151; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Timesheet Breakdown Dashboard</h1>
+        <p>Daily breakdown of clock data processing with calculation details</p>
+    </div>
+
+    <div class="filter-bar">
+        <div>
+            <label>Week Ending:</label>
+            <select id="weekFilter" onchange="filterData()">
+                <option value="">All Weeks</option>
+            </select>
+        </div>
+        <div>
+            <label>Employee:</label>
+            <input type="text" id="employeeSearch" placeholder="Search employee..." oninput="filterData()">
+        </div>
+        <div>
+            <label>Show:</label>
+            <select id="showFilter" onchange="filterData()">
+                <option value="all">All Days</option>
+                <option value="warnings">With Warnings Only</option>
+                <option value="no-lunch">No Lunch Detected</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="stats-grid" id="statsGrid">
+        <!-- Stats will be populated here -->
+    </div>
+
+    <div id="content">
+        <div class="loading">
+            <div class="spinner"></div>
+            <p>Loading timesheet breakdown data...</p>
+        </div>
+    </div>
+
+    <script>
+        let allData = [];
+
+        // Load data on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadBreakdownData();
+        });
+
+        function loadBreakdownData() {
+            google.script.run
+                .withSuccessHandler(handleDataLoaded)
+                .withFailureHandler(handleError)
+                .getTimesheetBreakdownData();
+        }
+
+        function handleDataLoaded(data) {
+            if (!data || !data.success) {
+                document.getElementById('content').innerHTML =
+                    '<div class="no-data"><h3>No Data Available</h3><p>' +
+                    (data ? data.error : 'Failed to load data') + '</p></div>';
+                return;
+            }
+
+            allData = data.data;
+            populateWeekFilter(allData);
+            updateStats(allData);
+            renderEmployees(allData);
+        }
+
+        function handleError(error) {
+            document.getElementById('content').innerHTML =
+                '<div class="no-data"><h3>Error Loading Data</h3><p>' + error.message + '</p></div>';
+        }
+
+        function populateWeekFilter(data) {
+            const weeks = [...new Set(data.map(e => e.weekEnding))].sort().reverse();
+            const select = document.getElementById('weekFilter');
+            weeks.forEach(week => {
+                const option = document.createElement('option');
+                option.value = week;
+                option.textContent = formatDate(week);
+                select.appendChild(option);
+            });
+        }
+
+        function updateStats(data) {
+            let totalEmployees = data.length;
+            let totalHours = 0;
+            let totalWarnings = 0;
+            let daysWithNoLunch = 0;
+
+            data.forEach(emp => {
+                totalHours += emp.totalMinutes / 60;
+                emp.dailyBreakdown.forEach(day => {
+                    totalWarnings += (day.warnings || []).length;
+                    if (!day.lunchTaken && !isFriday(day.date)) {
+                        daysWithNoLunch++;
+                    }
+                });
+            });
+
+            document.getElementById('statsGrid').innerHTML = `
+                <div class="stat-card">
+                    <div class="label">Employees</div>
+                    <div class="value">${totalEmployees}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">Total Hours</div>
+                    <div class="value">${formatHours(totalHours * 60)}</div>
+                </div>
+                <div class="stat-card ${totalWarnings > 0 ? 'warning' : ''}">
+                    <div class="label">Warnings</div>
+                    <div class="value">${totalWarnings}</div>
+                </div>
+                <div class="stat-card ${daysWithNoLunch > 0 ? 'error' : 'success'}">
+                    <div class="label">Days No Lunch</div>
+                    <div class="value">${daysWithNoLunch}</div>
+                </div>
+            `;
+        }
+
+        function filterData() {
+            const weekFilter = document.getElementById('weekFilter').value;
+            const searchTerm = document.getElementById('employeeSearch').value.toLowerCase();
+            const showFilter = document.getElementById('showFilter').value;
+
+            let filtered = allData;
+
+            if (weekFilter) {
+                filtered = filtered.filter(e => e.weekEnding === weekFilter);
+            }
+
+            if (searchTerm) {
+                filtered = filtered.filter(e =>
+                    e.employeeName.toLowerCase().includes(searchTerm)
+                );
+            }
+
+            if (showFilter === 'warnings') {
+                filtered = filtered.filter(e =>
+                    e.dailyBreakdown.some(d => (d.warnings || []).length > 0)
+                );
+            } else if (showFilter === 'no-lunch') {
+                filtered = filtered.filter(e =>
+                    e.dailyBreakdown.some(d => !d.lunchTaken && !isFriday(d.date))
+                );
+            }
+
+            updateStats(filtered);
+            renderEmployees(filtered);
+        }
+
+        function renderEmployees(data) {
+            if (data.length === 0) {
+                document.getElementById('content').innerHTML =
+                    '<div class="no-data"><h3>No Results</h3><p>No timesheets match your filters.</p></div>';
+                return;
+            }
+
+            const html = data.map(emp => renderEmployeeCard(emp)).join('');
+            document.getElementById('content').innerHTML = html;
+        }
+
+        function renderEmployeeCard(emp) {
+            const daysHtml = emp.dailyBreakdown
+                .sort((a, b) => a.date.localeCompare(b.date))
+                .map(day => renderDayRow(day))
+                .join('');
+
+            return `
+                <div class="employee-card">
+                    <div class="employee-header">
+                        <div>
+                            <div class="employee-name">${emp.employeeName}</div>
+                            <div style="font-size: 12px; color: #6b7280;">
+                                Week ending: ${formatDate(emp.weekEnding)} |
+                                Lunch deducted: ${emp.lunchDeductionMinutes}m
+                            </div>
+                        </div>
+                        <div class="employee-total">
+                            Total Paid: <strong>${formatHours(emp.totalMinutes)}</strong>
+                        </div>
+                    </div>
+                    <div class="employee-body">
+                        ${daysHtml}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderDayRow(day) {
+            const friday = isFriday(day.date);
+            const hasWarnings = (day.warnings || []).length > 0;
+            const noLunch = !day.lunchTaken && !friday;
+
+            let rowClass = 'day-row';
+            if (friday) rowClass += ' friday';
+            else if (noLunch) rowClass += ' error';
+            else if (hasWarnings) rowClass += ' warning';
+
+            const warningsHtml = (day.warnings || []).map(w =>
+                `<div class="warning-item">⚠️ ${w}</div>`
+            ).join('');
+
+            let lunchBadge = '';
+            if (friday) {
+                lunchBadge = '<span class="badge badge-friday">Friday - No Lunch</span>';
+            } else if (day.lunchTaken) {
+                lunchBadge = `<span class="badge badge-lunch">Lunch: -${day.lunchMinutes}m</span>`;
+            } else {
+                lunchBadge = '<span class="badge badge-no-lunch">NO LUNCH DETECTED</span>';
+            }
+
+            return `
+                <div class="${rowClass}">
+                    <div class="day-header">
+                        <div class="day-date">${formatDayDate(day.date)} ${lunchBadge}</div>
+                        <div class="day-paid">${formatHours(day.totalMinutes)}</div>
+                    </div>
+                    <div class="day-details">
+                        <div class="detail-group">
+                            <h4>Clock Times</h4>
+                            <div class="detail-item">In: ${day.clockIn || 'N/A'}</div>
+                            <div class="detail-item">Out: ${day.clockOut || 'N/A'}</div>
+                        </div>
+                        <div class="detail-group">
+                            <h4>Adjusted Times</h4>
+                            <div class="detail-item adjusted">In: ${day.adjustedIn || 'N/A'}</div>
+                            <div class="detail-item adjusted">Out: ${day.adjustedOut || 'N/A'}</div>
+                        </div>
+                        <div class="detail-group">
+                            <h4>Notes</h4>
+                            ${warningsHtml || '<div class="detail-item" style="color: #10b981;">✓ All good</div>'}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Utility functions
+        function formatHours(minutes) {
+            if (!minutes && minutes !== 0) return '0h 0m';
+            const h = Math.floor(minutes / 60);
+            const m = Math.round(minutes % 60);
+            return `${h}h ${m}m`;
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '';
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('en-US', {
+                year: 'numeric', month: 'short', day: 'numeric'
+            });
+        }
+
+        function formatDayDate(dateStr) {
+            if (!dateStr) return '';
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('en-US', {
+                weekday: 'long', month: 'short', day: 'numeric'
+            });
+        }
+
+        function isFriday(dateStr) {
+            if (!dateStr) return false;
+            const date = new Date(dateStr);
+            return date.getDay() === 5;
+        }
+    </script>
+</body>
+</html>
