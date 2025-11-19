@@ -371,7 +371,15 @@ function processClockData(clockData, config) {
     // Group punches by date
     var punchesByDate = {};
 
-    Logger.log('\n🔍 DIAGNOSTIC: Grouping and classifying punches...');
+    // CRITICAL: Sort clock data by date and time FIRST before assigning in/out types
+    // The alternating pattern only works if punches are processed in chronological order
+    clockData.sort(function(a, b) {
+      var timeA = parseTime(a.PUNCH_TIME);
+      var timeB = parseTime(b.PUNCH_TIME);
+      return timeA.getTime() - timeB.getTime();
+    });
+
+    Logger.log('\n🔍 DIAGNOSTIC: Grouping and classifying punches (sorted by time)...');
     for (var i = 0; i < clockData.length; i++) {
       var record = clockData[i];
       var punchTime = parseTime(record.PUNCH_TIME);
@@ -396,13 +404,17 @@ function processClockData(clockData, config) {
         // Determine if clock-in or clock-out
         var type = 'unknown';
         var currentCount = punchesByDate[dateKey].clockInPunches.length;
+        var deviceLower = deviceName.toLowerCase();
 
-        if (deviceName.toLowerCase().indexOf('in') >= 0) {
+        // Check for SPECIFIC device names that indicate in/out
+        // Must be exact matches like "Clock In" or "Clock Out", not substrings
+        if (deviceLower === 'clock in' || deviceLower === 'clock-in' || deviceLower === 'clockin') {
           type = 'in';
-        } else if (deviceName.toLowerCase().indexOf('out') >= 0) {
+        } else if (deviceLower === 'clock out' || deviceLower === 'clock-out' || deviceLower === 'clockout') {
           type = 'out';
         } else {
-          // Infer from order: odd = in, even = out
+          // For any other device (like "Main Unit"), use alternating pattern
+          // 1st scan = in, 2nd = out, 3rd = in, 4th = out
           type = currentCount % 2 === 0 ? 'in' : 'out';
         }
 
