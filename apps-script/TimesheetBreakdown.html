@@ -233,10 +233,12 @@
     <script>
         let allData = [];
 
-        // Load data on page load
-        document.addEventListener('DOMContentLoaded', function() {
-            loadBreakdownData();
-        });
+        // Load data immediately when script runs (works with dynamic module loading)
+        // DOMContentLoaded doesn't fire when loaded via innerHTML
+        (function() {
+            // Small delay to ensure DOM elements are ready
+            setTimeout(loadBreakdownData, 100);
+        })();
 
         function loadBreakdownData() {
             google.script.run
