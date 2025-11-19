@@ -1816,9 +1816,14 @@ function parseClockDataExcel(fileBlob) {
                       punchTimeValue.getUTCMinutes() + ':' + punchTimeValue.getUTCSeconds());
           }
 
-          // CRITICAL FIX: Use local components (getFullYear, getMonth, etc.) directly
-          // This preserves the time as shown in the Excel file without timezone conversion
-          punchDateTime = new Date(
+          // CRITICAL FIX: Google Sheets Excel conversion applies incorrect timezone
+          // The diagnostic showed: getHours() = 23 but should be 13 (10-hour offset)
+          // We need to subtract 10 hours to get the correct South Africa time
+
+          const TIMEZONE_CORRECTION_HOURS = 10; // Adjust if needed based on your timezone
+
+          // Create Date with current (wrong) time
+          let tempDateTime = new Date(
             punchTimeValue.getFullYear(),
             punchTimeValue.getMonth(),
             punchTimeValue.getDate(),
@@ -1826,6 +1831,17 @@ function parseClockDataExcel(fileBlob) {
             punchTimeValue.getMinutes(),
             punchTimeValue.getSeconds()
           );
+
+          // Subtract 10 hours to get correct time
+          punchDateTime = new Date(tempDateTime.getTime() - (TIMEZONE_CORRECTION_HOURS * 60 * 60 * 1000));
+
+          // DEBUG: Log correction
+          if (i < dataStartRow + 5) {
+            Logger.log('\n🔧 TIMEZONE CORRECTION APPLIED:');
+            Logger.log('   Before correction: ' + tempDateTime.getHours() + ':' + tempDateTime.getMinutes() + ':' + tempDateTime.getSeconds());
+            Logger.log('   After correction:  ' + punchDateTime.getHours() + ':' + punchDateTime.getMinutes() + ':' + punchDateTime.getSeconds());
+            Logger.log('   Corrected -' + TIMEZONE_CORRECTION_HOURS + ' hours');
+          }
 
           // DEBUG: Log created date
           if (i < dataStartRow + 5) {
