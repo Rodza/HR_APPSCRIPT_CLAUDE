@@ -1509,7 +1509,11 @@ function parseClockDataExcel(fileBlob) {
       // Open the converted spreadsheet
       const spreadsheet = SpreadsheetApp.openById(convertedFileId);
       const sheet = spreadsheet.getSheets()[0];
-      data = sheet.getDataRange().getValues();
+
+      // CRITICAL: Use getDisplayValues() instead of getValues() to avoid timezone conversion
+      // getValues() returns Date objects which apply timezone conversion
+      // getDisplayValues() returns strings exactly as shown in the sheet
+      data = sheet.getDataRange().getDisplayValues();
 
       Logger.log('📊 Retrieved ' + data.length + ' rows from converted sheet');
 
@@ -1578,53 +1582,79 @@ function parseClockDataExcel(fileBlob) {
       if (!row[colMap.personId] || String(row[colMap.personId]).trim() === '') continue;
 
       // Parse Punch Time which contains both date and time: "2025-11-14 07:33:34"
-      const punchTimeValue = row[colMap.punchTime];
+      // Since we're using getDisplayValues(), this will always be a string
+      const punchTimeValue = String(row[colMap.punchTime] || '').trim();
+
+      if (!punchTimeValue) {
+        Logger.log('⚠️ Row ' + (i + 1) + ': Empty punch time, skipping');
+        continue;
+      }
+
       let punchDateTime;
 
       try {
-        if (punchTimeValue instanceof Date) {
-          // Date object from Google Sheets - need to handle timezone correctly
-          // Google Sheets may have applied timezone conversion during Excel import
-          // We want to preserve the LOCAL time as shown in the Excel
-          // Solution: Extract the date/time components and create a new Date
-          punchDateTime = new Date(
-            punchTimeValue.getFullYear(),
-            punchTimeValue.getMonth(),
-            punchTimeValue.getDate(),
-            punchTimeValue.getHours(),
-            punchTimeValue.getMinutes(),
-            punchTimeValue.getSeconds()
-          );
-        } else if (typeof punchTimeValue === 'string') {
-          // Parse "YYYY-MM-DD HH:MM:SS" format manually to avoid timezone issues
-          const parts = punchTimeValue.split(' ');
-          if (parts.length >= 2) {
-            const dateParts = parts[0].split('-');
-            const timeParts = parts[1].split(':');
-            punchDateTime = new Date(
-              parseInt(dateParts[0]),      // year
-              parseInt(dateParts[1]) - 1,  // month (0-indexed)
-              parseInt(dateParts[2]),      // day
-              parseInt(timeParts[0]),      // hours
-              parseInt(timeParts[1]),      // minutes
-              parseInt(timeParts[2] || 0)  // seconds
-            );
-          } else {
-            punchDateTime = new Date(punchTimeValue);
-          }
-        } else if (typeof punchTimeValue === 'number') {
-          // Excel serial date
-          punchDateTime = parseExcelDate(punchTimeValue);
+        // Parse the string manually to avoid timezone conversion
+        // Common formats:
+        // "2025-11-14 07:33:34" or "14/11/2025 13:04:57" or "2025/11/14 13:04:57"
+
+        // Try to parse different date formats
+        let datePart, timePart;
+
+        // Split by space to separate date and time
+        const parts = punchTimeValue.split(' ');
+        if (parts.length >= 2) {
+          datePart = parts[0];
+          timePart = parts[1];
         } else {
-          Logger.log('⚠️ Row ' + (i + 1) + ': Invalid punch time format: ' + punchTimeValue);
+          Logger.log('⚠️ Row ' + (i + 1) + ': Invalid punch time format (no space separator): ' + punchTimeValue);
           continue;
         }
+
+        // Parse date part (handle both YYYY-MM-DD, DD/MM/YYYY, and YYYY/MM/DD formats)
+        let year, month, day;
+        if (datePart.indexOf('-') >= 0) {
+          // Format: YYYY-MM-DD
+          const dateParts = datePart.split('-');
+          year = parseInt(dateParts[0]);
+          month = parseInt(dateParts[1]) - 1; // 0-indexed
+          day = parseInt(dateParts[2]);
+        } else if (datePart.indexOf('/') >= 0) {
+          const dateParts = datePart.split('/');
+          // Detect format: if first part > 31, it's YYYY/MM/DD, otherwise DD/MM/YYYY
+          if (parseInt(dateParts[0]) > 31) {
+            // Format: YYYY/MM/DD
+            year = parseInt(dateParts[0]);
+            month = parseInt(dateParts[1]) - 1; // 0-indexed
+            day = parseInt(dateParts[2]);
+          } else {
+            // Format: DD/MM/YYYY
+            day = parseInt(dateParts[0]);
+            month = parseInt(dateParts[1]) - 1; // 0-indexed
+            year = parseInt(dateParts[2]);
+          }
+        } else {
+          Logger.log('⚠️ Row ' + (i + 1) + ': Unrecognized date format: ' + datePart);
+          continue;
+        }
+
+        // Parse time part (HH:MM:SS or HH:MM)
+        const timeParts = timePart.split(':');
+        const hours = parseInt(timeParts[0]);
+        const minutes = parseInt(timeParts[1]);
+        const seconds = parseInt(timeParts[2] || 0);
+
+        // Create Date object using component constructor (local timezone)
+        // This preserves the exact time values without timezone conversion
+        punchDateTime = new Date(year, month, day, hours, minutes, seconds);
 
         // Validate the parsed date
         if (!punchDateTime || isNaN(punchDateTime.getTime())) {
           Logger.log('⚠️ Row ' + (i + 1) + ': Failed to parse punch time: ' + punchTimeValue);
           continue;
         }
+
+        Logger.log('✅ Row ' + (i + 1) + ': Parsed "' + punchTimeValue + '" as ' + punchDateTime.toLocaleString());
+
       } catch (parseError) {
         Logger.log('⚠️ Row ' + (i + 1) + ': Error parsing punch time: ' + parseError.message);
         continue;
