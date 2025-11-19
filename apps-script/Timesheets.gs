@@ -1635,6 +1635,7 @@ function retryWithBackoff(fn, maxRetries, initialDelay) {
  */
 function parseClockDataExcel(fileBlob) {
   try {
+    Logger.log('🔴 CODE VERSION: 2025-11-19-v5 WITH 10-HOUR CORRECTION 🔴');
     Logger.log('📖 Parsing clock data Excel file...');
     Logger.log('📄 File name: ' + fileBlob.getName());
     Logger.log('📦 File type: ' + fileBlob.getContentType());
