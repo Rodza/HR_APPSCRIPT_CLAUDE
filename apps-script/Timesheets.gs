@@ -1330,10 +1330,12 @@ function importClockDataFromBase64(base64Data, filename, mimeType, override) {
     return result;
 
   } catch (error) {
-    Logger.log('❌ ERROR in importClockDataFromBase64: ' + error.message);
-    Logger.log('   Stack: ' + error.stack);
+    // Extract detailed error information
+    const errorMessage = error.message || error.toString() || 'Unknown error occurred during import';
+    Logger.log('❌ ERROR in importClockDataFromBase64: ' + errorMessage);
+    if (error.stack) Logger.log('   Stack: ' + error.stack);
     Logger.log('========== IMPORT CLOCK DATA FROM BASE64 FAILED ==========\n');
-    return { success: false, error: error.message };
+    return { success: false, error: errorMessage };
   }
 }
 
@@ -1462,14 +1464,59 @@ function importClockData(fileBlob, filename, override) {
     };
 
   } catch (error) {
-    Logger.log('❌ ERROR in importClockData: ' + error.message);
-    Logger.log('Stack: ' + error.stack);
+    // Extract detailed error information
+    const errorMessage = error.message || error.toString() || 'Unknown error occurred during import';
+    Logger.log('❌ ERROR in importClockData: ' + errorMessage);
+    if (error.stack) Logger.log('Stack: ' + error.stack);
     Logger.log('========== IMPORT CLOCK DATA FAILED ==========\n');
     return {
       success: false,
-      error: error.message
+      error: errorMessage
     };
   }
+}
+
+/**
+ * Retry a function with exponential backoff for rate limit errors
+ *
+ * @param {Function} fn - Function to retry
+ * @param {number} maxRetries - Maximum number of retries (default: 3)
+ * @param {number} initialDelay - Initial delay in milliseconds (default: 1000)
+ * @returns {*} Result of the function
+ */
+function retryWithBackoff(fn, maxRetries, initialDelay) {
+  maxRetries = maxRetries || 3;
+  initialDelay = initialDelay || 1000;
+
+  let lastError;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return fn();
+    } catch (error) {
+      lastError = error;
+
+      // Check if it's a rate limit error (429) or quota error
+      const errorMsg = error.message || '';
+      const isRateLimit = errorMsg.indexOf('429') >= 0 ||
+                         errorMsg.toLowerCase().indexOf('rate limit') >= 0 ||
+                         errorMsg.toLowerCase().indexOf('quota') >= 0 ||
+                         errorMsg.toLowerCase().indexOf('too many requests') >= 0;
+
+      // If it's the last attempt or not a rate limit error, throw
+      if (attempt === maxRetries || !isRateLimit) {
+        throw error;
+      }
+
+      // Calculate delay with exponential backoff
+      const delay = initialDelay * Math.pow(2, attempt);
+      Logger.log('⚠️ Rate limit error (attempt ' + (attempt + 1) + '/' + maxRetries + '): ' + errorMsg);
+      Logger.log('⏳ Waiting ' + delay + 'ms before retry...');
+
+      Utilities.sleep(delay);
+    }
+  }
+
+  throw lastError;
 }
 
 /**
@@ -1501,7 +1548,11 @@ function parseClockDataExcel(fileBlob) {
         mimeType: MimeType.GOOGLE_SHEETS
       };
 
-      const importedFile = Drive.Files.copy(resource, fileId);
+      // Wrap Drive API call with retry logic for rate limit errors
+      const importedFile = retryWithBackoff(function() {
+        return Drive.Files.copy(resource, fileId);
+      }, 3, 2000); // 3 retries, starting with 2 second delay
+
       convertedFileId = importedFile.id;
 
       Logger.log('✅ Conversion successful! Converted file ID: ' + convertedFileId);
@@ -1510,12 +1561,17 @@ function parseClockDataExcel(fileBlob) {
       const spreadsheet = SpreadsheetApp.openById(convertedFileId);
       const sheet = spreadsheet.getSheets()[0];
 
-      // CRITICAL: Use getDisplayValues() instead of getValues() to avoid timezone conversion
-      // getValues() returns Date objects which apply timezone conversion
-      // getDisplayValues() returns strings exactly as shown in the sheet
-      data = sheet.getDataRange().getDisplayValues();
+      // CRITICAL: Get both display values and raw values for comparison
+      // We need raw values to detect if timezone conversion happened
+      const range = sheet.getDataRange();
+      data = range.getValues(); // Get raw Date objects
+      const displayData = range.getDisplayValues(); // Get formatted strings
 
       Logger.log('📊 Retrieved ' + data.length + ' rows from converted sheet');
+
+      // Detect timezone offset by comparing first datetime cell
+      const scriptTimezone = Session.getScriptTimeZone();
+      Logger.log('🌍 Script timezone: ' + scriptTimezone);
 
       // Clean up temporary files
       Logger.log('🗑️ Cleaning up temporary files...');
@@ -1524,8 +1580,14 @@ function parseClockDataExcel(fileBlob) {
       Logger.log('✅ Cleanup complete');
 
     } catch (conversionError) {
-      Logger.log('❌ ERROR during Excel conversion: ' + conversionError.message);
-      Logger.log('Stack: ' + conversionError.stack);
+      // Extract detailed error information
+      const errorMessage = conversionError.message || conversionError.toString() || 'Unknown error';
+      const errorDetails = conversionError.details || '';
+      const errorStack = conversionError.stack || '';
+
+      Logger.log('❌ ERROR during Excel conversion: ' + errorMessage);
+      if (errorDetails) Logger.log('Error details: ' + errorDetails);
+      if (errorStack) Logger.log('Stack: ' + errorStack);
 
       // Clean up on error
       try {
@@ -1535,7 +1597,15 @@ function parseClockDataExcel(fileBlob) {
         Logger.log('⚠️ Could not clean up temp file: ' + e.message);
       }
 
-      throw new Error('Excel conversion failed: ' + conversionError.message);
+      // Provide user-friendly error messages
+      let userMessage = 'Excel conversion failed: ' + errorMessage;
+      if (errorMessage.indexOf('429') >= 0 || errorMessage.toLowerCase().indexOf('rate limit') >= 0) {
+        userMessage = 'Google API rate limit exceeded. Please wait a few moments and try again.';
+      } else if (errorMessage.toLowerCase().indexOf('quota') >= 0) {
+        userMessage = 'Google API quota exceeded. Please try again later.';
+      }
+
+      throw new Error(userMessage);
     }
 
     // Actual clock-in system export format:
@@ -1581,79 +1651,91 @@ function parseClockDataExcel(fileBlob) {
       // Skip empty rows (check Person ID column)
       if (!row[colMap.personId] || String(row[colMap.personId]).trim() === '') continue;
 
-      // Parse Punch Time which contains both date and time: "2025-11-14 07:33:34"
-      // Since we're using getDisplayValues(), this will always be a string
-      const punchTimeValue = String(row[colMap.punchTime] || '').trim();
-
-      if (!punchTimeValue) {
-        Logger.log('⚠️ Row ' + (i + 1) + ': Empty punch time, skipping');
-        continue;
-      }
-
+      // Parse Punch Time - critical timezone handling
+      // When Excel is converted to Google Sheets, datetime values are stored as UTC
+      // We need to extract UTC components to preserve the original time
+      const punchTimeValue = row[colMap.punchTime];
       let punchDateTime;
 
       try {
-        // Parse the string manually to avoid timezone conversion
-        // Common formats:
-        // "2025-11-14 07:33:34" or "14/11/2025 13:04:57" or "2025/11/14 13:04:57"
+        if (punchTimeValue instanceof Date && !isNaN(punchTimeValue.getTime())) {
+          // CRITICAL FIX: Extract UTC components from the Date object
+          // Google Sheets stores Excel times as UTC, so we need to read UTC values
+          // to get the original time from the Excel file
+          punchDateTime = new Date(
+            punchTimeValue.getUTCFullYear(),
+            punchTimeValue.getUTCMonth(),
+            punchTimeValue.getUTCDate(),
+            punchTimeValue.getUTCHours(),
+            punchTimeValue.getUTCMinutes(),
+            punchTimeValue.getUTCSeconds()
+          );
 
-        // Try to parse different date formats
-        let datePart, timePart;
+          // Log first few records for verification
+          if (i < dataStartRow + 3) {
+            Logger.log('📅 Row ' + (i + 1) + ' Punch Time:');
+            Logger.log('   Raw value: ' + punchTimeValue.toString());
+            Logger.log('   UTC components: ' + punchTimeValue.getUTCFullYear() + '-' +
+                      (punchTimeValue.getUTCMonth() + 1) + '-' + punchTimeValue.getUTCDate() +
+                      ' ' + punchTimeValue.getUTCHours() + ':' + punchTimeValue.getUTCMinutes() +
+                      ':' + punchTimeValue.getUTCSeconds());
+            Logger.log('   Local components: ' + punchTimeValue.getFullYear() + '-' +
+                      (punchTimeValue.getMonth() + 1) + '-' + punchTimeValue.getDate() +
+                      ' ' + punchTimeValue.getHours() + ':' + punchTimeValue.getMinutes() +
+                      ':' + punchTimeValue.getSeconds());
+            Logger.log('   Parsed as: ' + punchDateTime.toString());
+          }
+        } else if (typeof punchTimeValue === 'string' && punchTimeValue.trim()) {
+          // Fallback: parse string format
+          const punchTimeStr = punchTimeValue.trim();
+          const parts = punchTimeStr.split(' ');
 
-        // Split by space to separate date and time
-        const parts = punchTimeValue.split(' ');
-        if (parts.length >= 2) {
-          datePart = parts[0];
-          timePart = parts[1];
-        } else {
-          Logger.log('⚠️ Row ' + (i + 1) + ': Invalid punch time format (no space separator): ' + punchTimeValue);
-          continue;
-        }
+          if (parts.length >= 2) {
+            const datePart = parts[0];
+            const timePart = parts[1];
 
-        // Parse date part (handle both YYYY-MM-DD, DD/MM/YYYY, and YYYY/MM/DD formats)
-        let year, month, day;
-        if (datePart.indexOf('-') >= 0) {
-          // Format: YYYY-MM-DD
-          const dateParts = datePart.split('-');
-          year = parseInt(dateParts[0]);
-          month = parseInt(dateParts[1]) - 1; // 0-indexed
-          day = parseInt(dateParts[2]);
-        } else if (datePart.indexOf('/') >= 0) {
-          const dateParts = datePart.split('/');
-          // Detect format: if first part > 31, it's YYYY/MM/DD, otherwise DD/MM/YYYY
-          if (parseInt(dateParts[0]) > 31) {
-            // Format: YYYY/MM/DD
-            year = parseInt(dateParts[0]);
-            month = parseInt(dateParts[1]) - 1; // 0-indexed
-            day = parseInt(dateParts[2]);
+            let year, month, day;
+            if (datePart.indexOf('-') >= 0) {
+              const dateParts = datePart.split('-');
+              year = parseInt(dateParts[0]);
+              month = parseInt(dateParts[1]) - 1;
+              day = parseInt(dateParts[2]);
+            } else if (datePart.indexOf('/') >= 0) {
+              const dateParts = datePart.split('/');
+              if (parseInt(dateParts[0]) > 31) {
+                year = parseInt(dateParts[0]);
+                month = parseInt(dateParts[1]) - 1;
+                day = parseInt(dateParts[2]);
+              } else {
+                day = parseInt(dateParts[0]);
+                month = parseInt(dateParts[1]) - 1;
+                year = parseInt(dateParts[2]);
+              }
+            } else {
+              Logger.log('⚠️ Row ' + (i + 1) + ': Unrecognized date format: ' + datePart);
+              continue;
+            }
+
+            const timeParts = timePart.split(':');
+            const hours = parseInt(timeParts[0]);
+            const minutes = parseInt(timeParts[1]);
+            const seconds = parseInt(timeParts[2] || 0);
+
+            punchDateTime = new Date(year, month, day, hours, minutes, seconds);
           } else {
-            // Format: DD/MM/YYYY
-            day = parseInt(dateParts[0]);
-            month = parseInt(dateParts[1]) - 1; // 0-indexed
-            year = parseInt(dateParts[2]);
+            Logger.log('⚠️ Row ' + (i + 1) + ': Invalid punch time format: ' + punchTimeStr);
+            continue;
           }
         } else {
-          Logger.log('⚠️ Row ' + (i + 1) + ': Unrecognized date format: ' + datePart);
+          Logger.log('⚠️ Row ' + (i + 1) + ': Empty or invalid punch time, skipping');
           continue;
         }
-
-        // Parse time part (HH:MM:SS or HH:MM)
-        const timeParts = timePart.split(':');
-        const hours = parseInt(timeParts[0]);
-        const minutes = parseInt(timeParts[1]);
-        const seconds = parseInt(timeParts[2] || 0);
-
-        // Create Date object using component constructor (local timezone)
-        // This preserves the exact time values without timezone conversion
-        punchDateTime = new Date(year, month, day, hours, minutes, seconds);
 
         // Validate the parsed date
         if (!punchDateTime || isNaN(punchDateTime.getTime())) {
-          Logger.log('⚠️ Row ' + (i + 1) + ': Failed to parse punch time: ' + punchTimeValue);
+          Logger.log('⚠️ Row ' + (i + 1) + ': Failed to parse punch time');
           continue;
         }
-
-        Logger.log('✅ Row ' + (i + 1) + ': Parsed "' + punchTimeValue + '" as ' + punchDateTime.toLocaleString());
 
       } catch (parseError) {
         Logger.log('⚠️ Row ' + (i + 1) + ': Error parsing punch time: ' + parseError.message);
@@ -1682,9 +1764,11 @@ function parseClockDataExcel(fileBlob) {
     return { success: true, data: records };
 
   } catch (error) {
-    Logger.log('❌ ERROR in parseClockDataExcel: ' + error.message);
-    Logger.log('Stack: ' + error.stack);
-    return { success: false, error: error.message };
+    // Extract detailed error information
+    const errorMessage = error.message || error.toString() || 'Unknown error occurred';
+    Logger.log('❌ ERROR in parseClockDataExcel: ' + errorMessage);
+    if (error.stack) Logger.log('Stack: ' + error.stack);
+    return { success: false, error: errorMessage };
   }
 }
 
