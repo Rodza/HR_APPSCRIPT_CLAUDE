@@ -8,6 +8,114 @@
  * 3. User reviews and approves/rejects
  * 4. Approved records create payslips in MASTERSALARY
  *
+
+/**
+ * DIAGNOSTIC FUNCTION - Run this directly from Apps Script editor
+ * This will analyze the current RAW_CLOCK_DATA to find the timezone issue
+ *
+ * HOW TO RUN:
+ * 1. Open Apps Script editor
+ * 2. Select "diagnosePunchTimeIssue" from function dropdown at top
+ * 3. Click Run ▶ button
+ * 4. View logs in Execution log below
+ */
+function diagnosePunchTimeIssue() {
+  Logger.log('\n========== PUNCH TIME DIAGNOSTIC ==========\n');
+
+  // Get timezone info
+  const scriptTz = Session.getScriptTimeZone();
+  Logger.log('🌍 TIMEZONE INFORMATION:');
+  Logger.log('   Script timezone: ' + scriptTz);
+
+  const now = new Date();
+  Logger.log('   Current time: ' + now.toString());
+  Logger.log('   UTC time: ' + now.toUTCString());
+  Logger.log('   Timezone offset: ' + now.getTimezoneOffset() + ' minutes (' + (now.getTimezoneOffset() / -60) + ' hours from UTC)');
+
+  // Get spreadsheet
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  Logger.log('\n📊 SPREADSHEET:');
+  Logger.log('   Name: ' + ss.getName());
+  Logger.log('   Timezone: ' + ss.getSpreadsheetTimeZone());
+
+  // Get RAW_CLOCK_DATA sheet
+  const sheet = ss.getSheetByName('RAW_CLOCK_DATA');
+  if (!sheet) {
+    Logger.log('\n❌ RAW_CLOCK_DATA sheet not found!');
+    return;
+  }
+
+  Logger.log('\n📋 RAW_CLOCK_DATA SHEET:');
+  Logger.log('   Last row: ' + sheet.getLastRow());
+
+  // Get PUNCH_TIME column (column 9)
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) {
+    Logger.log('   No data rows found');
+    return;
+  }
+
+  // Read first 5 data rows
+  const numRows = Math.min(5, lastRow - 1);
+  const punchTimeCol = 9; // PUNCH_TIME column
+
+  const rawValues = sheet.getRange(2, punchTimeCol, numRows, 1).getValues();
+  const displayValues = sheet.getRange(2, punchTimeCol, numRows, 1).getDisplayValues();
+
+  Logger.log('\n🔍 ANALYZING FIRST ' + numRows + ' PUNCH TIME VALUES:\n');
+
+  for (let i = 0; i < numRows; i++) {
+    const rawVal = rawValues[i][0];
+    const dispVal = displayValues[i][0];
+
+    Logger.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    Logger.log('ROW ' + (i + 2) + ':');
+    Logger.log('   Display value: "' + dispVal + '"');
+    Logger.log('   Raw value type: ' + typeof rawVal);
+
+    if (rawVal instanceof Date) {
+      Logger.log('   Is Date object: YES');
+      Logger.log('   .toString(): ' + rawVal.toString());
+      Logger.log('   .toISOString(): ' + rawVal.toISOString());
+      Logger.log('   .toUTCString(): ' + rawVal.toUTCString());
+      Logger.log('   .toLocaleString(): ' + rawVal.toLocaleString());
+      Logger.log('');
+      Logger.log('   LOCAL components:');
+      Logger.log('      Date: ' + rawVal.getFullYear() + '-' + (rawVal.getMonth()+1) + '-' + rawVal.getDate());
+      Logger.log('      Time: ' + rawVal.getHours() + ':' + rawVal.getMinutes() + ':' + rawVal.getSeconds());
+      Logger.log('');
+      Logger.log('   UTC components:');
+      Logger.log('      Date: ' + rawVal.getUTCFullYear() + '-' + (rawVal.getUTCMonth()+1) + '-' + rawVal.getUTCDate());
+      Logger.log('      Time: ' + rawVal.getUTCHours() + ':' + rawVal.getUTCMinutes() + ':' + rawVal.getUTCSeconds());
+      Logger.log('');
+      Logger.log('   🎯 PROBLEM CHECK:');
+      Logger.log('      Excel should show: 13:04:57 (expected)');
+      Logger.log('      Display shows: ' + dispVal + ' ❌ if it shows 23:04:57');
+      Logger.log('      getHours() returns: ' + rawVal.getHours() + ' ❌ if this is 23, should be 13');
+      Logger.log('      getUTCHours() returns: ' + rawVal.getUTCHours() + ' ✅ if this is 13');
+    } else {
+      Logger.log('   Is Date object: NO');
+      Logger.log('   Value: ' + rawVal);
+    }
+    Logger.log('');
+  }
+
+  Logger.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  Logger.log('\n📝 INTERPRETATION GUIDE:');
+  Logger.log('   If getHours() = 23 and getUTCHours() = 13:');
+  Logger.log('      → The Date object contains the WRONG time (23 instead of 13)');
+  Logger.log('      → This means the issue happened BEFORE storing to sheet');
+  Logger.log('      → We need to fix the parseClockDataExcel function');
+  Logger.log('');
+  Logger.log('   If getHours() = 13 but display shows 23:04:57:');
+  Logger.log('      → The Date object has the CORRECT time');
+  Logger.log('      → The display formatting is wrong');
+  Logger.log('      → We need to fix the number format or timezone setting');
+  Logger.log('');
+  Logger.log('========== DIAGNOSTIC COMPLETE ==========\n');
+}
+
+/**
  * Sheet: PendingTimesheets
  * Columns: ID, EMPLOYEE NAME, WEEKENDING, HOURS, MINUTES, OVERTIMEHOURS,
  *          OVERTIMEMINUTES, NOTES, STATUS, IMPORTED_BY, IMPORTED_DATE,
