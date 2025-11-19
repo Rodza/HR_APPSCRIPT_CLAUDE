@@ -231,6 +231,9 @@
                 <div class="menu-item" onclick="loadModule('timesheets', event)">
                     <i class="fas fa-clock"></i> Timesheets
                 </div>
+                <div class="menu-item" onclick="loadModule('timesheetBreakdown', event)">
+                    <i class="fas fa-chart-bar"></i> Breakdown
+                </div>
                 <div class="menu-item" onclick="loadModule('payroll', event)">
                     <i class="fas fa-dollar-sign"></i> Payroll
                 </div>
@@ -341,6 +344,9 @@
                     break;
                 case 'timesheetDebugger':
                     loadTimesheetDebuggerModule();
+                    break;
+                case 'timesheetBreakdown':
+                    loadTimesheetBreakdownModule();
                     break;
                 case 'payroll':
                     loadPayrollModule();
@@ -731,6 +737,22 @@
                 })
                 .withFailureHandler(handleError)
                 .include('TimesheetDebugger');
+        }
+
+        function loadTimesheetBreakdownModule() {
+            google.script.run
+                .withSuccessHandler(function(html) {
+                    if (html) {
+                        const contentArea = document.getElementById('contentArea');
+                        contentArea.innerHTML = html;
+                        executeModuleScripts(contentArea);
+                    } else {
+                        showError('Failed to load Timesheet Breakdown module');
+                    }
+                    hideLoading();
+                })
+                .withFailureHandler(handleError)
+                .include('TimesheetBreakdown');
         }
 
         function loadPayrollModule() {
