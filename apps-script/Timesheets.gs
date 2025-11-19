@@ -1581,41 +1581,52 @@ function parseClockDataExcel(fileBlob) {
       const punchTimeValue = row[colMap.punchTime];
       let punchDateTime;
 
-      if (punchTimeValue instanceof Date) {
-        // Date object from Google Sheets - need to handle timezone correctly
-        // Google Sheets may have applied timezone conversion during Excel import
-        // We want to preserve the LOCAL time as shown in the Excel
-        // Solution: Extract the date/time components and create a new Date
-        punchDateTime = new Date(
-          punchTimeValue.getFullYear(),
-          punchTimeValue.getMonth(),
-          punchTimeValue.getDate(),
-          punchTimeValue.getHours(),
-          punchTimeValue.getMinutes(),
-          punchTimeValue.getSeconds()
-        );
-      } else if (typeof punchTimeValue === 'string') {
-        // Parse "YYYY-MM-DD HH:MM:SS" format manually to avoid timezone issues
-        const parts = punchTimeValue.split(' ');
-        if (parts.length >= 2) {
-          const dateParts = parts[0].split('-');
-          const timeParts = parts[1].split(':');
+      try {
+        if (punchTimeValue instanceof Date) {
+          // Date object from Google Sheets - need to handle timezone correctly
+          // Google Sheets may have applied timezone conversion during Excel import
+          // We want to preserve the LOCAL time as shown in the Excel
+          // Solution: Extract the date/time components and create a new Date
           punchDateTime = new Date(
-            parseInt(dateParts[0]),      // year
-            parseInt(dateParts[1]) - 1,  // month (0-indexed)
-            parseInt(dateParts[2]),      // day
-            parseInt(timeParts[0]),      // hours
-            parseInt(timeParts[1]),      // minutes
-            parseInt(timeParts[2] || 0)  // seconds
+            punchTimeValue.getFullYear(),
+            punchTimeValue.getMonth(),
+            punchTimeValue.getDate(),
+            punchTimeValue.getHours(),
+            punchTimeValue.getMinutes(),
+            punchTimeValue.getSeconds()
           );
+        } else if (typeof punchTimeValue === 'string') {
+          // Parse "YYYY-MM-DD HH:MM:SS" format manually to avoid timezone issues
+          const parts = punchTimeValue.split(' ');
+          if (parts.length >= 2) {
+            const dateParts = parts[0].split('-');
+            const timeParts = parts[1].split(':');
+            punchDateTime = new Date(
+              parseInt(dateParts[0]),      // year
+              parseInt(dateParts[1]) - 1,  // month (0-indexed)
+              parseInt(dateParts[2]),      // day
+              parseInt(timeParts[0]),      // hours
+              parseInt(timeParts[1]),      // minutes
+              parseInt(timeParts[2] || 0)  // seconds
+            );
+          } else {
+            punchDateTime = new Date(punchTimeValue);
+          }
+        } else if (typeof punchTimeValue === 'number') {
+          // Excel serial date
+          punchDateTime = parseExcelDate(punchTimeValue);
         } else {
-          punchDateTime = new Date(punchTimeValue);
+          Logger.log('⚠️ Row ' + (i + 1) + ': Invalid punch time format: ' + punchTimeValue);
+          continue;
         }
-      } else if (typeof punchTimeValue === 'number') {
-        // Excel serial date
-        punchDateTime = parseExcelDate(punchTimeValue);
-      } else {
-        Logger.log('⚠️ Row ' + (i + 1) + ': Invalid punch time format: ' + punchTimeValue);
+
+        // Validate the parsed date
+        if (!punchDateTime || isNaN(punchDateTime.getTime())) {
+          Logger.log('⚠️ Row ' + (i + 1) + ': Failed to parse punch time: ' + punchTimeValue);
+          continue;
+        }
+      } catch (parseError) {
+        Logger.log('⚠️ Row ' + (i + 1) + ': Error parsing punch time: ' + parseError.message);
         continue;
       }
 
