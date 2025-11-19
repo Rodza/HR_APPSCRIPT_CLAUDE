@@ -1,0 +1,1244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Time Clock Analyzer</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @media print {
+            body { margin: 0; padding: 20px; }
+            .no-print { display: none !important; }
+            .print-title { display: block !important; }
+            .page-break { page-break-before: always; }
+            @page { margin: 1cm; }
+        }
+        .print-title { display: none; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const DEFAULT_CONFIG = {
+            standardStartTime: '07:30',
+            standardEndTime: '16:30',
+            graceMinutes: 5,
+            endBufferMinutes: 5,
+            lunchBufferMinutes: 5,
+            minLunchMinutes: 20,
+            maxLunchMinutes: 35,
+            standardLunchMinutes: 30,
+            dailyBathroomThreshold: 30,
+            projectIncompleteDays: true,
+            fridayEndTime: '13:00',
+            applyLunchOnFriday: false,
+            lateMorningThreshold: '11:00',
+            earlyChangeThreshold: 10,
+            longBathroomThreshold: 15
+        };
+
+        // Icons
+        const Upload = () => (
+            <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            </svg>
+        );
+
+        const Clock = ({ className }) => (
+            <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+        );
+
+        const AlertCircle = ({ className }) => (
+            <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+        );
+
+        const Users = ({ className }) => (
+            <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+            </svg>
+        );
+
+        const FileText = ({ className }) => (
+            <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+        );
+
+        const Download = ({ className }) => (
+            <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+        );
+
+        const FileDown = ({ className }) => (
+            <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+        );
+
+        const Settings = ({ className }) => (
+            <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+        );
+
+        function TimesheetAnalyzer() {
+            const [summary, setSummary] = useState(null);
+            const [loading, setLoading] = useState(false);
+            const [showSettings, setShowSettings] = useState(false);
+            const [rawTransactions, setRawTransactions] = useState(null);
+            const [config, setConfig] = useState({ ...DEFAULT_CONFIG });
+
+            useEffect(() => {
+                if (rawTransactions) {
+                    analyzeData(rawTransactions);
+                }
+            }, [config]);
+
+            const formatDuration = (minutes) => {
+                if (minutes === null || minutes === undefined || isNaN(minutes)) return '0m';
+                const totalMinutes = Math.floor(minutes);
+                const hours = Math.floor(totalMinutes / 60);
+                const mins = totalMinutes % 60;
+                return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+            };
+
+            const toDateString = (value) => {
+                if (!value) return null;
+                
+                if (value instanceof Date) {
+                    if (isNaN(value.getTime())) return null;
+                    return value.toISOString().replace('T', ' ').substring(0, 19);
+                }
+                
+                if (typeof value === 'string') {
+                    return value;
+                }
+                
+                if (typeof value === 'number') {
+                    const excelEpoch = new Date(1899, 11, 30);
+                    const date = new Date(excelEpoch.getTime() + value * 86400000);
+                    if (isNaN(date.getTime())) return null;
+                    return date.toISOString().replace('T', ' ').substring(0, 19);
+                }
+                
+                return null;
+            };
+
+            const parseTime = (timeValue) => {
+                if (!timeValue) return null;
+                
+                try {
+                    if (timeValue instanceof Date) {
+                        return isNaN(timeValue.getTime()) ? null : timeValue;
+                    }
+                    
+                    if (typeof timeValue === 'number') {
+                        const excelEpoch = new Date(1899, 11, 30);
+                        const date = new Date(excelEpoch.getTime() + timeValue * 86400000);
+                        return isNaN(date.getTime()) ? null : date;
+                    }
+                    
+                    if (typeof timeValue === 'string') {
+                        const date = new Date(timeValue.replace(' ', 'T'));
+                        return isNaN(date.getTime()) ? null : date;
+                    }
+                    
+                    return null;
+                } catch {
+                    return null;
+                }
+            };
+
+            const getDateString = (timeValue) => {
+                if (!timeValue) return null;
+                
+                if (timeValue instanceof Date) {
+                    if (isNaN(timeValue.getTime())) return null;
+                    return timeValue.toISOString().split('T')[0];
+                }
+                
+                if (typeof timeValue === 'string') {
+                    return timeValue.split(' ')[0];
+                }
+                
+                if (typeof timeValue === 'number') {
+                    const excelEpoch = new Date(1899, 11, 30);
+                    const date = new Date(excelEpoch.getTime() + timeValue * 86400000);
+                    if (isNaN(date.getTime())) return null;
+                    return date.toISOString().split('T')[0];
+                }
+                
+                return null;
+            };
+
+            const getMinutesDiff = (date1, date2) => {
+                if (!date1 || !date2) return 0;
+                return (date2.getTime() - date1.getTime()) / 1000 / 60;
+            };
+
+            const roundToNearest5Min = (date) => {
+                if (!date) return date;
+                const minutes = date.getMinutes();
+                const hours = date.getHours();
+                const roundedMinutes = Math.round(minutes / 5) * 5;
+                
+                const rounded = new Date(date);
+                if (roundedMinutes === 60) {
+                    rounded.setHours(hours + 1, 0, 0, 0);
+                } else {
+                    rounded.setMinutes(roundedMinutes, 0, 0);
+                }
+                return rounded;
+            };
+
+            const applyStartBuffer = (clockInTime) => {
+                if (!clockInTime) return { time: clockInTime, status: 'unknown' };
+
+                const [hour, min] = config.standardStartTime.split(':').map(Number);
+                const standardStart = new Date(clockInTime);
+                standardStart.setHours(hour, min, 0, 0);
+
+                const graceEnd = new Date(standardStart);
+                graceEnd.setMinutes(graceEnd.getMinutes() + config.graceMinutes);
+
+                if (clockInTime < standardStart) {
+                    return { time: standardStart, status: 'early' };
+                }
+                if (clockInTime <= graceEnd) {
+                    return { time: standardStart, status: 'on-time' };
+                }
+                return { time: clockInTime, status: 'late', lateBy: Math.floor(getMinutesDiff(graceEnd, clockInTime)) };
+            };
+
+            const applyEndBuffer = (clockOutTime, isEndOfDay = false) => {
+                if (!clockOutTime) return { time: clockOutTime, warning: null };
+
+                const [hour, min] = config.standardEndTime.split(':').map(Number);
+                const standardEnd = new Date(clockOutTime);
+                standardEnd.setHours(hour, min, 0, 0);
+
+                const bufferStart = new Date(standardEnd);
+                bufferStart.setMinutes(bufferStart.getMinutes() - config.endBufferMinutes);
+
+                const bufferEnd = new Date(standardEnd);
+                bufferEnd.setMinutes(bufferEnd.getMinutes() + config.endBufferMinutes);
+
+                if (isEndOfDay) {
+                    if (clockOutTime >= bufferStart && clockOutTime <= bufferEnd) {
+                        return { time: standardEnd, warning: null };
+                    }
+                    if (clockOutTime > bufferEnd) {
+                        const minutesLate = Math.floor(getMinutesDiff(standardEnd, clockOutTime));
+                        return {
+                            time: standardEnd,
+                            warning: `Clocked out ${minutesLate} min after standard time`
+                        };
+                    }
+                    return { time: clockOutTime, warning: null };
+                }
+
+                if (clockOutTime >= bufferStart && clockOutTime <= bufferEnd) {
+                    return { time: standardEnd, warning: null };
+                }
+
+                return { time: clockOutTime, warning: null };
+            };
+
+            const processFile = async (file) => {
+                setLoading(true);
+                try {
+                    const arrayBuffer = await file.arrayBuffer();
+                    const workbook = XLSX.read(arrayBuffer, { cellDates: true });
+                    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+                    console.log('Raw data rows:', rawData.length);
+                    console.log('First 3 rows:', rawData.slice(0, 3));
+
+                    const headers = rawData[1];
+                    console.log('Headers found:', headers);
+                    
+                    const transactions = rawData.slice(2)
+                        .map(row => {
+                            const obj = {};
+                            headers.forEach((header, index) => obj[header] = row[index]);
+                            return obj;
+                        })
+                        .filter(row => row['Person Name'] && row['Punch Time']);
+
+                    console.log('Transactions after filter:', transactions.length);
+                    console.log('Sample Punch Time type (should be "object" for Date):', typeof transactions[0]?.['Punch Time']);
+                    console.log('Sample Punch Time value:', transactions[0]?.['Punch Time']);
+                    console.log('Is Date object?:', transactions[0]?.['Punch Time'] instanceof Date);
+                    
+                    if (transactions.length === 0) {
+                        alert('No valid data found in the Excel file. Please check that:\n- Row 2 contains headers: Person Name, Punch Time, Device Name, Department\n- Row 3+ contains transaction data');
+                        setLoading(false);
+                        return;
+                    }
+
+                    transactions.sort((a, b) => {
+                        const nameA = String(a['Person Name'] || '');
+                        const nameB = String(b['Person Name'] || '');
+                        const nameComp = nameA.localeCompare(nameB);
+                        if (nameComp !== 0) return nameComp;
+                        
+                        const timeA = parseTime(a['Punch Time']);
+                        const timeB = parseTime(b['Punch Time']);
+                        
+                        if (!timeA && !timeB) return 0;
+                        if (!timeA) return 1;
+                        if (!timeB) return -1;
+                        
+                        return timeA.getTime() - timeB.getTime();
+                    });
+
+                    const deduped = [];
+                    for (let i = 0; i < transactions.length; i++) {
+                        const curr = transactions[i];
+                        const prev = deduped[deduped.length - 1];
+                        
+                        if (!prev || 
+                            prev['Person Name'] !== curr['Person Name'] ||
+                            prev['Device Name'] !== curr['Device Name'] ||
+                            Math.abs(parseTime(curr['Punch Time']) - parseTime(prev['Punch Time'])) > 60000) {
+                            deduped.push(curr);
+                        }
+                    }
+
+                    console.log('Transactions after deduplication:', deduped.length);
+                    console.log('Sample transaction:', deduped[0]);
+
+                    analyzeData(deduped);
+                    setRawTransactions(deduped);
+                } catch (error) {
+                    console.error('Error processing file:', error);
+                    alert('Error processing file: ' + error.message);
+                }
+                setLoading(false);
+            };
+
+            const analyzeData = (transactions) => {
+                const dailyData = {};
+
+                transactions.forEach(tx => {
+                    const name = tx['Person Name'];
+                    const dateStr = getDateString(tx['Punch Time']);
+                    const device = tx['Device Name'];
+                    const time = parseTime(tx['Punch Time']);
+                    const department = tx['Department'] || 'Unknown';
+
+                    if (!name || !dateStr || !time) return;
+
+                    const key = `${name}_${dateStr}`;
+                    if (!dailyData[key]) {
+                        dailyData[key] = {
+                            name,
+                            date: dateStr,
+                            department,
+                            clockTimes: [],
+                            bathroomEntry: null,
+                            bathroomBreaks: [],
+                            totalBathroomMin: 0,
+                            warnings: []
+                        };
+                    }
+
+                    const day = dailyData[key];
+
+                    if (device === 'Clock In') {
+                        day.clockTimes.push(time);
+                    } else if (device === 'Bathroom Entry') {
+                        if (!day.bathroomEntry) day.bathroomEntry = time;
+                    } else if (device === 'Bathroom Exit') {
+                        if (day.bathroomEntry) {
+                            const duration = getMinutesDiff(day.bathroomEntry, time);
+                            day.bathroomBreaks.push({
+                                entry: day.bathroomEntry,
+                                exit: time,
+                                duration
+                            });
+                            day.bathroomEntry = null;
+                        }
+                    }
+                });
+
+                Object.values(dailyData).forEach(day => {
+                    day.workSessions = [];
+                    day.totalWorkMin = 0;
+                    day.paidMin = 0;
+                    day.startStatus = null;
+                    day.lunchBreak = null;
+
+                    const [thresholdHour, thresholdMin] = config.lateMorningThreshold.split(':').map(Number);
+                    let isLateMorning = false;
+                    
+                    if (day.clockTimes.length > 0 && day.clockTimes[0]) {
+                        const firstClockIn = day.clockTimes[0];
+                        const thresholdTime = new Date(firstClockIn);
+                        thresholdTime.setHours(thresholdHour, thresholdMin, 0, 0);
+                        
+                        if (firstClockIn > thresholdTime) {
+                            isLateMorning = true;
+                            day.warnings.push(`No morning clock-in before ${config.lateMorningThreshold} - first clock treated as lunch`);
+                        }
+                    }
+
+                    for (let i = 0; i < day.clockTimes.length; i += 2) {
+                        let clockIn = day.clockTimes[i];
+                        let clockOut = day.clockTimes[i + 1];
+
+                        if (i === 0 && isLateMorning && clockIn) {
+                            if (day.clockTimes.length > 1) {
+                                day.lunchBreak = {
+                                    start: null,
+                                    end: clockIn,
+                                    actual: 0,
+                                    completed: false
+                                };
+                            }
+                            continue;
+                        }
+
+                        if (i === 0 && clockIn && !isLateMorning) {
+                            const result = applyStartBuffer(clockIn);
+                            day.startStatus = result.status;
+                            clockIn = result.time;
+
+                            if (result.status === 'early') {
+                                day.warnings.push('Early arrival - adjusted to start time');
+                            } else if (result.status === 'late' && result.lateBy) {
+                                day.warnings.push(`Late by ${result.lateBy} minutes`);
+                            }
+                        }
+
+                        if (clockIn && clockOut) {
+                            day.workSessions.push({ in: clockIn, out: clockOut });
+                        } else if (clockIn) {
+                            day.workSessions.push({ in: clockIn, out: null });
+                            day.warnings.push('Missing clock out');
+                        }
+                    }
+
+                    if (day.workSessions.length >= 2) {
+                        for (let i = 0; i < day.workSessions.length - 1; i++) {
+                            const s1 = day.workSessions[i];
+                            const s2 = day.workSessions[i + 1];
+                            
+                            if (s1.out && s2.in) {
+                                const gap = getMinutesDiff(s1.out, s2.in);
+                                
+                                if (gap >= config.minLunchMinutes && gap <= config.maxLunchMinutes) {
+                                    const outDiff = Math.abs(getMinutesDiff(s1.out, roundToNearest5Min(s1.out)));
+                                    const inDiff = Math.abs(getMinutesDiff(s2.in, roundToNearest5Min(s2.in)));
+                                    
+                                    if (outDiff <= config.lunchBufferMinutes) {
+                                        s1.out = roundToNearest5Min(s1.out);
+                                    }
+                                    
+                                    if (inDiff <= config.lunchBufferMinutes) {
+                                        s2.in = roundToNearest5Min(s2.in);
+                                    }
+                                    
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    if (day.workSessions.length > 0) {
+                        const lastSession = day.workSessions[day.workSessions.length - 1];
+                        if (lastSession.out) {
+                            const result = applyEndBuffer(lastSession.out, true);
+                            if (result.warning) {
+                                day.warnings.push(result.warning);
+                            }
+                            lastSession.out = result.time;
+                        }
+                    }
+
+                    day.workSessions.forEach(s => {
+                        if (s.in && s.out) {
+                            const duration = getMinutesDiff(s.in, s.out);
+                            s.duration = duration;
+                            day.totalWorkMin += duration;
+                        }
+                    });
+
+                    const dateObj = new Date(day.date);
+                    const dayOfWeek = dateObj.getDay();
+                    const isFriday = dayOfWeek === 5;
+                    
+                    if (!isFriday && day.workSessions.length >= 2) {
+                        for (let i = 0; i < day.workSessions.length - 1; i++) {
+                            const s1 = day.workSessions[i];
+                            const s2 = day.workSessions[i + 1];
+                            if (s1.out && s2.in) {
+                                const gap = getMinutesDiff(s1.out, s2.in);
+                                if (gap >= config.minLunchMinutes && gap <= config.maxLunchMinutes) {
+                                    day.lunchBreak = {
+                                        start: s1.out,
+                                        end: s2.in,
+                                        actual: gap,
+                                        completed: s2.out !== null
+                                    };
+                                    if (gap < config.minLunchMinutes) {
+                                        day.warnings.push(`Short lunch: ${formatDuration(gap)} (counted as 30 min)`);
+                                    } else if (gap > config.maxLunchMinutes) {
+                                        day.warnings.push(`Long lunch: ${formatDuration(gap)} (counted as 30 min)`);
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    day.totalBathroomMin = 0;
+                    
+                    const firstClockIn = day.workSessions.length > 0 && day.workSessions[0].in ? day.workSessions[0].in : null;
+                    const lastClockOut = day.workSessions.length > 0 && day.workSessions[day.workSessions.length - 1].out 
+                        ? day.workSessions[day.workSessions.length - 1].out 
+                        : null;
+                    
+                    day.bathroomBreaks.forEach(brk => {
+                        let shouldCount = true;
+                        
+                        if (firstClockIn && brk.entry < firstClockIn) {
+                            shouldCount = false;
+                            brk.excludedFromTotal = true;
+                            brk.excludeReason = 'Before clock-in';
+                        } else if (lastClockOut && brk.exit > lastClockOut) {
+                            shouldCount = false;
+                            brk.excludedFromTotal = true;
+                            brk.excludeReason = 'After clock-out';
+                        } else if (day.lunchBreak && day.lunchBreak.start && day.lunchBreak.end) {
+                            const breakStart = brk.entry;
+                            const breakEnd = brk.exit;
+                            const lunchStart = day.lunchBreak.start;
+                            const lunchEnd = day.lunchBreak.end;
+                            
+                            if (breakStart >= lunchStart && breakEnd <= lunchEnd) {
+                                shouldCount = false;
+                                brk.excludedFromTotal = true;
+                                brk.excludeReason = 'During lunch';
+                            }
+                        }
+                        
+                        day.workSessions.forEach(session => {
+                            if (session.out) {
+                                const minutesBeforeClockOut = getMinutesDiff(brk.entry, session.out);
+                                if (minutesBeforeClockOut >= 0 && 
+                                    minutesBeforeClockOut <= config.earlyChangeThreshold &&
+                                    brk.exit <= session.out) {
+                                    brk.earlyChange = true;
+                                    brk.minutesBeforeClockOut = Math.floor(minutesBeforeClockOut);
+                                }
+                            }
+                        });
+                        
+                        if (shouldCount) {
+                            day.totalBathroomMin += brk.duration;
+                        }
+                    });
+                    
+                    day.bathroomBreaks.forEach(brk => {
+                        if (brk.earlyChange) {
+                            day.warnings.push(`Bathroom ${brk.minutesBeforeClockOut} min before clock-out (early change?)`);
+                        }
+                        if (brk.duration >= config.longBathroomThreshold && !brk.excludedFromTotal) {
+                            brk.longBreak = true;
+                            day.warnings.push(`Long bathroom break: ${formatDuration(brk.duration)}`);
+                        }
+                    });
+
+                    if (isFriday) {
+                        day.paidMin = day.totalWorkMin;
+                        
+                        if (config.projectIncompleteDays) {
+                            const lastSession = day.workSessions[day.workSessions.length - 1];
+                            if (lastSession && lastSession.in && !lastSession.out) {
+                                const [hour, min] = config.fridayEndTime.split(':').map(Number);
+                                const projectedOut = new Date(lastSession.in);
+                                projectedOut.setHours(hour, min, 0, 0);
+                                
+                                lastSession.out = projectedOut;
+                                lastSession.duration = getMinutesDiff(lastSession.in, lastSession.out);
+                                lastSession.projected = true;
+                                
+                                day.totalWorkMin = 0;
+                                day.workSessions.forEach(s => {
+                                    if (s.duration) day.totalWorkMin += s.duration;
+                                });
+                                
+                                day.paidMin = day.totalWorkMin;
+                                day.warnings.push(`Friday hours projected to ${config.fridayEndTime} (no lunch)`);
+                            }
+                        }
+                    } else if (day.lunchBreak && day.lunchBreak.completed) {
+                        const actualBreakTime = day.lunchBreak.actual;
+                        day.paidMin = day.totalWorkMin + actualBreakTime - config.standardLunchMinutes;
+                    } else {
+                        day.paidMin = day.totalWorkMin;
+                        if (day.workSessions.length > 1 && !day.lunchBreak) {
+                            day.warnings.push('No lunch detected');
+                        }
+                        if (day.lunchBreak && !day.lunchBreak.completed) {
+                            day.warnings.push('Incomplete day - no lunch deducted');
+                        }
+                    }
+
+                    if (day.totalBathroomMin > config.dailyBathroomThreshold) {
+                        day.warnings.push(`Bathroom: ${formatDuration(day.totalBathroomMin)}`);
+                        day.bathroomFlagged = true;
+                    }
+                    if (day.bathroomEntry) {
+                        day.warnings.push('Bathroom exit not recorded');
+                    }
+                });
+
+                const weeklyData = {};
+                Object.values(dailyData).forEach(day => {
+                    if (!weeklyData[day.name]) {
+                        weeklyData[day.name] = {
+                            name: day.name,
+                            department: day.department,
+                            days: [],
+                            totalPaidMin: 0,
+                            totalBathroomMin: 0,
+                            totalWarnings: 0,
+                            lateCount: 0,
+                            flaggedDays: 0,
+                            flagged: false
+                        };
+                    }
+
+                    const emp = weeklyData[day.name];
+                    emp.days.push(day);
+                    emp.totalPaidMin += day.paidMin || 0;
+                    emp.totalBathroomMin += day.totalBathroomMin || 0;
+                    emp.totalWarnings += day.warnings.length || 0;
+                    if (day.startStatus === 'late') emp.lateCount++;
+                    if (day.bathroomFlagged) emp.flaggedDays++;
+                });
+
+                Object.values(weeklyData).forEach(emp => {
+                    if (emp.flaggedDays > 0) {
+                        emp.flagged = true;
+                    }
+                    emp.days.sort((a, b) => a.date.localeCompare(b.date));
+                });
+
+                const byDepartment = {};
+                Object.values(weeklyData).forEach(emp => {
+                    const dept = emp.department || 'Unknown';
+                    if (!byDepartment[dept]) {
+                        byDepartment[dept] = [];
+                    }
+                    byDepartment[dept].push(emp);
+                });
+
+                setSummary(byDepartment);
+            };
+
+            const resetSettings = () => {
+                if (confirm('Reset settings to defaults? (This is temporary - only for this session)')) {
+                    setConfig({ ...DEFAULT_CONFIG });
+                }
+            };
+
+            const exportToExcel = () => {
+                if (!summary) return;
+
+                const wb = XLSX.utils.book_new();
+
+                const weeklyData = [
+                    ['WEEKLY TIMESHEET REPORT'],
+                    [],
+                    ['Department', 'Employee', 'Days', 'Paid Hours', 'Bathroom Total', 'Late Days', 'Status', 'Final Time']
+                ];
+                
+                Object.keys(summary).sort().forEach(dept => {
+                    summary[dept].forEach(emp => {
+                        weeklyData.push([
+                            dept,
+                            emp.name,
+                            emp.days.length,
+                            formatDuration(emp.totalPaidMin),
+                            formatDuration(emp.totalBathroomMin),
+                            emp.lateCount,
+                            emp.flagged ? 'FLAGGED' : 'OK',
+                            ''
+                        ]);
+                    });
+                });
+
+                const ws1 = XLSX.utils.aoa_to_sheet(weeklyData);
+                XLSX.utils.book_append_sheet(wb, ws1, 'Weekly Summary');
+
+                const today = new Date().toISOString().split('T')[0];
+                XLSX.writeFile(wb, `Weekly_Timesheet_${today}.xlsx`);
+            };
+
+            const exportToPDF = () => {
+                if (!summary) return;
+
+                const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+                
+                let html = `
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <meta charset="UTF-8">
+                        <title>Weekly Timesheet Report</title>
+                        <style>
+                            body { font-family: Arial, sans-serif; margin: 20px; }
+                            h1 { color: #4f46e5; border-bottom: 3px solid #4f46e5; padding-bottom: 10px; }
+                            h2 { color: #6366f1; margin-top: 30px; background: #eef2ff; padding: 10px; border-radius: 5px; }
+                            .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin: 20px 0; }
+                            .stat-box { border: 2px solid #e5e7eb; padding: 15px; border-radius: 8px; }
+                            .stat-label { color: #6b7280; font-size: 12px; }
+                            .stat-value { font-size: 24px; font-weight: bold; color: #1f2937; }
+                            .employee { border: 1px solid #e5e7eb; padding: 15px; margin: 15px 0; border-radius: 8px; }
+                            .employee.flagged { border-color: #ef4444; background: #fef2f2; }
+                            .employee-header { display: flex; justify-content: space-between; margin-bottom: 10px; align-items: center; }
+                            .employee-name { font-size: 18px; font-weight: bold; }
+                            .flag-badge { background: #ef4444; color: white; padding: 5px 10px; border-radius: 20px; font-size: 12px; }
+                            .employee-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 10px 0; font-size: 13px; }
+                            .day { background: #f9fafb; padding: 10px; margin: 10px 0; border-radius: 5px; border-left: 4px solid #4f46e5; }
+                            .day-header { font-weight: bold; margin-bottom: 5px; }
+                            .day-details { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; font-size: 12px; margin-top: 10px; }
+                            .warning { color: #f59e0b; font-size: 11px; }
+                            .section-title { font-weight: bold; margin-bottom: 5px; }
+                            .print-btn { background: #4f46e5; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin: 20px 0; font-size: 16px; }
+                            .print-btn:hover { background: #4338ca; }
+                            @media print { 
+                                .print-btn { display: none; }
+                                body { margin: 1cm; }
+                                .page-break { page-break-before: always; }
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        <button class="print-btn" onclick="window.print()">🖨️ Print / Save as PDF</button>
+                        <h1>Weekly Timesheet Report</h1>
+                        <p style="color: #6b7280;">Generated: ${today}</p>
+                `;
+
+                const totalEmployees = Object.values(summary).reduce((sum, dept) => sum + dept.length, 0);
+                const totalPaidMin = Object.values(summary).reduce((sum, dept) => 
+                    sum + dept.reduce((deptSum, emp) => deptSum + (emp.totalPaidMin || 0), 0), 0
+                );
+                const totalWarnings = Object.values(summary).reduce((sum, dept) => 
+                    sum + dept.reduce((deptSum, emp) => deptSum + (emp.totalWarnings || 0), 0), 0
+                );
+                const totalFlagged = Object.values(summary).reduce((sum, dept) => 
+                    sum + dept.filter(emp => emp.flagged).length, 0
+                );
+
+                html += `
+                    <div class="stats">
+                        <div class="stat-box">
+                            <div class="stat-label">Total Employees</div>
+                            <div class="stat-value">${totalEmployees}</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-label">Total Paid Hours</div>
+                            <div class="stat-value">${formatDuration(totalPaidMin)}</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-label">Total Warnings</div>
+                            <div class="stat-value">${totalWarnings}</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-label">Flagged Employees</div>
+                            <div class="stat-value">${totalFlagged}</div>
+                        </div>
+                    </div>
+                `;
+
+                Object.keys(summary).sort().forEach((dept, deptIdx) => {
+                    if (deptIdx > 0) html += '<div class="page-break"></div>';
+                    
+                    html += `<h2>${dept}</h2>`;
+                    html += `<p style="color: #6b7280;">${summary[dept].length} employees • ${formatDuration(summary[dept].reduce((sum, emp) => sum + (emp.totalPaidMin || 0), 0))} total paid hours</p>`;
+
+                    summary[dept].forEach(emp => {
+                        html += `
+                            <div class="employee ${emp.flagged ? 'flagged' : ''}">
+                                <div class="employee-header">
+                                    <div class="employee-name">${emp.name}</div>
+                                    ${emp.flagged ? '<div class="flag-badge">FLAGGED</div>' : ''}
+                                </div>
+                                <div class="employee-stats">
+                                    <div><strong>Days:</strong> ${emp.days.length}</div>
+                                    <div><strong>Paid:</strong> ${formatDuration(emp.totalPaidMin)}</div>
+                                    <div><strong>Bathroom:</strong> ${formatDuration(emp.totalBathroomMin)}${emp.flaggedDays > 0 ? ` (${emp.flaggedDays} day${emp.flaggedDays > 1 ? 's' : ''} flagged)` : ''}</div>
+                                    ${emp.lateCount > 0 ? `<div><strong>Late:</strong> ${emp.lateCount}x</div>` : '<div></div>'}
+                                </div>
+                        `;
+
+                        emp.days.forEach(day => {
+                            html += `
+                                <div class="day">
+                                    <div class="day-header">
+                                        ${new Date(day.date).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })}
+                                        ${day.startStatus ? `<span style="font-size: 11px; margin-left: 10px; color: ${day.startStatus === 'late' ? '#f59e0b' : '#10b981'};">(${day.startStatus === 'late' ? '⚠️ Late' : day.startStatus === 'early' ? '✓ Early' : '✓ On time'})</span>` : ''}
+                                    </div>
+                                    <div style="margin: 5px 0; font-size: 13px;">
+                                        <strong>Paid:</strong> ${formatDuration(day.paidMin)} | 
+                                        <strong>Bathroom:</strong> ${formatDuration(day.totalBathroomMin)}${day.totalBathroomMin > config.dailyBathroomThreshold ? ' ⚠️' : ''} |
+                                        ${day.lunchBreak ? `<strong>Lunch:</strong> ${formatDuration(day.lunchBreak.actual)} actual` : 'No lunch'}
+                                    </div>
+                                    <div class="day-details">
+                                        <div>
+                                            <div class="section-title">Work Sessions:</div>
+                                            ${day.workSessions.map(s => 
+                                                `• ${s.in.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })} → ${s.out ? s.out.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'Missing'}${s.projected ? ' <span style="color: #3b82f6;">(Projected)</span>' : ''}`
+                                            ).join('<br>')}
+                                        </div>
+                                        <div>
+                                            <div class="section-title">Bathroom:</div>
+                                            ${day.bathroomBreaks.length > 0 ? day.bathroomBreaks.map(b => 
+                                                `• ${b.entry.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })} → ${b.exit.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })} (${formatDuration(b.duration)})${b.longBreak ? ' <span style="color: #f97316; font-weight: 600;">⚠️ Long break</span>' : ''}${b.earlyChange ? ` <span style="color: #f97316; font-weight: 600;">⚠️ ${b.minutesBeforeClockOut} min before clock-out</span>` : ''}${b.excludedFromTotal ? ` <span style="color: #6b7280;">(${b.excludeReason || 'Excluded'})</span>` : ''}`
+                                            ).join('<br>') : 'None'}
+                                        </div>
+                                        <div>
+                                            <div class="section-title">Notes:</div>
+                                            ${day.warnings.length > 0 ? day.warnings.map(w => `<div class="warning">⚠️ ${w}</div>`).join('') : '<span style="color: #10b981;">✓ All good</span>'}
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        });
+
+                        html += '</div>';
+                    });
+                });
+
+                html += '</body></html>';
+
+                const blob = new Blob([html], { type: 'text/html' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `Timesheet_Report_${new Date().toISOString().split('T')[0]}.html`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+                alert('Report downloaded! Open the HTML file in your browser and use Print → Save as PDF');
+            };
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
+                    <div className="max-w-7xl mx-auto">
+                        <div className="bg-white rounded-lg shadow-lg p-8 mb-6 no-print">
+                            <div className="flex items-center gap-3 mb-6">
+                                <Clock className="w-8 h-8 text-indigo-600" />
+                                <h1 className="text-3xl font-bold text-gray-800">Time Clock Analyzer</h1>
+                            </div>
+
+                            <div className="mb-8">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h3 className="text-lg font-semibold text-gray-700">Upload Transaction Report</h3>
+                                    <div className="flex items-center gap-3">
+                                        {rawTransactions && (
+                                            <span className="text-sm text-green-600 bg-green-50 px-3 py-1 rounded-full">
+                                                ✓ Data loaded - Settings auto-update
+                                            </span>
+                                        )}
+                                        <button
+                                            onClick={() => setShowSettings(!showSettings)}
+                                            className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700 transition"
+                                        >
+                                            <Settings className="w-5 h-5" />
+                                            {showSettings ? 'Hide Settings' : 'Show Settings'}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {showSettings && (
+                                    <div className="bg-indigo-50 rounded-lg p-4 mb-4">
+                                        <div className="bg-blue-100 border-l-4 border-blue-500 p-3 mb-4">
+                                            <p className="text-sm text-blue-900">
+                                                <strong>ℹ️ Settings Note:</strong> Changes here are temporary (this session only). 
+                                                To make <strong>permanent changes for all users</strong>, edit the DEFAULT_CONFIG section 
+                                                at the top of this HTML file in a text editor.
+                                            </p>
+                                        </div>
+                                        <div className="flex justify-between items-center mb-4">
+                                            <h4 className="font-semibold text-gray-700">Configuration Settings (Temporary)</h4>
+                                            <button
+                                                onClick={resetSettings}
+                                                className="text-sm text-red-600 hover:text-red-700 font-medium"
+                                            >
+                                                Reset to Defaults
+                                            </button>
+                                        </div>
+                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Start Time</label>
+                                                <input
+                                                    type="time"
+                                                    value={config.standardStartTime}
+                                                    onChange={(e) => setConfig({...config, standardStartTime: e.target.value})}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">End Time</label>
+                                                <input
+                                                    type="time"
+                                                    value={config.standardEndTime}
+                                                    onChange={(e) => setConfig({...config, standardEndTime: e.target.value})}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Start Grace (min)</label>
+                                                <input
+                                                    type="number"
+                                                    value={config.graceMinutes}
+                                                    onChange={(e) => setConfig({...config, graceMinutes: Number(e.target.value)})}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">End Buffer (min)</label>
+                                                <input
+                                                    type="number"
+                                                    value={config.endBufferMinutes}
+                                                    onChange={(e) => setConfig({...config, endBufferMinutes: Number(e.target.value)})}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Lunch Buffer (min)</label>
+                                                <input
+                                                    type="number"
+                                                    value={config.lunchBufferMinutes}
+                                                    onChange={(e) => setConfig({...config, lunchBufferMinutes: Number(e.target.value)})}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Lunch Deduction (min)</label>
+                                                <input
+                                                    type="number"
+                                                    value={config.standardLunchMinutes}
+                                                    onChange={(e) => setConfig({...config, standardLunchMinutes: Number(e.target.value)})}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Min Lunch (min)</label>
+                                                <input
+                                                    type="number"
+                                                    value={config.minLunchMinutes}
+                                                    onChange={(e) => setConfig({...config, minLunchMinutes: Number(e.target.value)})}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Max Lunch (min)</label>
+                                                <input
+                                                    type="number"
+                                                    value={config.maxLunchMinutes}
+                                                    onChange={(e) => setConfig({...config, maxLunchMinutes: Number(e.target.value)})}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Daily Bathroom Limit (min)</label>
+                                                <input
+                                                    type="number"
+                                                    value={config.dailyBathroomThreshold}
+                                                    onChange={(e) => setConfig({...config, dailyBathroomThreshold: Number(e.target.value)})}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Late Morning Threshold</label>
+                                                <input
+                                                    type="time"
+                                                    value={config.lateMorningThreshold}
+                                                    onChange={(e) => setConfig({...config, lateMorningThreshold: e.target.value})}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                                                />
+                                                <p className="text-xs text-gray-500 mt-1">If first clock-in is after this time, treat as lunch</p>
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Early Change Alert (min)</label>
+                                                <input
+                                                    type="number"
+                                                    value={config.earlyChangeThreshold}
+                                                    onChange={(e) => setConfig({...config, earlyChangeThreshold: Number(e.target.value)})}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                                                />
+                                                <p className="text-xs text-gray-500 mt-1">Flag if bathroom entry within X min before clock-out</p>
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Long Bathroom Break (min)</label>
+                                                <input
+                                                    type="number"
+                                                    value={config.longBathroomThreshold}
+                                                    onChange={(e) => setConfig({...config, longBathroomThreshold: Number(e.target.value)})}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                                                />
+                                                <p className="text-xs text-gray-500 mt-1">Flag individual bathroom breaks over X minutes</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-indigo-300 rounded-lg cursor-pointer bg-indigo-50 hover:bg-indigo-100 transition">
+                                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                                        <Upload />
+                                        <p className="mb-2 text-sm text-gray-600 text-indigo-500 mt-3">
+                                            <span className="font-semibold">Click to upload</span> or drag and drop
+                                        </p>
+                                        <p className="text-xs text-gray-500">Excel file (.xlsx)</p>
+                                    </div>
+                                    <input
+                                        type="file"
+                                        className="hidden"
+                                        accept=".xlsx,.xls"
+                                        onChange={(e) => e.target.files?.[0] && processFile(e.target.files[0])}
+                                    />
+                                </label>
+                            </div>
+
+                            {loading && (
+                                <div className="text-center py-8">
+                                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                                    <p className="mt-2 text-gray-600">Processing...</p>
+                                </div>
+                            )}
+                        </div>
+
+                        {summary && (
+                            <div className="bg-white rounded-lg shadow-lg p-8">
+                                <div className="flex justify-between items-center mb-6">
+                                    <div className="flex items-center gap-3">
+                                        <FileText className="w-6 h-6 text-indigo-600" />
+                                        <h2 className="text-2xl font-bold text-gray-800">Weekly Summary</h2>
+                                    </div>
+                                    <div className="flex gap-3 no-print">
+                                        <button
+                                            onClick={exportToPDF}
+                                            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition font-medium"
+                                        >
+                                            <FileDown className="w-5 h-5" />
+                                            PDF Report
+                                        </button>
+                                        <button
+                                            onClick={exportToExcel}
+                                            className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition font-medium"
+                                        >
+                                            <Download className="w-5 h-5" />
+                                            Excel Data
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="print-title mb-6">
+                                    <h1 className="text-3xl font-bold text-gray-800">Weekly Timesheet Report</h1>
+                                    <p className="text-gray-600 mt-2">Generated: {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                                </div>
+
+                                <div className="mb-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+                                    <div className="bg-blue-50 rounded-lg p-4">
+                                        <Users className="w-5 h-5 text-blue-600 mb-1" />
+                                        <p className="text-sm text-gray-600">Employees</p>
+                                        <p className="text-2xl font-bold text-gray-800">
+                                            {Object.values(summary).reduce((sum, dept) => sum + dept.length, 0)}
+                                        </p>
+                                    </div>
+                                    <div className="bg-indigo-50 rounded-lg p-4">
+                                        <Clock className="w-5 h-5 text-indigo-600 mb-1" />
+                                        <p className="text-sm text-gray-600">Total Paid Hours</p>
+                                        <p className="text-2xl font-bold text-gray-800">
+                                            {formatDuration(
+                                                Object.values(summary).reduce((sum, dept) => 
+                                                    sum + dept.reduce((deptSum, emp) => deptSum + (emp.totalPaidMin || 0), 0), 0
+                                                )
+                                            )}
+                                        </p>
+                                    </div>
+                                    <div className="bg-orange-50 rounded-lg p-4">
+                                        <AlertCircle className="w-5 h-5 text-orange-600 mb-1" />
+                                        <p className="text-sm text-gray-600">Warnings</p>
+                                        <p className="text-2xl font-bold text-gray-800">
+                                            {Object.values(summary).reduce((sum, dept) => 
+                                                sum + dept.reduce((deptSum, emp) => deptSum + (emp.totalWarnings || 0), 0), 0
+                                            )}
+                                        </p>
+                                    </div>
+                                    <div className="bg-red-50 rounded-lg p-4">
+                                        <AlertCircle className="w-5 h-5 text-red-600 mb-1" />
+                                        <p className="text-sm text-gray-600">Flagged Employees</p>
+                                        <p className="text-2xl font-bold text-gray-800">
+                                            {Object.values(summary).reduce((sum, dept) => 
+                                                sum + dept.filter(emp => emp.flagged).length, 0
+                                            )}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-8">
+                                    {Object.keys(summary).sort().map((dept, deptIdx) => (
+                                        <div key={deptIdx}>
+                                            <div className="bg-gradient-to-r from-indigo-600 to-indigo-500 text-white rounded-lg p-4 mb-4">
+                                                <h3 className="text-2xl font-bold">{dept}</h3>
+                                                <p className="text-indigo-100 text-sm mt-1">
+                                                    {summary[dept].length} employee{summary[dept].length !== 1 ? 's' : ''} • 
+                                                    {' '}{formatDuration(summary[dept].reduce((sum, emp) => sum + (emp.totalPaidMin || 0), 0))} total paid hours
+                                                </p>
+                                            </div>
+
+                                            <div className="space-y-6">
+                                                {summary[dept].map((emp, idx) => (
+                                                    <div
+                                                        key={idx}
+                                                        className={`border rounded-lg p-5 ${emp.flagged ? 'border-red-300 bg-red-50' : 'border-gray-200'}`}
+                                                    >
+                                                        <div className="flex justify-between items-start mb-4 pb-4 border-b">
+                                                            <div>
+                                                                <h3 className="text-xl font-bold text-gray-800">{emp.name}</h3>
+                                                                <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-1 mt-2 text-sm">
+                                                                    <span className="text-gray-600"><strong>Days:</strong> {emp.days.length}</span>
+                                                                    <span className="text-indigo-600"><strong>Paid:</strong> {formatDuration(emp.totalPaidMin)}</span>
+                                                                    <span className={emp.flagged ? 'text-red-600 font-semibold' : 'text-gray-600'}>
+                                                                        <strong>Bathroom:</strong> {formatDuration(emp.totalBathroomMin)}
+                                                                        {emp.flaggedDays > 0 && ` (${emp.flaggedDays} day${emp.flaggedDays > 1 ? 's' : ''} >${config.dailyBathroomThreshold}m)`}
+                                                                    </span>
+                                                                    {emp.lateCount > 0 && (
+                                                                        <span className="text-orange-600"><strong>Late:</strong> {emp.lateCount}x</span>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                            {emp.flagged && (
+                                                                <div className="flex items-center gap-2 bg-red-100 px-3 py-1 rounded-full">
+                                                                    <AlertCircle className="w-4 h-4 text-red-600" />
+                                                                    <span className="text-sm font-semibold text-red-700">FLAGGED</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+
+                                                        <div className="space-y-4">
+                                                            {emp.days.map((day, dayIdx) => (
+                                                                <div key={dayIdx} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                                                                    <div className="flex justify-between items-start mb-3">
+                                                                        <div>
+                                                                            <h4 className="font-semibold text-gray-700">
+                                                                                {new Date(day.date).toLocaleDateString('en-US', { 
+                                                                                    weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' 
+                                                                                })}
+                                                                            </h4>
+                                                                            {day.startStatus && (
+                                                                                <span className={`text-xs ${
+                                                                                    day.startStatus === 'late' ? 'text-orange-600' :
+                                                                                    day.startStatus === 'early' ? 'text-blue-600' : 'text-green-600'
+                                                                                }`}>
+                                                                                    {day.startStatus === 'late' ? '⚠️ Late' :
+                                                                                     day.startStatus === 'early' ? '✓ Early (adj)' : '✓ On time'}
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                        <div className="text-right text-sm">
+                                                                            <div className="text-indigo-600 font-semibold">
+                                                                                Paid: {formatDuration(day.paidMin)}
+                                                                            </div>
+                                                                            <div className={day.totalBathroomMin > config.dailyBathroomThreshold ? 'text-red-600 font-semibold' : 'text-gray-600'}>
+                                                                                Bathroom: {formatDuration(day.totalBathroomMin)}
+                                                                                {day.totalBathroomMin > config.dailyBathroomThreshold && ' ⚠️ FLAGGED'}
+                                                                            </div>
+                                                                            {day.lunchBreak && (
+                                                                                <div className="text-xs text-gray-500 mt-1">
+                                                                                    Lunch: {formatDuration(day.lunchBreak.actual)} actual (30 min counted)
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+
+                                                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                                                                        <div>
+                                                                            <p className="font-semibold text-gray-700 mb-1">Work Sessions:</p>
+                                                                            {day.workSessions.length > 0 ? (
+                                                                                day.workSessions.map((s, i) => (
+                                                                                    <p key={i} className="text-gray-600 mb-1">
+                                                                                        • {s.in.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                                                                                        {' → '}
+                                                                                        {s.out ? s.out.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'Missing'}
+                                                                                        {s.projected && <span className="text-blue-600 text-xs ml-1">(Projected)</span>}
+                                                                                    </p>
+                                                                                ))
+                                                                            ) : (
+                                                                                <p className="text-gray-400 italic">None</p>
+                                                                            )}
+                                                                        </div>
+
+                                                                        <div>
+                                                                            <p className="font-semibold text-gray-700 mb-1">Bathroom:</p>
+                                                                            {day.bathroomBreaks.length > 0 ? (
+                                                                                day.bathroomBreaks.map((b, i) => (
+                                                                                    <p key={i} className={`mb-1 ${b.earlyChange || b.longBreak ? 'text-orange-600 font-semibold' : 'text-gray-600'}`}>
+                                                                                        • {b.entry.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                                                                                        {' → '}
+                                                                                        {b.exit.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                                                                                        {' '}({formatDuration(b.duration)})
+                                                                                        {b.longBreak && <span className="text-orange-600 text-xs ml-1">⚠️ Long break</span>}
+                                                                                        {b.earlyChange && <span className="text-orange-600 text-xs ml-1">⚠️ {b.minutesBeforeClockOut} min before clock-out</span>}
+                                                                                        {b.excludedFromTotal && <span className="text-gray-500 text-xs ml-1">({b.excludeReason || 'Excluded'})</span>}
+                                                                                    </p>
+                                                                                ))
+                                                                            ) : (
+                                                                                <p className="text-gray-400 italic">None</p>
+                                                                            )}
+                                                                        </div>
+
+                                                                        <div>
+                                                                            <p className="font-semibold text-gray-700 mb-1">Notes:</p>
+                                                                            {day.warnings.length > 0 ? (
+                                                                                day.warnings.map((w, i) => (
+                                                                                    <p key={i} className="text-orange-600 text-xs mb-1">⚠️ {w}</p>
+                                                                                ))
+                                                                            ) : (
+                                                                                <p className="text-green-600 text-xs">✓ All good</p>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<TimesheetAnalyzer />, document.getElementById('root'));
+    </script>
+</body>
+</html>
