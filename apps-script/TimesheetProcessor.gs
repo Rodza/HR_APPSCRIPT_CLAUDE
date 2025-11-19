@@ -172,51 +172,44 @@ function calculateLunchBreak(punches, config, isFriday) {
   var clockIns = punches.filter(function(p) { return p.type === 'in'; });
   var clockOuts = punches.filter(function(p) { return p.type === 'out'; });
 
-  if (clockIns.length < 2 || clockOuts.length < 2) {
-    return {
-      lunchTaken: false,
-      lunchMinutes: 0,
-      lunchStart: null,
-      lunchEnd: null,
-      reason: 'Insufficient punches to detect lunch'
-    };
-  }
+  // Try to detect lunch from multiple punches
+  if (clockIns.length >= 2 && clockOuts.length >= 2) {
+    // Find the largest gap between consecutive out/in pairs
+    var largestGap = 0;
+    var gapStart = null;
+    var gapEnd = null;
 
-  // Find the largest gap between consecutive out/in pairs
-  var largestGap = 0;
-  var gapStart = null;
-  var gapEnd = null;
+    for (var i = 0; i < clockOuts.length; i++) {
+      var out = clockOuts[i].time;
 
-  for (var i = 0; i < clockOuts.length; i++) {
-    var out = clockOuts[i].time;
+      // Find next clock-in after this clock-out
+      for (var j = 0; j < clockIns.length; j++) {
+        var in_time = clockIns[j].time;
 
-    // Find next clock-in after this clock-out
-    for (var j = 0; j < clockIns.length; j++) {
-      var in_time = clockIns[j].time;
+        if (in_time.getTime() > out.getTime()) {
+          var gapMinutes = (in_time.getTime() - out.getTime()) / (60 * 1000);
 
-      if (in_time.getTime() > out.getTime()) {
-        var gapMinutes = (in_time.getTime() - out.getTime()) / (60 * 1000);
-
-        if (gapMinutes > largestGap) {
-          largestGap = gapMinutes;
-          gapStart = out;
-          gapEnd = in_time;
+          if (gapMinutes > largestGap) {
+            largestGap = gapMinutes;
+            gapStart = out;
+            gapEnd = in_time;
+          }
+          break;
         }
-        break;
       }
     }
-  }
 
-  // Check if gap is within lunch range
-  if (largestGap >= config.minLunchMinutes && largestGap <= config.maxLunchMinutes) {
-    return {
-      lunchTaken: true,
-      lunchMinutes: config.standardLunchMinutes,
-      lunchStart: gapStart,
-      lunchEnd: gapEnd,
-      actualGapMinutes: Math.round(largestGap),
-      reason: 'Lunch detected (' + Math.round(largestGap) + ' min gap)'
-    };
+    // Check if gap is within lunch range
+    if (largestGap >= config.minLunchMinutes && largestGap <= config.maxLunchMinutes) {
+      return {
+        lunchTaken: true,
+        lunchMinutes: config.standardLunchMinutes,
+        lunchStart: gapStart,
+        lunchEnd: gapEnd,
+        actualGapMinutes: Math.round(largestGap),
+        reason: 'Lunch detected (' + Math.round(largestGap) + ' min gap)'
+      };
+    }
   }
 
   // Check if employee clocked in late (after late morning threshold)
@@ -238,6 +231,7 @@ function calculateLunchBreak(punches, config, isFriday) {
     }
   }
 
+  // No lunch detected
   return {
     lunchTaken: false,
     lunchMinutes: 0,
@@ -565,7 +559,19 @@ function processDayData(dayData, config) {
   // Calculate total minutes
   var workedMs = adjustedOut.getTime() - adjustedIn.getTime();
   var workedMinutes = workedMs / (60 * 1000);
+
+  // Handle invalid data: clock-out before clock-in (results in negative time)
+  if (workedMinutes < 0) {
+    warnings.push('Invalid data: Clock-out (' + formatTime(adjustedOut) + ') before clock-in (' + formatTime(adjustedIn) + ')');
+    workedMinutes = 0;
+  }
+
   var totalMinutes = workedMinutes - lunchResult.lunchMinutes;
+
+  // Ensure total doesn't go negative after lunch deduction
+  if (totalMinutes < 0) {
+    totalMinutes = 0;
+  }
 
   return {
     date: dayData.date,
