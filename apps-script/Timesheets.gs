@@ -1330,10 +1330,12 @@ function importClockDataFromBase64(base64Data, filename, mimeType, override) {
     return result;
 
   } catch (error) {
-    Logger.log('❌ ERROR in importClockDataFromBase64: ' + error.message);
-    Logger.log('   Stack: ' + error.stack);
+    // Extract detailed error information
+    const errorMessage = error.message || error.toString() || 'Unknown error occurred during import';
+    Logger.log('❌ ERROR in importClockDataFromBase64: ' + errorMessage);
+    if (error.stack) Logger.log('   Stack: ' + error.stack);
     Logger.log('========== IMPORT CLOCK DATA FROM BASE64 FAILED ==========\n');
-    return { success: false, error: error.message };
+    return { success: false, error: errorMessage };
   }
 }
 
@@ -1462,14 +1464,59 @@ function importClockData(fileBlob, filename, override) {
     };
 
   } catch (error) {
-    Logger.log('❌ ERROR in importClockData: ' + error.message);
-    Logger.log('Stack: ' + error.stack);
+    // Extract detailed error information
+    const errorMessage = error.message || error.toString() || 'Unknown error occurred during import';
+    Logger.log('❌ ERROR in importClockData: ' + errorMessage);
+    if (error.stack) Logger.log('Stack: ' + error.stack);
     Logger.log('========== IMPORT CLOCK DATA FAILED ==========\n');
     return {
       success: false,
-      error: error.message
+      error: errorMessage
     };
   }
+}
+
+/**
+ * Retry a function with exponential backoff for rate limit errors
+ *
+ * @param {Function} fn - Function to retry
+ * @param {number} maxRetries - Maximum number of retries (default: 3)
+ * @param {number} initialDelay - Initial delay in milliseconds (default: 1000)
+ * @returns {*} Result of the function
+ */
+function retryWithBackoff(fn, maxRetries, initialDelay) {
+  maxRetries = maxRetries || 3;
+  initialDelay = initialDelay || 1000;
+
+  let lastError;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return fn();
+    } catch (error) {
+      lastError = error;
+
+      // Check if it's a rate limit error (429) or quota error
+      const errorMsg = error.message || '';
+      const isRateLimit = errorMsg.indexOf('429') >= 0 ||
+                         errorMsg.toLowerCase().indexOf('rate limit') >= 0 ||
+                         errorMsg.toLowerCase().indexOf('quota') >= 0 ||
+                         errorMsg.toLowerCase().indexOf('too many requests') >= 0;
+
+      // If it's the last attempt or not a rate limit error, throw
+      if (attempt === maxRetries || !isRateLimit) {
+        throw error;
+      }
+
+      // Calculate delay with exponential backoff
+      const delay = initialDelay * Math.pow(2, attempt);
+      Logger.log('⚠️ Rate limit error (attempt ' + (attempt + 1) + '/' + maxRetries + '): ' + errorMsg);
+      Logger.log('⏳ Waiting ' + delay + 'ms before retry...');
+
+      Utilities.sleep(delay);
+    }
+  }
+
+  throw lastError;
 }
 
 /**
@@ -1501,7 +1548,11 @@ function parseClockDataExcel(fileBlob) {
         mimeType: MimeType.GOOGLE_SHEETS
       };
 
-      const importedFile = Drive.Files.copy(resource, fileId);
+      // Wrap Drive API call with retry logic for rate limit errors
+      const importedFile = retryWithBackoff(function() {
+        return Drive.Files.copy(resource, fileId);
+      }, 3, 2000); // 3 retries, starting with 2 second delay
+
       convertedFileId = importedFile.id;
 
       Logger.log('✅ Conversion successful! Converted file ID: ' + convertedFileId);
@@ -1524,8 +1575,14 @@ function parseClockDataExcel(fileBlob) {
       Logger.log('✅ Cleanup complete');
 
     } catch (conversionError) {
-      Logger.log('❌ ERROR during Excel conversion: ' + conversionError.message);
-      Logger.log('Stack: ' + conversionError.stack);
+      // Extract detailed error information
+      const errorMessage = conversionError.message || conversionError.toString() || 'Unknown error';
+      const errorDetails = conversionError.details || '';
+      const errorStack = conversionError.stack || '';
+
+      Logger.log('❌ ERROR during Excel conversion: ' + errorMessage);
+      if (errorDetails) Logger.log('Error details: ' + errorDetails);
+      if (errorStack) Logger.log('Stack: ' + errorStack);
 
       // Clean up on error
       try {
@@ -1535,7 +1592,15 @@ function parseClockDataExcel(fileBlob) {
         Logger.log('⚠️ Could not clean up temp file: ' + e.message);
       }
 
-      throw new Error('Excel conversion failed: ' + conversionError.message);
+      // Provide user-friendly error messages
+      let userMessage = 'Excel conversion failed: ' + errorMessage;
+      if (errorMessage.indexOf('429') >= 0 || errorMessage.toLowerCase().indexOf('rate limit') >= 0) {
+        userMessage = 'Google API rate limit exceeded. Please wait a few moments and try again.';
+      } else if (errorMessage.toLowerCase().indexOf('quota') >= 0) {
+        userMessage = 'Google API quota exceeded. Please try again later.';
+      }
+
+      throw new Error(userMessage);
     }
 
     // Actual clock-in system export format:
@@ -1682,9 +1747,11 @@ function parseClockDataExcel(fileBlob) {
     return { success: true, data: records };
 
   } catch (error) {
-    Logger.log('❌ ERROR in parseClockDataExcel: ' + error.message);
-    Logger.log('Stack: ' + error.stack);
-    return { success: false, error: error.message };
+    // Extract detailed error information
+    const errorMessage = error.message || error.toString() || 'Unknown error occurred';
+    Logger.log('❌ ERROR in parseClockDataExcel: ' + errorMessage);
+    if (error.stack) Logger.log('Stack: ' + error.stack);
+    return { success: false, error: errorMessage };
   }
 }
 
