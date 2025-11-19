@@ -1462,8 +1462,8 @@ function importClockData(fileBlob, filename, override) {
     Logger.log('Filename: ' + filename);
     Logger.log('Override: ' + (override ? 'YES' : 'NO'));
 
-    // Parse Excel file
-    const parseResult = parseClockDataExcel(fileBlob);
+    // Parse Excel file (v2 - cache busting rename)
+    const parseResult = parseClockDataExcel_v2(fileBlob);
     if (!parseResult.success) {
       throw new Error('Failed to parse Excel: ' + parseResult.error);
     }
@@ -1628,14 +1628,14 @@ function retryWithBackoff(fn, maxRetries, initialDelay) {
 }
 
 /**
- * Parse clock data from Excel file
+ * Parse clock data from Excel file - VERSION 2 (Cache-busting rename)
  *
  * @param {Blob} fileBlob - Excel file blob
  * @returns {Object} Result with parsed data
  */
-function parseClockDataExcel(fileBlob) {
+function parseClockDataExcel_v2(fileBlob) {
   try {
-    Logger.log('🔴 CODE VERSION: 2025-11-19-v5 WITH 10-HOUR CORRECTION 🔴');
+    Logger.log('🔴 CODE VERSION: 2025-11-19-v6 WITH 10-HOUR CORRECTION (CACHE BUSTED) 🔴');
     Logger.log('📖 Parsing clock data Excel file...');
     Logger.log('📄 File name: ' + fileBlob.getName());
     Logger.log('📦 File type: ' + fileBlob.getContentType());
