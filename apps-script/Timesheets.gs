@@ -1561,19 +1561,26 @@ function parseClockDataExcel(fileBlob) {
       const spreadsheet = SpreadsheetApp.openById(convertedFileId);
       const sheet = spreadsheet.getSheets()[0];
 
-      // Get timezone information for debugging
+      // DEBUG: Get timezone information
       const scriptTimezone = Session.getScriptTimeZone();
       const spreadsheetTimezone = spreadsheet.getSpreadsheetTimeZone();
+      Logger.log('\n========== TIMEZONE DEBUG INFO ==========');
       Logger.log('🌍 Script timezone: ' + scriptTimezone);
       Logger.log('🌍 Spreadsheet timezone: ' + spreadsheetTimezone);
+      Logger.log('🌍 Current server time: ' + new Date().toString());
+      Logger.log('🌍 Server UTC time: ' + new Date().toUTCString());
 
-      // CRITICAL: Use getValues() to get Date objects with preserved times
-      // Excel datetimes are stored in Google Sheets as Date objects
-      // We'll extract local components (not UTC) to preserve the exact time
+      // Get timezone offset in hours
+      const tzOffset = new Date().getTimezoneOffset();
+      Logger.log('🌍 Timezone offset: ' + tzOffset + ' minutes (' + (tzOffset / -60) + ' hours from UTC)');
+
+      // Get both raw values and display values for comparison
       const range = sheet.getDataRange();
       data = range.getValues(); // Get Date objects
+      const displayData = range.getDisplayValues(); // Get formatted strings
 
       Logger.log('📊 Retrieved ' + data.length + ' rows from converted sheet');
+      Logger.log('========================================\n');
 
       // Clean up temporary files
       Logger.log('🗑️ Cleaning up temporary files...');
@@ -1667,6 +1674,40 @@ function parseClockDataExcel(fileBlob) {
 
       try {
         if (punchTimeValue instanceof Date && !isNaN(punchTimeValue.getTime())) {
+          // DEBUG: Detailed logging for first 5 records
+          if (i < dataStartRow + 5) {
+            Logger.log('\n========== ROW ' + (i + 1) + ' PUNCH TIME DEBUG ==========');
+            Logger.log('📥 RAW VALUE FROM GOOGLE SHEETS:');
+            Logger.log('   Type: ' + typeof punchTimeValue);
+            Logger.log('   Is Date: ' + (punchTimeValue instanceof Date));
+            Logger.log('   Display value: ' + displayData[i][colMap.punchTime]);
+            Logger.log('   .toString(): ' + punchTimeValue.toString());
+            Logger.log('   .toISOString(): ' + punchTimeValue.toISOString());
+            Logger.log('   .toUTCString(): ' + punchTimeValue.toUTCString());
+            Logger.log('   .toLocaleString(): ' + punchTimeValue.toLocaleString());
+            Logger.log('   .getTime(): ' + punchTimeValue.getTime());
+
+            Logger.log('\n🔍 LOCAL COMPONENTS (what we use):');
+            Logger.log('   getFullYear(): ' + punchTimeValue.getFullYear());
+            Logger.log('   getMonth(): ' + punchTimeValue.getMonth() + ' (0-indexed, so +1 = ' + (punchTimeValue.getMonth() + 1) + ')');
+            Logger.log('   getDate(): ' + punchTimeValue.getDate());
+            Logger.log('   getHours(): ' + punchTimeValue.getHours());
+            Logger.log('   getMinutes(): ' + punchTimeValue.getMinutes());
+            Logger.log('   getSeconds(): ' + punchTimeValue.getSeconds());
+            Logger.log('   => Extracted time: ' + punchTimeValue.getHours() + ':' +
+                      punchTimeValue.getMinutes() + ':' + punchTimeValue.getSeconds());
+
+            Logger.log('\n🌍 UTC COMPONENTS (for comparison):');
+            Logger.log('   getUTCFullYear(): ' + punchTimeValue.getUTCFullYear());
+            Logger.log('   getUTCMonth(): ' + punchTimeValue.getUTCMonth() + ' (0-indexed, so +1 = ' + (punchTimeValue.getUTCMonth() + 1) + ')');
+            Logger.log('   getUTCDate(): ' + punchTimeValue.getUTCDate());
+            Logger.log('   getUTCHours(): ' + punchTimeValue.getUTCHours());
+            Logger.log('   getUTCMinutes(): ' + punchTimeValue.getUTCMinutes());
+            Logger.log('   getUTCSeconds(): ' + punchTimeValue.getUTCSeconds());
+            Logger.log('   => UTC time: ' + punchTimeValue.getUTCHours() + ':' +
+                      punchTimeValue.getUTCMinutes() + ':' + punchTimeValue.getUTCSeconds());
+          }
+
           // CRITICAL FIX: Use local components (getFullYear, getMonth, etc.) directly
           // This preserves the time as shown in the Excel file without timezone conversion
           punchDateTime = new Date(
@@ -1678,15 +1719,15 @@ function parseClockDataExcel(fileBlob) {
             punchTimeValue.getSeconds()
           );
 
-          // Log first few records for verification
+          // DEBUG: Log created date
           if (i < dataStartRow + 5) {
-            Logger.log('📅 Row ' + (i + 1) + ' Punch Time:');
-            Logger.log('   Original Date: ' + punchTimeValue.toString());
-            Logger.log('   Local components: ' + punchTimeValue.getFullYear() + '-' +
-                      (punchTimeValue.getMonth() + 1) + '-' + punchTimeValue.getDate() +
-                      ' ' + punchTimeValue.getHours() + ':' + punchTimeValue.getMinutes() +
-                      ':' + punchTimeValue.getSeconds());
-            Logger.log('   Created Date: ' + punchDateTime.toString());
+            Logger.log('\n✅ CREATED DATE OBJECT:');
+            Logger.log('   .toString(): ' + punchDateTime.toString());
+            Logger.log('   .toISOString(): ' + punchDateTime.toISOString());
+            Logger.log('   .toLocaleString(): ' + punchDateTime.toLocaleString());
+            Logger.log('   Time components: ' + punchDateTime.getHours() + ':' +
+                      punchDateTime.getMinutes() + ':' + punchDateTime.getSeconds());
+            Logger.log('========================================\n');
           }
         } else if (typeof punchTimeValue === 'string' && punchTimeValue.trim()) {
           // Fallback for string values: parse manually
@@ -1905,8 +1946,27 @@ function storeRawClockData(clockRecords, importId) {
     // Resolve employee IDs from clock references
     const employeeMap = buildEmployeeClockRefMap();
 
-    const rows = clockRecords.map(function(record) {
+    const rows = clockRecords.map(function(record, idx) {
       const empInfo = employeeMap[String(record.ClockInRef).trim()] || {};
+
+      // DEBUG: Log first 3 records being stored
+      if (idx < 3) {
+        Logger.log('\n========== STORING RECORD ' + (idx + 1) + ' TO SHEET ==========');
+        Logger.log('📋 Record.PunchTime:');
+        Logger.log('   Type: ' + typeof record.PunchTime);
+        Logger.log('   Is Date: ' + (record.PunchTime instanceof Date));
+        if (record.PunchTime instanceof Date) {
+          Logger.log('   .toString(): ' + record.PunchTime.toString());
+          Logger.log('   .toISOString(): ' + record.PunchTime.toISOString());
+          Logger.log('   .toLocaleString(): ' + record.PunchTime.toLocaleString());
+          Logger.log('   Hours: ' + record.PunchTime.getHours());
+          Logger.log('   Minutes: ' + record.PunchTime.getMinutes());
+          Logger.log('   Seconds: ' + record.PunchTime.getSeconds());
+        } else {
+          Logger.log('   Value: ' + record.PunchTime);
+        }
+        Logger.log('========================================\n');
+      }
 
       return [
         generateFullUUID(),                    // ID
@@ -1944,6 +2004,24 @@ function storeRawClockData(clockRecords, importId) {
       punchTimeRange.setNumberFormat('yyyy-mm-dd hh:mm:ss');
 
       SpreadsheetApp.flush();
+
+      // DEBUG: Read back the first 3 records to see what was actually stored
+      Logger.log('\n========== VERIFICATION: READING BACK FROM SHEET ==========');
+      const verifyRows = Math.min(3, rows.length);
+      const storedData = rawDataSheet.getRange(startRow, punchTimeCol, verifyRows, 1).getValues();
+      const storedDisplay = rawDataSheet.getRange(startRow, punchTimeCol, verifyRows, 1).getDisplayValues();
+
+      for (let i = 0; i < verifyRows; i++) {
+        Logger.log('\n📖 Stored Record ' + (i + 1) + ':');
+        Logger.log('   Raw value (getValues): ' + storedData[i][0]);
+        Logger.log('   Display value (getDisplayValues): ' + storedDisplay[i][0]);
+        if (storedData[i][0] instanceof Date) {
+          Logger.log('   Stored as Date object: ' + storedData[i][0].toString());
+          Logger.log('   Hours: ' + storedData[i][0].getHours());
+          Logger.log('   Minutes: ' + storedData[i][0].getMinutes());
+        }
+      }
+      Logger.log('========================================\n');
     }
 
     Logger.log('✅ Stored ' + rows.length + ' raw clock records');
