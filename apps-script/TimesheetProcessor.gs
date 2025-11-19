@@ -157,8 +157,12 @@ function applyEndBuffer(clockOut, standardEnd, bufferMinutes) {
  * @returns {Object} Lunch details
  */
 function calculateLunchBreak(punches, config, isFriday) {
+  Logger.log('\n  🍽️  DIAGNOSTIC: Calculating lunch break...');
+  Logger.log('    isFriday: ' + isFriday + ', applyLunchOnFriday: ' + config.applyLunchOnFriday);
+
   // Don't apply lunch on Friday if configured
   if (isFriday && !config.applyLunchOnFriday) {
+    Logger.log('    ❌ No lunch on Friday (config)');
     return {
       lunchTaken: false,
       lunchMinutes: 0,
@@ -172,8 +176,15 @@ function calculateLunchBreak(punches, config, isFriday) {
   var clockIns = punches.filter(function(p) { return p.type === 'in'; });
   var clockOuts = punches.filter(function(p) { return p.type === 'out'; });
 
+  Logger.log('    Total punches: ' + punches.length);
+  Logger.log('    Clock-ins: ' + clockIns.length + ', Clock-outs: ' + clockOuts.length);
+  Logger.log('    Lunch detection requires: 2+ INs AND 2+ OUTs');
+
   // Try to detect lunch from multiple punches
   if (clockIns.length >= 2 && clockOuts.length >= 2) {
+    Logger.log('    ✓ Sufficient punches for lunch detection');
+    Logger.log('    Analyzing gaps between OUT/IN pairs...');
+
     // Find the largest gap between consecutive out/in pairs
     var largestGap = 0;
     var gapStart = null;
@@ -189,6 +200,9 @@ function calculateLunchBreak(punches, config, isFriday) {
         if (in_time.getTime() > out.getTime()) {
           var gapMinutes = (in_time.getTime() - out.getTime()) / (60 * 1000);
 
+          Logger.log('      Gap #' + (i + 1) + ': ' + formatTime(out) + ' → ' + formatTime(in_time) +
+                     ' = ' + Math.round(gapMinutes) + ' minutes');
+
           if (gapMinutes > largestGap) {
             largestGap = gapMinutes;
             gapStart = out;
@@ -199,8 +213,12 @@ function calculateLunchBreak(punches, config, isFriday) {
       }
     }
 
+    Logger.log('    Largest gap: ' + Math.round(largestGap) + ' minutes');
+    Logger.log('    Valid lunch range: ' + config.minLunchMinutes + '-' + config.maxLunchMinutes + ' minutes');
+
     // Check if gap is within lunch range
     if (largestGap >= config.minLunchMinutes && largestGap <= config.maxLunchMinutes) {
+      Logger.log('    ✅ LUNCH DETECTED: ' + Math.round(largestGap) + ' min gap → deducting ' + config.standardLunchMinutes + ' min');
       return {
         lunchTaken: true,
         lunchMinutes: config.standardLunchMinutes,
@@ -209,7 +227,12 @@ function calculateLunchBreak(punches, config, isFriday) {
         actualGapMinutes: Math.round(largestGap),
         reason: 'Lunch detected (' + Math.round(largestGap) + ' min gap)'
       };
+    } else {
+      Logger.log('    ❌ Gap outside valid range - no lunch deducted');
     }
+  } else {
+    Logger.log('    ❌ INSUFFICIENT PUNCHES: Need 2+ INs AND 2+ OUTs, but got ' +
+               clockIns.length + ' INs and ' + clockOuts.length + ' OUTs');
   }
 
   // Check if employee clocked in late (after late morning threshold)
@@ -220,7 +243,12 @@ function calculateLunchBreak(punches, config, isFriday) {
     lateThreshold.setMonth(firstClockIn.getMonth());
     lateThreshold.setDate(firstClockIn.getDate());
 
+    Logger.log('    Checking late arrival rule...');
+    Logger.log('      First clock-in: ' + formatTime(firstClockIn));
+    Logger.log('      Late threshold: ' + config.lateMorningThreshold);
+
     if (firstClockIn.getTime() >= lateThreshold.getTime()) {
+      Logger.log('    ✅ LATE ARRIVAL: Lunch assumed taken, deducting ' + config.standardLunchMinutes + ' min');
       return {
         lunchTaken: true,
         lunchMinutes: config.standardLunchMinutes,
@@ -232,6 +260,7 @@ function calculateLunchBreak(punches, config, isFriday) {
   }
 
   // No lunch detected
+  Logger.log('    ❌ NO LUNCH DETECTED - No deduction applied');
   return {
     lunchTaken: false,
     lunchMinutes: 0,
@@ -342,6 +371,7 @@ function processClockData(clockData, config) {
     // Group punches by date
     var punchesByDate = {};
 
+    Logger.log('\n🔍 DIAGNOSTIC: Grouping and classifying punches...');
     for (var i = 0; i < clockData.length; i++) {
       var record = clockData[i];
       var punchTime = parseTime(record.PUNCH_TIME);
@@ -365,14 +395,20 @@ function processClockData(clockData, config) {
       } else {
         // Determine if clock-in or clock-out
         var type = 'unknown';
+        var currentCount = punchesByDate[dateKey].clockInPunches.length;
+
         if (deviceName.toLowerCase().indexOf('in') >= 0) {
           type = 'in';
         } else if (deviceName.toLowerCase().indexOf('out') >= 0) {
           type = 'out';
         } else {
           // Infer from order: odd = in, even = out
-          type = punchesByDate[dateKey].clockInPunches.length % 2 === 0 ? 'in' : 'out';
+          type = currentCount % 2 === 0 ? 'in' : 'out';
         }
+
+        Logger.log('  📌 ' + dateKey + ' @ ' + formatTime(punchTime) +
+                   ' | Device: "' + deviceName + '" | Count: ' + currentCount +
+                   ' | Type: ' + type.toUpperCase());
 
         punchesByDate[dateKey].clockInPunches.push({
           time: punchTime,
@@ -380,6 +416,16 @@ function processClockData(clockData, config) {
           device: deviceName
         });
       }
+    }
+
+    // Log summary for each day
+    Logger.log('\n📊 DIAGNOSTIC: Daily punch summary:');
+    for (var dateKey in punchesByDate) {
+      var dayData = punchesByDate[dateKey];
+      var inCount = dayData.clockInPunches.filter(function(p) { return p.type === 'in'; }).length;
+      var outCount = dayData.clockInPunches.filter(function(p) { return p.type === 'out'; }).length;
+      Logger.log('  ' + dateKey + ': ' + inCount + ' INs, ' + outCount + ' OUTs, ' +
+                 dayData.bathroomPunches.length + ' bathroom punches');
     }
 
     // Process each day
@@ -415,6 +461,20 @@ function processClockData(clockData, config) {
     // Calculate hours and minutes
     var totalHours = Math.floor(totalMinutes / 60);
     var remainingMinutes = totalMinutes % 60;
+
+    // Log weekly summary
+    Logger.log('\n📊 DIAGNOSTIC: WEEKLY SUMMARY');
+    Logger.log('============================================');
+    dailyBreakdown.forEach(function(day) {
+      var dayHours = Math.floor(day.totalMinutes / 60);
+      var dayMins = day.totalMinutes % 60;
+      Logger.log('  ' + day.date + ': ' + dayHours + 'h ' + dayMins + 'm' +
+                 (day.lunchMinutes > 0 ? ' (lunch: -' + day.lunchMinutes + 'm)' : ' (NO LUNCH)'));
+    });
+    Logger.log('============================================');
+    Logger.log('  TOTAL PAID TIME: ' + totalHours + 'h ' + remainingMinutes + 'm');
+    Logger.log('  Total lunch deducted: ' + totalLunchDeduction + ' minutes');
+    Logger.log('============================================');
 
     var result = {
       success: true,
@@ -457,6 +517,8 @@ function processDayData(dayData, config) {
   var date = new Date(dayData.date);
   var isFriday = date.getDay() === 5;
 
+  Logger.log('\n📅 DIAGNOSTIC: Processing day: ' + dayData.date + (isFriday ? ' (FRIDAY)' : ''));
+
   var warnings = [];
   var appliedRules = [];
 
@@ -464,6 +526,12 @@ function processDayData(dayData, config) {
   dayData.clockInPunches.sort(function(a, b) {
     return a.time.getTime() - b.time.getTime();
   });
+
+  Logger.log('  Sorted punches (' + dayData.clockInPunches.length + ' total):');
+  for (var i = 0; i < dayData.clockInPunches.length; i++) {
+    Logger.log('    ' + (i + 1) + '. ' + formatTime(dayData.clockInPunches[i].time) +
+               ' (' + dayData.clockInPunches[i].type.toUpperCase() + ')');
+  }
 
   // Get first clock-in and last clock-out
   var firstIn = null;
@@ -477,6 +545,9 @@ function processDayData(dayData, config) {
       lastOut = dayData.clockInPunches[i].time;
     }
   }
+
+  Logger.log('  First IN: ' + (firstIn ? formatTime(firstIn) : 'NONE'));
+  Logger.log('  Last OUT: ' + (lastOut ? formatTime(lastOut) : 'NONE'));
 
   // If incomplete day and projectIncompleteDays is enabled
   if (config.projectIncompleteDays && (!firstIn || !lastOut)) {
@@ -544,6 +615,10 @@ function processDayData(dayData, config) {
     appliedRules.push('endBufferApplied');
   }
 
+  Logger.log('\n  ⏰ DIAGNOSTIC: Time adjustments...');
+  Logger.log('    Adjusted IN: ' + formatTime(adjustedIn));
+  Logger.log('    Adjusted OUT: ' + formatTime(adjustedOut));
+
   // Calculate lunch
   var lunchResult = calculateLunchBreak(dayData.clockInPunches, config, isFriday);
   if (lunchResult.lunchTaken) {
@@ -560,6 +635,11 @@ function processDayData(dayData, config) {
   var workedMs = adjustedOut.getTime() - adjustedIn.getTime();
   var workedMinutes = workedMs / (60 * 1000);
 
+  Logger.log('\n  💰 DIAGNOSTIC: Final calculation...');
+  Logger.log('    Adjusted OUT - Adjusted IN = Worked minutes');
+  Logger.log('    ' + formatTime(adjustedOut) + ' - ' + formatTime(adjustedIn) + ' = ' +
+             Math.round(workedMinutes) + ' minutes (' + (Math.round(workedMinutes / 60 * 10) / 10) + ' hours)');
+
   // Handle invalid data: clock-out before clock-in (results in negative time)
   if (workedMinutes < 0) {
     warnings.push('Invalid data: Clock-out (' + formatTime(adjustedOut) + ') before clock-in (' + formatTime(adjustedIn) + ')');
@@ -567,6 +647,10 @@ function processDayData(dayData, config) {
   }
 
   var totalMinutes = workedMinutes - lunchResult.lunchMinutes;
+
+  Logger.log('    Lunch deduction: -' + lunchResult.lunchMinutes + ' minutes');
+  Logger.log('    PAID TIME: ' + Math.round(totalMinutes) + ' minutes (' +
+             Math.floor(totalMinutes / 60) + 'h ' + Math.round(totalMinutes % 60) + 'm)');
 
   // Ensure total doesn't go negative after lunch deduction
   if (totalMinutes < 0) {
