@@ -1567,11 +1567,11 @@ function parseClockDataExcel(fileBlob) {
       Logger.log('🌍 Script timezone: ' + scriptTimezone);
       Logger.log('🌍 Spreadsheet timezone: ' + spreadsheetTimezone);
 
-      // CRITICAL: Use getDisplayValues() to get string representations
-      // This avoids timezone conversion issues with Date objects
-      // We'll parse the strings manually to preserve exact times
+      // CRITICAL: Use getValues() to get Date objects with preserved times
+      // Excel datetimes are stored in Google Sheets as Date objects
+      // We'll extract local components (not UTC) to preserve the exact time
       const range = sheet.getDataRange();
-      data = range.getDisplayValues(); // Get formatted strings exactly as displayed
+      data = range.getValues(); // Get Date objects
 
       Logger.log('📊 Retrieved ' + data.length + ' rows from converted sheet');
 
@@ -1653,12 +1653,12 @@ function parseClockDataExcel(fileBlob) {
       // Skip empty rows (check Person ID column)
       if (!row[colMap.personId] || String(row[colMap.personId]).trim() === '') continue;
 
-      // Parse Punch Time - CRITICAL timezone fix
-      // Since we're using getDisplayValues(), this will be a string exactly as shown in the sheet
-      // We parse it manually to avoid timezone conversion issues
-      const punchTimeStr = String(row[colMap.punchTime] || '').trim();
+      // Parse Punch Time - CRITICAL: Use local components to preserve Excel time
+      // Google Sheets stores Excel datetimes as Date objects
+      // We extract local (not UTC) components to preserve the exact time shown in Excel
+      const punchTimeValue = row[colMap.punchTime];
 
-      if (!punchTimeStr) {
+      if (!punchTimeValue) {
         Logger.log('⚠️ Row ' + (i + 1) + ': Empty punch time, skipping');
         continue;
       }
@@ -1666,111 +1666,82 @@ function parseClockDataExcel(fileBlob) {
       let punchDateTime;
 
       try {
-        // Log first few records for debugging
-        if (i < dataStartRow + 5) {
-          Logger.log('📅 Row ' + (i + 1) + ' Punch Time String: "' + punchTimeStr + '"');
-        }
+        if (punchTimeValue instanceof Date && !isNaN(punchTimeValue.getTime())) {
+          // CRITICAL FIX: Use local components (getFullYear, getMonth, etc.) directly
+          // This preserves the time as shown in the Excel file without timezone conversion
+          punchDateTime = new Date(
+            punchTimeValue.getFullYear(),
+            punchTimeValue.getMonth(),
+            punchTimeValue.getDate(),
+            punchTimeValue.getHours(),
+            punchTimeValue.getMinutes(),
+            punchTimeValue.getSeconds()
+          );
 
-        // Parse string format: "14/11/2025 23:04:57" or "2025-11-14 13:04:57"
-        const parts = punchTimeStr.split(' ');
+          // Log first few records for verification
+          if (i < dataStartRow + 5) {
+            Logger.log('📅 Row ' + (i + 1) + ' Punch Time:');
+            Logger.log('   Original Date: ' + punchTimeValue.toString());
+            Logger.log('   Local components: ' + punchTimeValue.getFullYear() + '-' +
+                      (punchTimeValue.getMonth() + 1) + '-' + punchTimeValue.getDate() +
+                      ' ' + punchTimeValue.getHours() + ':' + punchTimeValue.getMinutes() +
+                      ':' + punchTimeValue.getSeconds());
+            Logger.log('   Created Date: ' + punchDateTime.toString());
+          }
+        } else if (typeof punchTimeValue === 'string' && punchTimeValue.trim()) {
+          // Fallback for string values: parse manually
+          const punchTimeStr = punchTimeValue.trim();
+          const parts = punchTimeStr.split(' ');
 
-        if (parts.length < 2) {
-          Logger.log('⚠️ Row ' + (i + 1) + ': Invalid format (no space): "' + punchTimeStr + '"');
-          continue;
-        }
+          if (parts.length >= 2) {
+            const datePart = parts[0];
+            const timePart = parts[1];
 
-        const datePart = parts[0];
-        const timePart = parts[1];
+            let year, month, day;
+            if (datePart.indexOf('-') >= 0) {
+              const dateParts = datePart.split('-');
+              year = parseInt(dateParts[0]);
+              month = parseInt(dateParts[1]) - 1;
+              day = parseInt(dateParts[2]);
+            } else if (datePart.indexOf('/') >= 0) {
+              const dateParts = datePart.split('/');
+              if (parseInt(dateParts[0]) > 31) {
+                year = parseInt(dateParts[0]);
+                month = parseInt(dateParts[1]) - 1;
+                day = parseInt(dateParts[2]);
+              } else {
+                day = parseInt(dateParts[0]);
+                month = parseInt(dateParts[1]) - 1;
+                year = parseInt(dateParts[2]);
+              }
+            } else {
+              Logger.log('⚠️ Row ' + (i + 1) + ': Unrecognized date format: ' + datePart);
+              continue;
+            }
 
-        // Parse date part (handle DD/MM/YYYY, YYYY-MM-DD, YYYY/MM/DD formats)
-        let year, month, day;
+            const timeParts = timePart.split(':');
+            const hours = parseInt(timeParts[0]);
+            const minutes = parseInt(timeParts[1]);
+            const seconds = parseInt(timeParts[2] || 0);
 
-        if (datePart.indexOf('-') >= 0) {
-          // Format: YYYY-MM-DD
-          const dateParts = datePart.split('-');
-          year = parseInt(dateParts[0]);
-          month = parseInt(dateParts[1]) - 1; // 0-indexed
-          day = parseInt(dateParts[2]);
-        } else if (datePart.indexOf('/') >= 0) {
-          const dateParts = datePart.split('/');
-          const firstPart = parseInt(dateParts[0]);
-
-          if (firstPart > 31) {
-            // Format: YYYY/MM/DD
-            year = firstPart;
-            month = parseInt(dateParts[1]) - 1;
-            day = parseInt(dateParts[2]);
-          } else if (firstPart > 12) {
-            // Format: DD/MM/YYYY (day > 12, so definitely day-first)
-            day = firstPart;
-            month = parseInt(dateParts[1]) - 1;
-            year = parseInt(dateParts[2]);
+            punchDateTime = new Date(year, month, day, hours, minutes, seconds);
           } else {
-            // Ambiguous but assume DD/MM/YYYY for South Africa
-            day = firstPart;
-            month = parseInt(dateParts[1]) - 1;
-            year = parseInt(dateParts[2]);
+            Logger.log('⚠️ Row ' + (i + 1) + ': Invalid punch time format: ' + punchTimeStr);
+            continue;
           }
         } else {
-          Logger.log('⚠️ Row ' + (i + 1) + ': Unrecognized date format: "' + datePart + '"');
+          Logger.log('⚠️ Row ' + (i + 1) + ': Invalid punch time value, skipping');
           continue;
-        }
-
-        // Parse time part: HH:MM:SS or HH:MM
-        const timeParts = timePart.split(':');
-        let hours = parseInt(timeParts[0]);
-        const minutes = parseInt(timeParts[1]);
-        const seconds = parseInt(timeParts[2] || 0);
-
-        // CRITICAL FIX: The Excel-to-Sheets conversion applies a timezone offset
-        // Google Sheets shows times 10 hours ahead (13:04:57 becomes 23:04:57)
-        // We need to subtract this offset to get the original time
-        // This happens because the conversion treats times as UTC and displays in UTC+10
-        const TIMEZONE_OFFSET_HOURS = 10; // Adjust this if the offset is different
-
-        // Log before correction (first few records only)
-        if (i < dataStartRow + 5) {
-          Logger.log('📅 Row ' + (i + 1) + ' BEFORE correction:');
-          Logger.log('   Display shows: ' + hours + ':' + minutes + ':' + seconds);
-        }
-
-        // Apply correction: subtract the offset
-        hours = hours - TIMEZONE_OFFSET_HOURS;
-
-        // Handle day wraparound
-        if (hours < 0) {
-          hours += 24;
-          day -= 1;
-          // Handle month wraparound if needed
-          if (day < 1) {
-            month -= 1;
-            if (month < 0) {
-              month = 11;
-              year -= 1;
-            }
-            // Get days in previous month (simplified)
-            day = new Date(year, month + 1, 0).getDate();
-          }
-        }
-
-        // Create Date object with corrected time
-        punchDateTime = new Date(year, month, day, hours, minutes, seconds);
-
-        // Log after correction (first few records only)
-        if (i < dataStartRow + 5) {
-          Logger.log('   AFTER correction: ' + hours + ':' + minutes + ':' + seconds);
-          Logger.log('   Date object: ' + punchDateTime.toString());
-          Logger.log('   Will store as: ' + punchDateTime.toLocaleString());
         }
 
         // Validate the parsed date
         if (!punchDateTime || isNaN(punchDateTime.getTime())) {
-          Logger.log('⚠️ Row ' + (i + 1) + ': Failed to parse: "' + punchTimeStr + '"');
+          Logger.log('⚠️ Row ' + (i + 1) + ': Failed to parse punch time');
           continue;
         }
 
       } catch (parseError) {
-        Logger.log('⚠️ Row ' + (i + 1) + ': Error parsing "' + punchTimeStr + '": ' + parseError.message);
+        Logger.log('⚠️ Row ' + (i + 1) + ': Error parsing punch time: ' + parseError.message);
         continue;
       }
 
@@ -1929,21 +1900,6 @@ function storeRawClockData(clockRecords, importId) {
 
     if (!rawDataSheet) {
       throw new Error('RAW_CLOCK_DATA sheet not found');
-    }
-
-    // CRITICAL: Set spreadsheet timezone to South Africa (UTC+2)
-    // This ensures datetime values are displayed in the correct timezone
-    const spreadsheet = rawDataSheet.getParent();
-    const currentTz = spreadsheet.getSpreadsheetTimeZone();
-    Logger.log('🌍 Current spreadsheet timezone: ' + currentTz);
-
-    if (currentTz !== 'Africa/Johannesburg') {
-      try {
-        spreadsheet.setSpreadsheetTimeZone('Africa/Johannesburg');
-        Logger.log('✅ Set spreadsheet timezone to Africa/Johannesburg (UTC+2)');
-      } catch (e) {
-        Logger.log('⚠️ Could not set timezone: ' + e.message);
-      }
     }
 
     // Resolve employee IDs from clock references
