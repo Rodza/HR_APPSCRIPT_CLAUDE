@@ -119,6 +119,13 @@ function setupRawClockDataSheet() {
     // Freeze header row
     sheet.setFrozenRows(1);
 
+    // Format PUNCH_TIME column (column 9) to show datetime format
+    // This ensures time is visible, not just date
+    const punchTimeCol = 9; // PUNCH_TIME in RAW_CLOCK_DATA_COLUMNS
+    const lastRow = Math.max(2, sheet.getLastRow()); // At least row 2
+    const punchTimeRange = sheet.getRange(2, punchTimeCol, lastRow - 1, 1);
+    punchTimeRange.setNumberFormat('yyyy-mm-dd hh:mm:ss');
+
     // Auto-resize columns
     for (let i = 1; i <= headers.length; i++) {
       sheet.autoResizeColumn(i);
@@ -408,6 +415,60 @@ function setupAllTimesheetSheets() {
 
   } catch (error) {
     Logger.log('❌ ERROR in setupAllTimesheetSheets: ' + error.message);
+    Logger.log('Stack: ' + error.stack);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Fix PUNCH_TIME column format in RAW_CLOCK_DATA to show datetime
+ * Run this to fix existing data that only shows dates without times
+ */
+function fixRawClockDataPunchTimeFormat() {
+  try {
+    Logger.log('========== FIX PUNCH_TIME COLUMN FORMAT ==========');
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = null;
+
+    // Find the sheet
+    const sheets = ss.getSheets();
+    for (let i = 0; i < sheets.length; i++) {
+      if (sheets[i].getName() === 'RAW_CLOCK_DATA') {
+        sheet = sheets[i];
+        break;
+      }
+    }
+
+    if (!sheet) {
+      throw new Error('RAW_CLOCK_DATA sheet not found');
+    }
+
+    const lastRow = sheet.getLastRow();
+    if (lastRow <= 1) {
+      Logger.log('✓ No data rows to format');
+      return { success: true, message: 'No data to format' };
+    }
+
+    // Format PUNCH_TIME column (column 9) to show both date and time
+    const punchTimeCol = 9;
+    const punchTimeRange = sheet.getRange(2, punchTimeCol, lastRow - 1, 1);
+    punchTimeRange.setNumberFormat('yyyy-mm-dd hh:mm:ss');
+
+    SpreadsheetApp.flush();
+
+    Logger.log('✅ Formatted ' + (lastRow - 1) + ' PUNCH_TIME cells');
+    Logger.log('   Column 9 (PUNCH_TIME) now shows: YYYY-MM-DD HH:MM:SS');
+    Logger.log('========== FIX COMPLETE ==========');
+
+    return {
+      success: true,
+      message: 'PUNCH_TIME column formatted successfully',
+      rowsFormatted: lastRow - 1
+    };
+
+  } catch (error) {
+    Logger.log('❌ ERROR: ' + error.message);
     Logger.log('Stack: ' + error.stack);
     return { success: false, error: error.message };
   }
@@ -1714,13 +1775,21 @@ function storeRawClockData(clockRecords, importId) {
 
     // Batch append for performance
     if (rows.length > 0) {
+      const startRow = rawDataSheet.getLastRow() + 1;
       const range = rawDataSheet.getRange(
-        rawDataSheet.getLastRow() + 1,
+        startRow,
         1,
         rows.length,
         rows[0].length
       );
       range.setValues(rows);
+
+      // Format PUNCH_TIME column (column 9) to show date AND time
+      // Without this, Google Sheets may only show the date part
+      const punchTimeCol = 9; // PUNCH_TIME is the 9th column in RAW_CLOCK_DATA_COLUMNS
+      const punchTimeRange = rawDataSheet.getRange(startRow, punchTimeCol, rows.length, 1);
+      punchTimeRange.setNumberFormat('yyyy-mm-dd hh:mm:ss');
+
       SpreadsheetApp.flush();
     }
 
