@@ -251,13 +251,16 @@ function formatPhoneNumber(phone) {
 // ============================================================================
 
 /**
- * Get all sheets with proper error handling
+ * Get all sheets with proper error handling - VERSION 2 (Cache-busting rename)
+ *
+ * This is the actual implementation. The original getSheets() delegates to this.
  *
  * @returns {Object} Object with sheet references
  */
-function getSheets() {
+function getSheets_v2() {
   try {
-    console.log('=== getSheets() START ===');
+    console.log('🔴 CODE VERSION: 2025-11-19-v1 (CACHE BUSTED - getSheets_v2) 🔴');
+    console.log('=== getSheets_v2() START ===');
 
     // Step 1: Get active spreadsheet
     console.log('Step 1: Getting active spreadsheet...');
@@ -342,11 +345,11 @@ function getSheets() {
       console.warn('  ✗ empdetails sheet NOT found!');
     }
 
-    console.log('=== getSheets() END ===');
+    console.log('=== getSheets_v2() END ===');
     return sheets;
 
   } catch (error) {
-    console.error('=== getSheets() ERROR ===');
+    console.error('=== getSheets_v2() ERROR ===');
     console.error('Error type:', error.name);
     console.error('Error message:', error.message);
     console.error('Full error:', error.toString());
@@ -354,6 +357,18 @@ function getSheets() {
     logError('Failed to get sheets', error);
     throw new Error('Failed to access spreadsheet: ' + error.toString());
   }
+}
+
+/**
+ * Get all sheets with proper error handling (WRAPPER - calls _v2)
+ *
+ * This wrapper ensures all existing callers work while the actual
+ * implementation is in getSheets_v2() to bypass Apps Script cache.
+ *
+ * @returns {Object} Object with sheet references
+ */
+function getSheets() {
+  return getSheets_v2();
 }
 
 /**
