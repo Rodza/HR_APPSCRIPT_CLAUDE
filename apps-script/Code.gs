@@ -452,6 +452,44 @@ function runFixRawClockDataHeaders() {
 }
 
 /**
+ * Fix PUNCH_TIME column format in RAW_CLOCK_DATA
+ */
+function runFixRawClockDataPunchTimeFormat() {
+  try {
+    var ui = SpreadsheetApp.getUi();
+
+    // Confirm with user
+    var response = ui.alert(
+      'Fix PUNCH_TIME Format',
+      'This will format the PUNCH_TIME column to show date AND time.\n\n' +
+      'Current: 14/11/2025 (date only)\n' +
+      'After: 2025-11-14 07:18:56 (date + time)\n\n' +
+      'Continue?',
+      ui.ButtonSet.YES_NO
+    );
+
+    if (response !== ui.Button.YES) {
+      return;
+    }
+
+    // Run fix
+    var result = fixRawClockDataPunchTimeFormat();
+
+    if (result.success) {
+      var message = 'PUNCH_TIME column formatted!\n\n';
+      message += 'Formatted ' + result.rowsFormatted + ' rows\n';
+      message += 'Time component is now visible';
+      ui.alert('Success', message, ui.ButtonSet.OK);
+    } else {
+      ui.alert('Error', 'Fix failed: ' + result.error, ui.ButtonSet.OK);
+    }
+
+  } catch (error) {
+    SpreadsheetApp.getUi().alert('Error: ' + error.toString());
+  }
+}
+
+/**
  * Fix PendingTimesheets wrong headers
  */
 function runFixPendingTimesheetsHeaders() {
@@ -561,6 +599,7 @@ function onOpen() {
     .addSeparator()
     .addItem('⚙️ Setup Sheets', 'runTimesheetSheetSetup')
     .addItem('🔧 Fix RAW_CLOCK_DATA Headers', 'runFixRawClockDataHeaders')
+    .addItem('🔧 Fix PUNCH_TIME Format', 'runFixRawClockDataPunchTimeFormat')
     .addItem('🔧 Fix PendingTimesheets Headers', 'runFixPendingTimesheetsHeaders')
     .addSeparator()
     .addItem('📋 Check PendingTimesheets Headers', 'runCheckPendingTimesheetsHeaders'));
