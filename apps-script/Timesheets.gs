@@ -2515,6 +2515,156 @@ function getTimesheetReconData(id) {
   }
 }
 
+// ==================== TIMESHEET BREAKDOWN DASHBOARD ====================
+
+/**
+ * Get timesheet breakdown data for the dashboard
+ * Returns all pending timesheets with their daily breakdown details
+ *
+ * @returns {Object} Result with array of employee breakdown data
+ */
+function getTimesheetBreakdownData() {
+  try {
+    Logger.log('\n========== GET TIMESHEET BREAKDOWN DATA ==========');
+
+    const sheets = getSheets_v2();
+    const pendingSheet = sheets.pending;
+    const rawClockSheet = sheets.rawClockData;
+
+    if (!pendingSheet) {
+      throw new Error('PendingTimesheets sheet not found');
+    }
+
+    if (!rawClockSheet) {
+      throw new Error('RAW_CLOCK_DATA sheet not found');
+    }
+
+    // Get pending timesheets
+    const pendingData = pendingSheet.getDataRange().getValues();
+    const pendingHeaders = pendingData[0];
+
+    // Find column indices for pending timesheets
+    const idCol = findColumnIndex(pendingHeaders, 'ID');
+    const empNameCol = findColumnIndex(pendingHeaders, 'EMPLOYEE_NAME');
+    const weekEndingCol = findColumnIndex(pendingHeaders, 'WEEKENDING');
+    const hoursCol = findColumnIndex(pendingHeaders, 'HOURS');
+    const minutesCol = findColumnIndex(pendingHeaders, 'MINUTES');
+    const statusCol = findColumnIndex(pendingHeaders, 'STATUS');
+
+    // Get raw clock data
+    const rawData = rawClockSheet.getDataRange().getValues();
+    const rawHeaders = rawData[0];
+
+    // Find column indices for raw clock data
+    const rawEmpNameCol = findColumnIndex(rawHeaders, 'EMPLOYEE_NAME');
+    const rawWeekEndingCol = findColumnIndex(rawHeaders, 'WEEK_ENDING');
+    const rawPunchDateCol = findColumnIndex(rawHeaders, 'PUNCH_DATE');
+    const rawPunchTimeCol = findColumnIndex(rawHeaders, 'PUNCH_TIME');
+    const rawDeviceCol = findColumnIndex(rawHeaders, 'DEVICE_NAME');
+
+    // Get time config
+    const configResult = getTimeConfig();
+    const config = configResult.success ? configResult.data : DEFAULT_TIME_CONFIG;
+
+    const results = [];
+
+    // Process each pending timesheet
+    for (let i = 1; i < pendingData.length; i++) {
+      const row = pendingData[i];
+      const employeeName = row[empNameCol];
+      const weekEnding = row[weekEndingCol];
+
+      if (!employeeName) continue;
+
+      // Format week ending for comparison
+      const weekEndingStr = weekEnding instanceof Date
+        ? Utilities.formatDate(weekEnding, Session.getScriptTimeZone(), 'yyyy-MM-dd')
+        : String(weekEnding);
+
+      // Find raw clock data for this employee and week
+      const employeeClockData = [];
+      for (let j = 1; j < rawData.length; j++) {
+        const rawRow = rawData[j];
+        const rawEmpName = rawRow[rawEmpNameCol];
+        const rawWeekEnd = rawRow[rawWeekEndingCol];
+
+        // Match employee name
+        if (rawEmpName === employeeName) {
+          // Format raw week ending for comparison
+          const rawWeekEndStr = rawWeekEnd instanceof Date
+            ? Utilities.formatDate(rawWeekEnd, Session.getScriptTimeZone(), 'yyyy-MM-dd')
+            : String(rawWeekEnd);
+
+          // Check if week matches (or week ending is not set in raw data)
+          if (!rawWeekEnd || rawWeekEndStr === weekEndingStr) {
+            employeeClockData.push({
+              EMPLOYEE_NAME: rawEmpName,
+              PUNCH_DATE: rawRow[rawPunchDateCol],
+              PUNCH_TIME: rawRow[rawPunchTimeCol],
+              DEVICE_NAME: rawRow[rawDeviceCol] || 'Main Unit'
+            });
+          }
+        }
+      }
+
+      // Process the clock data to get daily breakdown
+      let dailyBreakdown = [];
+      let lunchDeduction = 0;
+
+      if (employeeClockData.length > 0) {
+        const processResult = processClockData(employeeClockData, config);
+        if (processResult.success) {
+          dailyBreakdown = processResult.data.dailyBreakdown || [];
+          lunchDeduction = processResult.data.lunchDeductionMinutes || 0;
+        }
+      }
+
+      // Calculate total from stored values
+      const storedHours = row[hoursCol] || 0;
+      const storedMinutes = row[minutesCol] || 0;
+      const totalMinutes = (storedHours * 60) + storedMinutes;
+
+      results.push({
+        id: row[idCol],
+        employeeName: employeeName,
+        weekEnding: weekEndingStr,
+        totalMinutes: totalMinutes,
+        lunchDeductionMinutes: lunchDeduction,
+        status: row[statusCol] || 'Pending',
+        dailyBreakdown: dailyBreakdown
+      });
+    }
+
+    Logger.log('✅ Retrieved breakdown for ' + results.length + ' timesheets');
+    Logger.log('========== GET TIMESHEET BREAKDOWN DATA COMPLETE ==========\n');
+
+    return {
+      success: true,
+      data: results
+    };
+
+  } catch (error) {
+    Logger.log('❌ ERROR in getTimesheetBreakdownData: ' + error.message);
+    Logger.log('Stack: ' + (error.stack || 'N/A'));
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * Show the timesheet breakdown dashboard
+ */
+function showTimesheetBreakdown() {
+  const html = HtmlService.createHtmlOutputFromFile('TimesheetBreakdown')
+    .setWidth(1200)
+    .setHeight(800)
+    .setTitle('Timesheet Breakdown Dashboard');
+
+  SpreadsheetApp.getUi().showModalDialog(html, 'Timesheet Breakdown Dashboard');
+}
+
 /**
  * Lock timesheet record after payslip generation
  *
