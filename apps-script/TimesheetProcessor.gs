@@ -669,12 +669,19 @@ function processDayData(dayData, config) {
     totalMinutes = 0;
   }
 
+  // Collect all punch times for Clock 1, Clock 2, Clock 3, Clock 4 display
+  var punchTimes = [];
+  for (var i = 0; i < dayData.clockInPunches.length; i++) {
+    punchTimes.push(formatTime(dayData.clockInPunches[i].time));
+  }
+
   return {
     date: dayData.date,
     clockIn: formatTime(firstIn),
     clockOut: formatTime(lastOut),
     adjustedIn: formatTime(adjustedIn),
     adjustedOut: formatTime(adjustedOut),
+    punchTimes: punchTimes,  // Array of all clock times [Clock1, Clock2, Clock3, Clock4]
     lunchTaken: lunchResult.lunchTaken,
     lunchMinutes: lunchResult.lunchMinutes,
     bathroomMinutes: bathroomResult.totalMinutes,

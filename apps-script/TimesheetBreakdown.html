@@ -405,6 +405,25 @@
                 lunchBadge = '<span class="badge badge-no-lunch">NO LUNCH DETECTED</span>';
             }
 
+            // Generate Clock 1, Clock 2, Clock 3, Clock 4 display
+            const punchTimes = day.punchTimes || [];
+            let clockTimesHtml = '';
+            if (friday) {
+                // Friday: Only Clock 1 and Clock 2
+                clockTimesHtml = `
+                    <div class="detail-item">Clock 1: ${punchTimes[0] || 'N/A'}</div>
+                    <div class="detail-item">Clock 2: ${punchTimes[1] || 'N/A'}</div>
+                `;
+            } else {
+                // Mon-Thu: Clock 1, 2, 3, 4
+                clockTimesHtml = `
+                    <div class="detail-item">Clock 1: ${punchTimes[0] || 'N/A'}</div>
+                    <div class="detail-item">Clock 2: ${punchTimes[1] || 'N/A'}</div>
+                    <div class="detail-item">Clock 3: ${punchTimes[2] || 'N/A'}</div>
+                    <div class="detail-item">Clock 4: ${punchTimes[3] || 'N/A'}</div>
+                `;
+            }
+
             return `
                 <div class="${rowClass}">
                     <div class="day-header">
@@ -413,9 +432,8 @@
                     </div>
                     <div class="day-details">
                         <div class="detail-group">
-                            <h4>Clock Times</h4>
-                            <div class="detail-item">In: ${day.clockIn || 'N/A'}</div>
-                            <div class="detail-item">Out: ${day.clockOut || 'N/A'}</div>
+                            <h4>Raw Punches</h4>
+                            ${clockTimesHtml}
                         </div>
                         <div class="detail-group">
                             <h4>Adjusted Times</h4>
