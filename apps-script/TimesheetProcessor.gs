@@ -231,26 +231,13 @@ function calculateLunchBreak(punches, config, isFriday) {
     }
   }
 
-  // NEW: For normal workdays (Mon-Thu), ALWAYS deduct standard lunch
-  // Even if not explicitly detected in punches
-  // This handles cases where employees don't clock out/in for lunch
-  if (!isFriday) {
-    return {
-      lunchTaken: true,
-      lunchMinutes: config.standardLunchMinutes,
-      lunchStart: null,
-      lunchEnd: null,
-      reason: 'Standard lunch deduction (not detected in punches)'
-    };
-  }
-
-  // Fallback - no lunch
+  // No lunch detected
   return {
     lunchTaken: false,
     lunchMinutes: 0,
     lunchStart: null,
     lunchEnd: null,
-    reason: 'No lunch detected or applicable'
+    reason: 'No lunch detected'
   };
 }
 
