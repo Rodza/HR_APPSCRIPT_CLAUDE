@@ -1183,6 +1183,7 @@ function generateBatchPayslipPDFs(recordNumbers) {
  */
 function updatePayslipLoanPayment(recordNumber, loanData) {
   try {
+    Logger.log('🔵🔵🔵 FUNCTION VERSION: 2025-11-20-SYNC-V1 🔵🔵🔵');
     Logger.log('\n========== UPDATE LOAN PAYMENT ==========');
     Logger.log('ℹ️ Record Number: ' + recordNumber);
     Logger.log('ℹ️ Loan Data: ' + JSON.stringify(loanData));
