@@ -1250,6 +1250,16 @@ function updatePayslipLoanPayment(recordNumber, loanData) {
 
     Logger.log('✅ Loan payment updated for payslip #' + recordNumber);
     Logger.log('✅ Paid to Account: ' + formatCurrency(currentPayslip.PaidtoAccount));
+
+    // Sync loan transaction to EmployeeLoans sheet
+    try {
+      syncLoanTransactionFromPayslip(currentPayslip);
+      Logger.log('✅ Loan transaction synced to EmployeeLoans sheet');
+    } catch (syncError) {
+      Logger.log('⚠️ Warning: Failed to sync loan transaction: ' + syncError.message);
+      // Don't fail the whole operation if sync fails
+    }
+
     Logger.log('========== UPDATE LOAN PAYMENT COMPLETE ==========\n');
 
     // Sanitize for web
@@ -1260,6 +1270,124 @@ function updatePayslipLoanPayment(recordNumber, loanData) {
     Logger.log('❌ ERROR in updatePayslipLoanPayment: ' + error.message);
     return { success: false, error: error.message };
   }
+}
+
+/**
+ * Sync loan transaction from payslip to EmployeeLoans sheet
+ * Handles creating/updating/deleting loan transactions based on payslip data
+ *
+ * @param {Object} payslip - The payslip data
+ */
+function syncLoanTransactionFromPayslip(payslip) {
+  Logger.log('\n========== SYNC LOAN TRANSACTION ==========');
+  Logger.log('Payslip #' + payslip.RECORDNUMBER);
+
+  const sheets = getSheets();
+  const loanSheet = sheets.loans;
+
+  if (!loanSheet) {
+    throw new Error('EmployeeLoans sheet not found');
+  }
+
+  const loanData = loanSheet.getDataRange().getValues();
+  const headers = loanData[0];
+
+  // Find column indexes
+  const salaryLinkCol = findColumnIndex(headers, 'SalaryLink');
+  const loanIdCol = findColumnIndex(headers, 'LoanID');
+
+  if (salaryLinkCol === -1) {
+    Logger.log('⚠️ SalaryLink column not found - skipping sync');
+    return;
+  }
+
+  // Find and delete existing transactions linked to this payslip
+  const recordNumber = String(payslip.RECORDNUMBER);
+  const rowsToDelete = [];
+
+  for (let i = 1; i < loanData.length; i++) {
+    if (String(loanData[i][salaryLinkCol]) === recordNumber) {
+      rowsToDelete.push(i + 1); // Sheet row index (1-based)
+    }
+  }
+
+  // Delete rows from bottom to top to avoid index shifting
+  rowsToDelete.sort((a, b) => b - a);
+  for (const rowIndex of rowsToDelete) {
+    loanSheet.deleteRow(rowIndex);
+    Logger.log('🗑️ Deleted existing loan transaction at row ' + rowIndex);
+  }
+
+  // Get employee ID
+  const employeeId = payslip.id;
+  if (!employeeId) {
+    Logger.log('⚠️ No employee ID in payslip - skipping loan sync');
+    return;
+  }
+
+  // Get current loan balance for this employee (after deletions)
+  SpreadsheetApp.flush();
+  const balanceResult = getCurrentLoanBalance(employeeId);
+  const currentBalance = (balanceResult && balanceResult.success) ? balanceResult.data : 0;
+
+  const paymentType = payslip.LoanDisbursementType || 'Separate';
+  const transactionDate = payslip.WEEKENDING || new Date();
+
+  // Create loan transaction based on payment type
+  if (paymentType === 'Repayment' && payslip.LoanDeductionThisWeek > 0) {
+    // Repayment - negative amount (reduces balance)
+    const amount = -Math.abs(parseFloat(payslip.LoanDeductionThisWeek));
+    const balanceAfter = currentBalance + amount;
+
+    const transaction = {
+      LoanID: generateId(),
+      'Employee ID': employeeId,
+      'Employee Name': payslip['EMPLOYEE NAME'],
+      Timestamp: new Date(),
+      TransactionDate: transactionDate,
+      LoanAmount: amount,
+      LoanType: 'Repayment',
+      DisbursementMode: 'Repayment',
+      SalaryLink: recordNumber,
+      BalanceBefore: currentBalance,
+      BalanceAfter: balanceAfter,
+      Notes: 'Auto-synced from payslip #' + recordNumber
+    };
+
+    const row = objectToRow(transaction, headers);
+    loanSheet.appendRow(row);
+    Logger.log('✅ Created Repayment transaction: ' + formatCurrency(amount));
+
+  } else if ((paymentType === 'With Salary' || paymentType === 'Separate') && payslip.NewLoanThisWeek > 0) {
+    // New loan - positive amount (increases balance)
+    const amount = Math.abs(parseFloat(payslip.NewLoanThisWeek));
+    const balanceAfter = currentBalance + amount;
+
+    const transaction = {
+      LoanID: generateId(),
+      'Employee ID': employeeId,
+      'Employee Name': payslip['EMPLOYEE NAME'],
+      Timestamp: new Date(),
+      TransactionDate: transactionDate,
+      LoanAmount: amount,
+      LoanType: 'Disbursement',
+      DisbursementMode: paymentType,
+      SalaryLink: recordNumber,
+      BalanceBefore: currentBalance,
+      BalanceAfter: balanceAfter,
+      Notes: 'Auto-synced from payslip #' + recordNumber
+    };
+
+    const row = objectToRow(transaction, headers);
+    loanSheet.appendRow(row);
+    Logger.log('✅ Created Disbursement transaction: ' + formatCurrency(amount) + ' (' + paymentType + ')');
+
+  } else {
+    Logger.log('ℹ️ No loan transaction to create (amount is 0)');
+  }
+
+  SpreadsheetApp.flush();
+  Logger.log('========== SYNC LOAN TRANSACTION COMPLETE ==========\n');
 }
 
 /**
