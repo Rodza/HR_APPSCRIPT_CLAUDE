@@ -67,8 +67,10 @@ function createPayslip(data) {
     data.HOURLYRATE = employee['HOURLY RATE'];
 
     // Get current loan balance (handle null safely)
-    const loanBalance = getCurrentLoanBalance(employee.id);
-    data.CurrentLoanBalance = (loanBalance !== null && loanBalance !== undefined) ? loanBalance : 0;
+    const loanBalanceResult = getCurrentLoanBalance(employee.id);
+    data.CurrentLoanBalance = (loanBalanceResult && loanBalanceResult.success && loanBalanceResult.data !== undefined)
+      ? loanBalanceResult.data
+      : 0;
 
     // Calculate all payslip values
     const calculations = calculatePayslip(data);
