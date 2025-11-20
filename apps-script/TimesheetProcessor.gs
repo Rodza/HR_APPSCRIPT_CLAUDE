@@ -379,6 +379,40 @@ function processClockData(clockData, config) {
       return timeA.getTime() - timeB.getTime();
     });
 
+    // Filter out duplicate scans within 2 minutes (keep only first scan)
+    var DUPLICATE_THRESHOLD_MS = 2 * 60 * 1000; // 2 minutes in milliseconds
+    var filteredClockData = [];
+    var lastPunchTime = null;
+
+    for (var i = 0; i < clockData.length; i++) {
+      var record = clockData[i];
+      var punchTime = parseTime(record.PUNCH_TIME);
+
+      if (lastPunchTime === null) {
+        // First punch, always keep
+        filteredClockData.push(record);
+        lastPunchTime = punchTime;
+      } else {
+        var timeDiff = punchTime.getTime() - lastPunchTime.getTime();
+
+        if (timeDiff >= DUPLICATE_THRESHOLD_MS) {
+          // More than 2 minutes apart, keep this punch
+          filteredClockData.push(record);
+          lastPunchTime = punchTime;
+        } else {
+          // Within 2 minutes, skip as duplicate
+          Logger.log('  ⚠️ DUPLICATE SCAN DETECTED: ' + formatTime(punchTime) +
+                     ' (only ' + Math.round(timeDiff / 1000) + 's after previous) - SKIPPED');
+        }
+      }
+    }
+
+    Logger.log('\n📋 DIAGNOSTIC: Filtered ' + (clockData.length - filteredClockData.length) +
+               ' duplicate scans (kept ' + filteredClockData.length + ' of ' + clockData.length + ')');
+
+    // Use filtered data for processing
+    clockData = filteredClockData;
+
     Logger.log('\n🔍 DIAGNOSTIC: Grouping and classifying punches (sorted by time)...');
     for (var i = 0; i < clockData.length; i++) {
       var record = clockData[i];
