@@ -1344,28 +1344,31 @@ function syncLoanTransactionFromPayslip(payslip) {
   const transactionDate = payslip.WEEKENDING || new Date();
 
   // Create loan transaction based on payment type
+  // Row order must match: LoanID, Employee Name, Employee ID, Timestamp, TransactionDate,
+  //                       LoanAmount, LoanType, DisbursementMode, SalaryLink, Notes,
+  //                       BalanceBefore, BalanceAfter
+
   if (paymentType === 'Repayment' && payslip.LoanDeductionThisWeek > 0) {
     // Repayment - negative amount (reduces balance)
     const amount = -Math.abs(parseFloat(payslip.LoanDeductionThisWeek));
     const balanceAfter = currentBalance + amount;
 
-    const transaction = {
-      'LoanID': generateId(),
-      'Employee Name': payslip['EMPLOYEE NAME'],
-      'Employee ID': employeeId,
-      'Timestamp': new Date(),
-      'TransactionDate': transactionDate,
-      'LoanAmount': amount,
-      'LoanType': 'Repayment',
-      'DisbursementMode': 'Repayment',
-      'SalaryLink': recordNumber,
-      'Notes': 'Auto-synced from payslip #' + recordNumber,
-      'BalanceBefore': currentBalance,
-      'BalanceAfter': balanceAfter
-    };
+    const rowData = [
+      generateFullUUID(),                           // LoanID
+      payslip['EMPLOYEE NAME'],                     // Employee Name
+      employeeId,                                   // Employee ID
+      new Date(),                                   // Timestamp
+      transactionDate,                              // TransactionDate
+      amount,                                       // LoanAmount
+      'Repayment',                                  // LoanType
+      'Repayment',                                  // DisbursementMode
+      recordNumber,                                 // SalaryLink
+      'Auto-synced from payslip #' + recordNumber,  // Notes
+      currentBalance,                               // BalanceBefore
+      balanceAfter                                  // BalanceAfter
+    ];
 
-    const row = objectToRow(transaction, headers);
-    loanSheet.appendRow(row);
+    loanSheet.appendRow(rowData);
     Logger.log('✅ Created Repayment transaction: ' + formatCurrency(amount));
 
   } else if ((paymentType === 'With Salary' || paymentType === 'Separate') && payslip.NewLoanThisWeek > 0) {
@@ -1373,23 +1376,22 @@ function syncLoanTransactionFromPayslip(payslip) {
     const amount = Math.abs(parseFloat(payslip.NewLoanThisWeek));
     const balanceAfter = currentBalance + amount;
 
-    const transaction = {
-      'LoanID': generateId(),
-      'Employee Name': payslip['EMPLOYEE NAME'],
-      'Employee ID': employeeId,
-      'Timestamp': new Date(),
-      'TransactionDate': transactionDate,
-      'LoanAmount': amount,
-      'LoanType': 'Disbursement',
-      'DisbursementMode': paymentType,
-      'SalaryLink': recordNumber,
-      'Notes': 'Auto-synced from payslip #' + recordNumber,
-      'BalanceBefore': currentBalance,
-      'BalanceAfter': balanceAfter
-    };
+    const rowData = [
+      generateFullUUID(),                           // LoanID
+      payslip['EMPLOYEE NAME'],                     // Employee Name
+      employeeId,                                   // Employee ID
+      new Date(),                                   // Timestamp
+      transactionDate,                              // TransactionDate
+      amount,                                       // LoanAmount
+      'Disbursement',                               // LoanType
+      paymentType,                                  // DisbursementMode
+      recordNumber,                                 // SalaryLink
+      'Auto-synced from payslip #' + recordNumber,  // Notes
+      currentBalance,                               // BalanceBefore
+      balanceAfter                                  // BalanceAfter
+    ];
 
-    const row = objectToRow(transaction, headers);
-    loanSheet.appendRow(row);
+    loanSheet.appendRow(rowData);
     Logger.log('✅ Created Disbursement transaction: ' + formatCurrency(amount) + ' (' + paymentType + ')');
 
   } else {
