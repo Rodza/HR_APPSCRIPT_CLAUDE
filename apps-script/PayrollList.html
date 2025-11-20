@@ -10,7 +10,45 @@
             margin-bottom: 20px;
         }
         .amount-cell { font-weight: bold; color: #28a745; }
-        .action-buttons { display: flex; gap: 5px; }
+        .action-buttons { display: flex; gap: 5px; flex-wrap: wrap; }
+        .batch-actions {
+            background-color: #e3f2fd;
+            padding: 10px 15px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            display: none;
+        }
+        .batch-actions.show { display: block; }
+        .loan-input {
+            width: 80px;
+            padding: 2px 5px;
+            font-size: 12px;
+        }
+        .loan-select {
+            width: 100px;
+            padding: 2px 5px;
+            font-size: 12px;
+        }
+        .locked-row { background-color: #f5f5f5; }
+        .locked-badge {
+            font-size: 10px;
+            background-color: #6c757d;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+            margin-left: 5px;
+        }
+        .editable-badge {
+            font-size: 10px;
+            background-color: #28a745;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+            margin-left: 5px;
+        }
+        .btn-group-sm .btn { padding: 0.25rem 0.4rem; }
+        .table th { white-space: nowrap; font-size: 13px; }
+        .table td { font-size: 13px; vertical-align: middle; }
     </style>
 </head>
 <body>
@@ -52,11 +90,27 @@
                 </div>
             </div>
 
+            <!-- Batch Actions Bar -->
+            <div id="batchActions" class="batch-actions">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span><strong id="selectedCount">0</strong> payslips selected</span>
+                    <div>
+                        <button class="btn btn-success btn-sm me-2" onclick="generateBatchPDFs()">
+                            <i class="fas fa-file-pdf"></i> Generate PDFs
+                        </button>
+                        <button class="btn btn-primary btn-sm" onclick="printBatchPDFs()">
+                            <i class="fas fa-print"></i> Print PDFs
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <!-- Table -->
             <div class="table-responsive">
                 <table class="table table-hover">
                     <thead>
                         <tr>
+                            <th><input type="checkbox" id="selectAll" onclick="toggleSelectAll()"></th>
                             <th>Record #</th>
                             <th>Date</th>
                             <th>Employee</th>
@@ -65,12 +119,15 @@
                             <th>Gross Pay</th>
                             <th>Deductions</th>
                             <th>Net Pay</th>
+                            <th>Loan Balance</th>
+                            <th>Loan Payment</th>
+                            <th>Payment Type</th>
                             <th>Paid to Account</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody id="payslipsTableBody">
-                        <tr><td colspan="10" class="text-center">Loading...</td></tr>
+                        <tr><td colspan="14" class="text-center">Loading...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -208,8 +265,9 @@
             const tbody = document.getElementById('payslipsTableBody');
 
             if (payslips.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="10" class="text-center">No payslips found</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="14" class="text-center">No payslips found</td></tr>';
                 document.getElementById('summaryRow').style.display = 'none';
+                updateBatchActions();
                 return;
             }
 
@@ -222,9 +280,17 @@
                 totalNet += p.NETTSALARY || 0;
                 totalPaid += p.PaidtoAccount || 0;
 
+                // Check if payslip is editable (before end of Friday)
+                const isEditable = checkPayslipEditable(p.WEEKENDING);
+                const rowClass = isEditable ? '' : 'locked-row';
+                const statusBadge = isEditable
+                    ? '<span class="editable-badge">Editable</span>'
+                    : '<span class="locked-badge">Locked</span>';
+
                 return `
-                    <tr>
-                        <td><strong>#${p.RECORDNUMBER}</strong></td>
+                    <tr class="${rowClass}" data-record="${p.RECORDNUMBER}">
+                        <td><input type="checkbox" class="payslip-checkbox" value="${p.RECORDNUMBER}" onchange="updateBatchActions()"></td>
+                        <td><strong>#${p.RECORDNUMBER}</strong>${statusBadge}</td>
                         <td><small>${formatDate(p.TIMESTAMP)}</small></td>
                         <td><strong>${p['EMPLOYEE NAME'] || ''}</strong></td>
                         <td>${p.EMPLOYER || ''}</td>
@@ -232,11 +298,38 @@
                         <td>${formatCurrency(p.GROSSSALARY || 0)}</td>
                         <td>${formatCurrency(p.TOTALDEDUCTIONS || 0)}</td>
                         <td>${formatCurrency(p.NETTSALARY || 0)}</td>
+                        <td>${formatCurrency(p.CurrentLoanBalance || 0)}</td>
+                        <td>
+                            <input type="number" class="form-control loan-input"
+                                   value="${p.LoanDeductionThisWeek || 0}"
+                                   data-record="${p.RECORDNUMBER}"
+                                   onchange="updateLoanPayment(${p.RECORDNUMBER}, this)"
+                                   ${!isEditable ? 'disabled' : ''}>
+                        </td>
+                        <td>
+                            <select class="form-select loan-select"
+                                    data-record="${p.RECORDNUMBER}"
+                                    onchange="updatePaymentType(${p.RECORDNUMBER}, this)"
+                                    ${!isEditable ? 'disabled' : ''}>
+                                <option value="With Salary" ${(p.LoanPaymentType === 'With Salary') ? 'selected' : ''}>With Salary</option>
+                                <option value="Separate" ${(p.LoanPaymentType === 'Separate' || !p.LoanPaymentType) ? 'selected' : ''}>Separate</option>
+                                <option value="Repayment" ${(p.LoanPaymentType === 'Repayment') ? 'selected' : ''}>Repayment</option>
+                            </select>
+                        </td>
                         <td class="amount-cell">${formatCurrency(p.PaidtoAccount || 0)}</td>
                         <td class="action-buttons">
-                            <button class="btn btn-sm btn-info" onclick="editPayslip(${p.RECORDNUMBER})" title="Edit">
-                                <i class="fas fa-edit"></i>
-                            </button>
+                            ${isEditable ? `
+                                <button class="btn btn-sm btn-info" onclick="editPayslip(${p.RECORDNUMBER})" title="Edit">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-sm btn-danger" onclick="deletePayslip(${p.RECORDNUMBER})" title="Delete">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            ` : `
+                                <button class="btn btn-sm btn-secondary" disabled title="Locked">
+                                    <i class="fas fa-lock"></i>
+                                </button>
+                            `}
                             <button class="btn btn-sm btn-success" onclick="viewPayslip(${p.RECORDNUMBER})" title="View">
                                 <i class="fas fa-eye"></i>
                             </button>
@@ -260,6 +353,9 @@
             document.getElementById('totalNet').textContent = formatCurrency(totalNet);
                 document.getElementById('totalPaid').textContent = formatCurrency(totalPaid);
                 document.getElementById('summaryRow').style.display = 'block';
+
+                // Reset batch actions
+                updateBatchActions();
             };
 
             window.filterPayslips = function() {
@@ -426,6 +522,212 @@
                         showError('Error: ' + error.message);
                     })
                     .generatePayslipPDF(recordNumber);
+            };
+
+            // Check if payslip is editable (client-side check)
+            window.checkPayslipEditable = function(weekEnding) {
+                if (!weekEnding) return false;
+
+                const weekEndingDate = new Date(weekEnding);
+                const now = new Date();
+
+                // Set to end of Friday (23:59:59)
+                const editDeadline = new Date(weekEndingDate);
+                editDeadline.setHours(23, 59, 59, 999);
+
+                return now <= editDeadline;
+            };
+
+            // Toggle select all checkboxes
+            window.toggleSelectAll = function() {
+                const selectAll = document.getElementById('selectAll').checked;
+                const checkboxes = document.querySelectorAll('.payslip-checkbox');
+                checkboxes.forEach(cb => cb.checked = selectAll);
+                updateBatchActions();
+            };
+
+            // Update batch actions bar visibility
+            window.updateBatchActions = function() {
+                const checkboxes = document.querySelectorAll('.payslip-checkbox:checked');
+                const batchActions = document.getElementById('batchActions');
+                const selectedCount = document.getElementById('selectedCount');
+
+                if (checkboxes.length > 0) {
+                    batchActions.classList.add('show');
+                    selectedCount.textContent = checkboxes.length;
+                } else {
+                    batchActions.classList.remove('show');
+                }
+            };
+
+            // Get selected record numbers
+            window.getSelectedRecordNumbers = function() {
+                const checkboxes = document.querySelectorAll('.payslip-checkbox:checked');
+                return Array.from(checkboxes).map(cb => parseInt(cb.value));
+            };
+
+            // Generate PDFs for selected payslips
+            window.generateBatchPDFs = function() {
+                const recordNumbers = getSelectedRecordNumbers();
+
+                if (recordNumbers.length === 0) {
+                    showError('No payslips selected');
+                    return;
+                }
+
+                if (!confirm(`Generate PDFs for ${recordNumbers.length} payslip(s)?`)) {
+                    return;
+                }
+
+                showLoading();
+                showInfo(`Generating ${recordNumbers.length} PDFs... This may take a while.`);
+
+                google.script.run
+                    .withSuccessHandler(function(result) {
+                        hideLoading();
+                        if (!result) {
+                            showError('Failed to generate PDFs: Server returned null');
+                            return;
+                        }
+                        if (result.success !== false) {
+                            showSuccess(`PDFs generated: ${result.succeeded}/${result.total} succeeded`);
+                            if (result.failed > 0) {
+                                showError(`${result.failed} PDFs failed to generate`);
+                            }
+                            loadPayslips(); // Reload to show PDF links
+                        } else {
+                            showError('Failed to generate PDFs: ' + (result.error || 'Unknown error'));
+                        }
+                    })
+                    .withFailureHandler(function(error) {
+                        hideLoading();
+                        showError('Error: ' + error.message);
+                    })
+                    .generateBatchPayslipPDFs(recordNumbers);
+            };
+
+            // Print batch PDFs (open all in new tabs for printing)
+            window.printBatchPDFs = function() {
+                const recordNumbers = getSelectedRecordNumbers();
+
+                if (recordNumbers.length === 0) {
+                    showError('No payslips selected');
+                    return;
+                }
+
+                // Find payslips with existing PDFs
+                const payslipsWithPDFs = window.payrollListData.allPayslips.filter(p =>
+                    recordNumbers.includes(p.RECORDNUMBER) && p.FILELINK
+                );
+
+                if (payslipsWithPDFs.length === 0) {
+                    showError('No PDFs available for selected payslips. Generate PDFs first.');
+                    return;
+                }
+
+                if (!confirm(`Open ${payslipsWithPDFs.length} PDF(s) for printing?`)) {
+                    return;
+                }
+
+                // Open each PDF in a new tab
+                payslipsWithPDFs.forEach(p => {
+                    window.open(p.FILELINK, '_blank');
+                });
+
+                showSuccess(`Opened ${payslipsWithPDFs.length} PDFs for printing`);
+            };
+
+            // Delete a payslip
+            window.deletePayslip = function(recordNumber) {
+                if (!confirm(`Are you sure you want to delete payslip #${recordNumber}?\n\nThis action cannot be undone.`)) {
+                    return;
+                }
+
+                showLoading();
+
+                google.script.run
+                    .withSuccessHandler(function(result) {
+                        hideLoading();
+                        if (!result) {
+                            showError('Failed to delete payslip: Server returned null');
+                            return;
+                        }
+                        if (result.success) {
+                            showSuccess('Payslip deleted successfully');
+                            loadPayslips(); // Reload list
+                        } else {
+                            showError('Failed to delete payslip: ' + (result.error || 'Unknown error'));
+                        }
+                    })
+                    .withFailureHandler(function(error) {
+                        hideLoading();
+                        showError('Error: ' + error.message);
+                    })
+                    .deletePayslip(recordNumber);
+            };
+
+            // Update loan payment inline
+            window.updateLoanPayment = function(recordNumber, inputElement) {
+                const loanPayment = parseFloat(inputElement.value) || 0;
+
+                showLoading();
+
+                google.script.run
+                    .withSuccessHandler(function(result) {
+                        hideLoading();
+                        if (!result) {
+                            showError('Failed to update loan payment: Server returned null');
+                            return;
+                        }
+                        if (result.success) {
+                            showSuccess('Loan payment updated');
+                            // Update the Paid to Account value in the row
+                            const row = document.querySelector(`tr[data-record="${recordNumber}"]`);
+                            if (row && result.data) {
+                                const paidCell = row.querySelector('.amount-cell');
+                                if (paidCell) {
+                                    paidCell.textContent = formatCurrency(result.data.PaidtoAccount || 0);
+                                }
+                            }
+                        } else {
+                            showError('Failed to update: ' + (result.error || 'Unknown error'));
+                            loadPayslips(); // Reload to reset values
+                        }
+                    })
+                    .withFailureHandler(function(error) {
+                        hideLoading();
+                        showError('Error: ' + error.message);
+                        loadPayslips(); // Reload to reset values
+                    })
+                    .updatePayslipLoanPayment(recordNumber, { loanPayment: loanPayment });
+            };
+
+            // Update payment type inline
+            window.updatePaymentType = function(recordNumber, selectElement) {
+                const paymentType = selectElement.value;
+
+                showLoading();
+
+                google.script.run
+                    .withSuccessHandler(function(result) {
+                        hideLoading();
+                        if (!result) {
+                            showError('Failed to update payment type: Server returned null');
+                            return;
+                        }
+                        if (result.success) {
+                            showSuccess('Payment type updated');
+                        } else {
+                            showError('Failed to update: ' + (result.error || 'Unknown error'));
+                            loadPayslips(); // Reload to reset values
+                        }
+                    })
+                    .withFailureHandler(function(error) {
+                        hideLoading();
+                        showError('Error: ' + error.message);
+                        loadPayslips(); // Reload to reset values
+                    })
+                    .updatePayslipLoanPayment(recordNumber, { paymentType: paymentType });
             };
 
             // Load payslips on page load

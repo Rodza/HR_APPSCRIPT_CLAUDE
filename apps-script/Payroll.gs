@@ -349,6 +349,11 @@ function updatePayslip(recordNumber, data) {
     // Get current payslip
     const currentPayslip = buildObjectFromRow(rows[rowIndex], headers);
 
+    // Check if payslip is still editable
+    if (!isPayslipEditable(currentPayslip.WEEKENDING)) {
+      throw new Error('Cannot update payslip: The editing period has ended (past Friday midnight of the payslip week)');
+    }
+
     // Merge updates
     const updatedPayslip = Object.assign({}, currentPayslip, data);
 
@@ -991,6 +996,242 @@ function test_calculatePayslip_UIF() {
   }
 
   Logger.log('========== TEST COMPLETE ==========\n');
+}
+
+/**
+ * Delete a payslip by record number
+ * Only allowed if the payslip is still editable (before end of Friday)
+ */
+function deletePayslip(recordNumber) {
+  try {
+    Logger.log('\n========== DELETE PAYSLIP ==========');
+    Logger.log('ℹ️ Record Number: ' + recordNumber);
+
+    const sheets = getSheets();
+    const salarySheet = sheets.salary;
+    if (!salarySheet) throw new Error('Salary sheet not found');
+
+    // Find payslip
+    const allData = salarySheet.getDataRange().getValues();
+    const headers = allData[0];
+    const rows = allData.slice(1);
+
+    const recordNumCol = findColumnIndex(headers, 'RECORDNUMBER');
+    const weekEndingCol = findColumnIndex(headers, 'WEEKENDING');
+    const rowIndex = rows.findIndex(r => String(r[recordNumCol]) === String(recordNumber));
+
+    if (rowIndex === -1) {
+      throw new Error('Payslip not found: ' + recordNumber);
+    }
+
+    // Check if payslip is still editable
+    const weekEnding = rows[rowIndex][weekEndingCol];
+    if (!isPayslipEditable(weekEnding)) {
+      throw new Error('Cannot delete payslip: The editing period has ended (past Friday midnight of the payslip week)');
+    }
+
+    // Delete the row (add 2 to account for header and 0-index)
+    const sheetRowIndex = rowIndex + 2;
+    salarySheet.deleteRow(sheetRowIndex);
+    SpreadsheetApp.flush();
+
+    Logger.log('✅ Payslip deleted: #' + recordNumber);
+    Logger.log('========== DELETE PAYSLIP COMPLETE ==========\n');
+
+    return { success: true, message: 'Payslip deleted successfully' };
+
+  } catch (error) {
+    Logger.log('❌ ERROR in deletePayslip: ' + error.message);
+    Logger.log('========== DELETE PAYSLIP FAILED ==========\n');
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Check if a payslip is still editable based on week ending date
+ * Payslips are editable until the end of Friday of the payslip week
+ *
+ * @param {Date|string} weekEnding - The week ending date of the payslip
+ * @returns {boolean} True if editable, false otherwise
+ */
+function isPayslipEditable(weekEnding) {
+  if (!weekEnding) return false;
+
+  const weekEndingDate = new Date(weekEnding);
+  const now = new Date();
+
+  // Get the Friday of the payslip week (week ending is always Friday)
+  // Set to end of Friday (23:59:59)
+  const editDeadline = new Date(weekEndingDate);
+  editDeadline.setHours(23, 59, 59, 999);
+
+  return now <= editDeadline;
+}
+
+/**
+ * Get payslip editability status
+ * Returns both the status and the deadline for display purposes
+ */
+function getPayslipEditStatus(recordNumber) {
+  try {
+    const result = getPayslip(recordNumber);
+    if (!result.success) {
+      return { success: false, error: result.error };
+    }
+
+    const payslip = result.data;
+    const isEditable = isPayslipEditable(payslip.WEEKENDING);
+
+    return {
+      success: true,
+      data: {
+        isEditable: isEditable,
+        weekEnding: payslip.WEEKENDING,
+        message: isEditable
+          ? 'Editable until end of Friday ' + formatDateForDisplay(payslip.WEEKENDING)
+          : 'Locked - editing period ended'
+      }
+    };
+
+  } catch (error) {
+    Logger.log('❌ ERROR in getPayslipEditStatus: ' + error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Generate PDFs for multiple payslips (batch operation)
+ *
+ * @param {Array} recordNumbers - Array of record numbers to generate PDFs for
+ * @returns {Object} Result with success count and any errors
+ */
+function generateBatchPayslipPDFs(recordNumbers) {
+  try {
+    Logger.log('\n========== BATCH GENERATE PAYSLIP PDFs ==========');
+    Logger.log('ℹ️ Record Numbers: ' + JSON.stringify(recordNumbers));
+
+    if (!recordNumbers || recordNumbers.length === 0) {
+      throw new Error('No payslips selected');
+    }
+
+    const results = {
+      success: true,
+      total: recordNumbers.length,
+      succeeded: 0,
+      failed: 0,
+      details: []
+    };
+
+    for (const recordNumber of recordNumbers) {
+      try {
+        const pdfResult = generatePayslipPDF(recordNumber);
+        if (pdfResult.success) {
+          results.succeeded++;
+          results.details.push({
+            recordNumber: recordNumber,
+            success: true,
+            url: pdfResult.data.url
+          });
+        } else {
+          results.failed++;
+          results.details.push({
+            recordNumber: recordNumber,
+            success: false,
+            error: pdfResult.error
+          });
+        }
+      } catch (error) {
+        results.failed++;
+        results.details.push({
+          recordNumber: recordNumber,
+          success: false,
+          error: error.message
+        });
+      }
+    }
+
+    Logger.log('✅ Batch complete: ' + results.succeeded + '/' + results.total + ' succeeded');
+    Logger.log('========== BATCH GENERATE COMPLETE ==========\n');
+
+    return results;
+
+  } catch (error) {
+    Logger.log('❌ ERROR in generateBatchPayslipPDFs: ' + error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Update loan payment for a payslip (inline edit from list)
+ *
+ * @param {number} recordNumber - The payslip record number
+ * @param {Object} loanData - Loan data {loanPayment, paymentType}
+ * @returns {Object} Result
+ */
+function updatePayslipLoanPayment(recordNumber, loanData) {
+  try {
+    Logger.log('\n========== UPDATE LOAN PAYMENT ==========');
+    Logger.log('ℹ️ Record Number: ' + recordNumber);
+    Logger.log('ℹ️ Loan Data: ' + JSON.stringify(loanData));
+
+    const sheets = getSheets();
+    const salarySheet = sheets.salary;
+    if (!salarySheet) throw new Error('Salary sheet not found');
+
+    // Find payslip
+    const allData = salarySheet.getDataRange().getValues();
+    const headers = allData[0];
+    const rows = allData.slice(1);
+
+    const recordNumCol = findColumnIndex(headers, 'RECORDNUMBER');
+    const weekEndingCol = findColumnIndex(headers, 'WEEKENDING');
+    const rowIndex = rows.findIndex(r => String(r[recordNumCol]) === String(recordNumber));
+
+    if (rowIndex === -1) {
+      throw new Error('Payslip not found: ' + recordNumber);
+    }
+
+    // Check if payslip is still editable
+    const weekEnding = rows[rowIndex][weekEndingCol];
+    if (!isPayslipEditable(weekEnding)) {
+      throw new Error('Cannot update payslip: The editing period has ended');
+    }
+
+    // Get current payslip
+    const currentPayslip = buildObjectFromRow(rows[rowIndex], headers);
+
+    // Update loan fields
+    if (loanData.loanPayment !== undefined) {
+      currentPayslip.LoanDeductionThisWeek = parseFloat(loanData.loanPayment) || 0;
+    }
+    if (loanData.paymentType !== undefined) {
+      currentPayslip.LoanPaymentType = loanData.paymentType;
+    }
+
+    // Recalculate payslip
+    const calculations = calculatePayslip(currentPayslip);
+    Object.assign(currentPayslip, calculations);
+
+    // Add audit fields
+    addAuditFields(currentPayslip, false);
+
+    // Convert to row and update
+    const updatedRow = objectToRow(currentPayslip, headers);
+    const sheetRowIndex = rowIndex + 2;
+    salarySheet.getRange(sheetRowIndex, 1, 1, headers.length).setValues([updatedRow]);
+    SpreadsheetApp.flush();
+
+    Logger.log('✅ Loan payment updated for payslip #' + recordNumber);
+    Logger.log('========== UPDATE LOAN PAYMENT COMPLETE ==========\n');
+
+    // Sanitize for web
+    const sanitizedPayslip = sanitizeForWeb(currentPayslip);
+    return { success: true, data: sanitizedPayslip };
+
+  } catch (error) {
+    Logger.log('❌ ERROR in updatePayslipLoanPayment: ' + error.message);
+    return { success: false, error: error.message };
+  }
 }
 
 /**
