@@ -123,9 +123,21 @@
 
             <!-- Table -->
             <div class="table-responsive">
+                <div class="mb-2">
+                    <button class="btn btn-success btn-sm" onclick="bulkApprove()" id="bulkApproveBtn" style="display:none;">
+                        <i class="fas fa-check-double"></i> Approve Selected (<span id="selectedCount">0</span>)
+                    </button>
+                    <button class="btn btn-outline-secondary btn-sm" onclick="selectAll()" id="selectAllBtn">
+                        <i class="fas fa-check-square"></i> Select All
+                    </button>
+                    <button class="btn btn-outline-secondary btn-sm" onclick="deselectAll()" id="deselectAllBtn" style="display:none;">
+                        <i class="fas fa-square"></i> Deselect All
+                    </button>
+                </div>
                 <table class="table table-hover table-sm">
                     <thead class="table-light">
                         <tr>
+                            <th><input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll(this)"></th>
                             <th>Employee</th>
                             <th>Clock Ref</th>
                             <th>Week Ending</th>
@@ -135,7 +147,6 @@
                             <th>Mins</th>
                             <th>OT Hours</th>
                             <th>OT Mins</th>
-                            <th>Lunch (min)</th>
                             <th>Bathroom (min)</th>
                             <th>Warnings</th>
                             <th>Status</th>
@@ -275,11 +286,19 @@
                     ? `<span class="badge bg-warning text-dark" title="${escapeHtml(warningText)}">${warningCount}</span>`
                     : '-';
 
+                // Get week ending - try multiple field names
+                const weekEndingValue = ts.WEEKENDING || ts.WEEK_ENDING || ts['WEEK ENDING'] || '';
+
                 return `
                     <tr data-id="${ts.ID}">
+                        <td>
+                            ${isPending ? `
+                                <input type="checkbox" class="row-checkbox" data-id="${ts.ID}" onchange="updateBulkSelection()">
+                            ` : ''}
+                        </td>
                         <td><strong>${escapeHtml(ts['EMPLOYEE NAME'] || '')}</strong></td>
                         <td>${escapeHtml(ts.EMPLOYEE_CLOCK_REF || '-')}</td>
-                        <td>${formatDate(ts.WEEKENDING)}</td>
+                        <td>${formatDate(weekEndingValue)}</td>
                         <td class="text-end">${ts.CALCULATED_TOTAL_HOURS || 0}</td>
                         <td class="text-end">${ts.CALCULATED_TOTAL_MINUTES || 0}</td>
                         <td>
@@ -314,7 +333,6 @@
                                        data-original="${ts.OVERTIMEMINUTES || 0}">
                             ` : `<span class="text-end">${ts.OVERTIMEMINUTES || 0}</span>`}
                         </td>
-                        <td class="text-end">${ts.LUNCH_DEDUCTION_MIN || 0}</td>
                         <td class="text-end">${ts.BATHROOM_TIME_MIN || 0}</td>
                         <td>${warningBadge}</td>
                         <td><span class="badge ${statusClass}">${ts.STATUS}</span></td>
@@ -573,6 +591,107 @@
                     showError('Error: ' + error.message);
                 })
                 .updatePendingTimesheet(timesheetId, data);
+        }
+
+        // ==================== BULK SELECTION ====================
+
+        function updateBulkSelection() {
+            const checkboxes = document.querySelectorAll('.row-checkbox:checked');
+            const count = checkboxes.length;
+
+            document.getElementById('selectedCount').textContent = count;
+            document.getElementById('bulkApproveBtn').style.display = count > 0 ? 'inline-block' : 'none';
+            document.getElementById('deselectAllBtn').style.display = count > 0 ? 'inline-block' : 'none';
+
+            // Update select all checkbox state
+            const allCheckboxes = document.querySelectorAll('.row-checkbox');
+            const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+            if (selectAllCheckbox) {
+                selectAllCheckbox.checked = allCheckboxes.length > 0 && count === allCheckboxes.length;
+                selectAllCheckbox.indeterminate = count > 0 && count < allCheckboxes.length;
+            }
+        }
+
+        function toggleSelectAll(checkbox) {
+            const allCheckboxes = document.querySelectorAll('.row-checkbox');
+            allCheckboxes.forEach(cb => {
+                cb.checked = checkbox.checked;
+            });
+            updateBulkSelection();
+        }
+
+        function selectAll() {
+            const allCheckboxes = document.querySelectorAll('.row-checkbox');
+            allCheckboxes.forEach(cb => {
+                cb.checked = true;
+            });
+            const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+            if (selectAllCheckbox) selectAllCheckbox.checked = true;
+            updateBulkSelection();
+        }
+
+        function deselectAll() {
+            const allCheckboxes = document.querySelectorAll('.row-checkbox');
+            allCheckboxes.forEach(cb => {
+                cb.checked = false;
+            });
+            const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+            if (selectAllCheckbox) selectAllCheckbox.checked = false;
+            updateBulkSelection();
+        }
+
+        function bulkApprove() {
+            const checkboxes = document.querySelectorAll('.row-checkbox:checked');
+            const ids = Array.from(checkboxes).map(cb => cb.getAttribute('data-id'));
+
+            if (ids.length === 0) {
+                showWarning('No timesheets selected');
+                return;
+            }
+
+            if (!confirm(`Approve ${ids.length} timesheet(s)? This will create payslips for each.`)) {
+                return;
+            }
+
+            showLoading();
+
+            // Process approvals sequentially
+            let approved = 0;
+            let failed = 0;
+            let current = 0;
+
+            function approveNext() {
+                if (current >= ids.length) {
+                    hideLoading();
+                    if (failed === 0) {
+                        showSuccess(`Successfully approved ${approved} timesheet(s)`);
+                    } else {
+                        showWarning(`Approved ${approved}, failed ${failed}`);
+                    }
+                    loadTimesheets();
+                    return;
+                }
+
+                const timesheetId = ids[current];
+                current++;
+
+                google.script.run
+                    .withSuccessHandler(function(result) {
+                        if (result && result.success) {
+                            approved++;
+                        } else {
+                            failed++;
+                        }
+                        approveNext();
+                    })
+                    .withFailureHandler(function(error) {
+                        failed++;
+                        approveNext();
+                    })
+                    .approveTimesheet(timesheetId);
+            }
+
+            approveNext();
         }
 
         // ==================== UTILITY FUNCTIONS ====================
