@@ -1350,18 +1350,18 @@ function syncLoanTransactionFromPayslip(payslip) {
     const balanceAfter = currentBalance + amount;
 
     const transaction = {
-      LoanID: generateId(),
-      'Employee ID': employeeId,
+      'LoanID': generateId(),
       'Employee Name': payslip['EMPLOYEE NAME'],
-      Timestamp: new Date(),
-      TransactionDate: transactionDate,
-      LoanAmount: amount,
-      LoanType: 'Repayment',
-      DisbursementMode: 'Repayment',
-      SalaryLink: recordNumber,
-      BalanceBefore: currentBalance,
-      BalanceAfter: balanceAfter,
-      Notes: 'Auto-synced from payslip #' + recordNumber
+      'Employee ID': employeeId,
+      'Timestamp': new Date(),
+      'TransactionDate': transactionDate,
+      'LoanAmount': amount,
+      'LoanType': 'Repayment',
+      'DisbursementMode': 'Repayment',
+      'SalaryLink': recordNumber,
+      'Notes': 'Auto-synced from payslip #' + recordNumber,
+      'BalanceBefore': currentBalance,
+      'BalanceAfter': balanceAfter
     };
 
     const row = objectToRow(transaction, headers);
@@ -1374,18 +1374,18 @@ function syncLoanTransactionFromPayslip(payslip) {
     const balanceAfter = currentBalance + amount;
 
     const transaction = {
-      LoanID: generateId(),
-      'Employee ID': employeeId,
+      'LoanID': generateId(),
       'Employee Name': payslip['EMPLOYEE NAME'],
-      Timestamp: new Date(),
-      TransactionDate: transactionDate,
-      LoanAmount: amount,
-      LoanType: 'Disbursement',
-      DisbursementMode: paymentType,
-      SalaryLink: recordNumber,
-      BalanceBefore: currentBalance,
-      BalanceAfter: balanceAfter,
-      Notes: 'Auto-synced from payslip #' + recordNumber
+      'Employee ID': employeeId,
+      'Timestamp': new Date(),
+      'TransactionDate': transactionDate,
+      'LoanAmount': amount,
+      'LoanType': 'Disbursement',
+      'DisbursementMode': paymentType,
+      'SalaryLink': recordNumber,
+      'Notes': 'Auto-synced from payslip #' + recordNumber,
+      'BalanceBefore': currentBalance,
+      'BalanceAfter': balanceAfter
     };
 
     const row = objectToRow(transaction, headers);
