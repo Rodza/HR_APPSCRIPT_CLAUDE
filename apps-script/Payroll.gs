@@ -1263,14 +1263,16 @@ function updatePayslipLoanPayment(recordNumber, loanData) {
     Logger.log('✅ Paid to Account: ' + formatCurrency(currentPayslip.PaidtoAccount));
 
     // Sync loan transaction to EmployeeLoans sheet
+    Logger.log('🔄 About to call syncLoanTransactionFromPayslip...');
     try {
       syncLoanTransactionFromPayslip(currentPayslip);
       Logger.log('✅ Loan transaction synced to EmployeeLoans sheet');
     } catch (syncError) {
       Logger.log('❌ ERROR: Failed to sync loan transaction: ' + syncError.message);
-      Logger.log('❌ Stack: ' + syncError.stack);
+      Logger.log('❌ Stack: ' + (syncError.stack || 'No stack'));
       // Don't fail the whole operation if sync fails, but log prominently
     }
+    Logger.log('🔄 Sync attempt completed');
 
     Logger.log('========== UPDATE LOAN PAYMENT COMPLETE ==========\n');
 
