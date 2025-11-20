@@ -368,6 +368,23 @@ function processClockData(clockData, config) {
     Logger.log('\n========== PROCESS CLOCK DATA ==========');
     Logger.log('Processing ' + clockData.length + ' clock records');
 
+    // Filter out records with empty or invalid PUNCH_TIME before processing
+    var validClockData = [];
+    for (var i = 0; i < clockData.length; i++) {
+      var record = clockData[i];
+      if (record.PUNCH_TIME && record.PUNCH_TIME.toString().trim() !== '') {
+        validClockData.push(record);
+      } else {
+        Logger.log('  ⚠️ Skipping record with empty PUNCH_TIME: ' + JSON.stringify(record));
+      }
+    }
+
+    if (validClockData.length !== clockData.length) {
+      Logger.log('  📋 Filtered out ' + (clockData.length - validClockData.length) + ' records with empty PUNCH_TIME');
+    }
+
+    clockData = validClockData;
+
     // Group punches by date
     var punchesByDate = {};
 
