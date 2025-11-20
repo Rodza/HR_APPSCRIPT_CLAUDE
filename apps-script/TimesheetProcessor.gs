@@ -596,6 +596,91 @@ function processDayData(dayData, config) {
                ' (' + dayData.clockInPunches[i].type.toUpperCase() + ')');
   }
 
+  // ========== VALIDATION CHECKS ==========
+  var punches = dayData.clockInPunches;
+  var punchCount = punches.length;
+  var expectedPunches = isFriday ? 2 : 4;
+
+  // Helper: Get hour and minute from a punch
+  function getTimeMinutes(punchTime) {
+    return punchTime.getHours() * 60 + punchTime.getMinutes();
+  }
+
+  // Time thresholds (in minutes from midnight)
+  var LATE_THRESHOLD = 7 * 60 + 35;  // 07:35
+  var LUNCH_OUT_START = 11 * 60 + 30;  // 11:30
+  var LUNCH_OUT_END = 12 * 60 + 30;    // 12:30
+  var LUNCH_RETURN_START = 12 * 60 + 15;  // 12:15
+  var LUNCH_RETURN_END = 13 * 60 + 0;     // 13:00
+  var AFTERNOON_OUT_START = 16 * 60 + 0;  // 16:00
+  var FRIDAY_OUT_START = 12 * 60 + 45;    // 12:45
+
+  if (punchCount > 0) {
+    var firstPunchTime = getTimeMinutes(punches[0].time);
+
+    // Check 4: Late Clock In (after 07:35)
+    if (firstPunchTime > LATE_THRESHOLD) {
+      var lateMinutes = firstPunchTime - (7 * 60 + 30);  // Minutes after 07:30
+      warnings.push('Late Clock In (' + formatTime(punches[0].time) + ' - ' + lateMinutes + ' min late)');
+    }
+
+    // Check 5: No morning clock in (first punch is around lunch time)
+    if (firstPunchTime >= LUNCH_OUT_START) {
+      warnings.push('No morning clock in - first scan at ' + formatTime(punches[0].time));
+      // Don't count morning time
+      appliedRules.push('noMorningClockIn');
+    }
+  }
+
+  // Checks for Mon-Thu (expected 4 punches)
+  if (!isFriday) {
+    // Check 2: Missing Clock 4 (no afternoon scan out)
+    if (punchCount < 4) {
+      warnings.push('Missing afternoon clock out (Clock 4)');
+    }
+
+    // Check 3: Not Scanned in from Lunch
+    // Pattern: Clock 1 morning, Clock 2 lunch out, Clock 3 is afternoon out (not lunch return)
+    if (punchCount === 3) {
+      var clock2Time = getTimeMinutes(punches[1].time);
+      var clock3Time = getTimeMinutes(punches[2].time);
+
+      // If Clock 2 is around lunch time (11:30-12:30) and Clock 3 is around end of day (16:00+)
+      if (clock2Time >= LUNCH_OUT_START && clock2Time <= LUNCH_OUT_END &&
+          clock3Time >= AFTERNOON_OUT_START) {
+        warnings.push('Not Scanned in from Lunch - no return scan after lunch');
+        // Time from Clock 2 to Clock 3 should not be counted as work
+        appliedRules.push('notScannedInFromLunch');
+      }
+    }
+
+    // Also check if 4 punches but Clock 3 is too late (should be around 12:30, not 16:00)
+    if (punchCount >= 3) {
+      var clock3Time = getTimeMinutes(punches[2].time);
+      // If Clock 3 is after 14:00, it's probably the afternoon out, not lunch return
+      if (clock3Time >= 14 * 60) {
+        if (punchCount === 3) {
+          // Already handled above
+        } else if (punchCount === 4) {
+          // Check if Clock 3 and Clock 4 are both in afternoon (missed lunch return)
+          var clock4Time = getTimeMinutes(punches[3].time);
+          if (clock3Time >= AFTERNOON_OUT_START - 60 && clock4Time >= AFTERNOON_OUT_START) {
+            warnings.push('Irregular scan pattern - possible missed lunch return');
+          }
+        }
+      }
+    }
+  }
+
+  // Friday checks (expected 2 punches)
+  if (isFriday && punchCount < 2) {
+    if (punchCount === 1) {
+      warnings.push('Missing Friday clock out (Clock 2)');
+    }
+  }
+
+  Logger.log('  Validation warnings: ' + (warnings.length > 0 ? warnings.join('; ') : 'None'));
+
   // Get first clock-in and last clock-out
   var firstIn = null;
   var lastOut = null;
@@ -712,6 +797,37 @@ function processDayData(dayData, config) {
   var totalMinutes = workedMinutes - lunchResult.lunchMinutes;
 
   Logger.log('    Lunch deduction: -' + lunchResult.lunchMinutes + ' minutes');
+
+  // Special handling for "Not Scanned in from Lunch" - only count morning time
+  if (appliedRules.indexOf('notScannedInFromLunch') >= 0 && dayData.clockInPunches.length >= 2) {
+    // Only count time from Clock 1 to Clock 2 (morning session)
+    var morningIn = dayData.clockInPunches[0].time;
+    var morningOut = dayData.clockInPunches[1].time;
+
+    // Apply buffer to morning in
+    var morningStandardStart = parseTimeString(config.standardStartTime);
+    morningStandardStart.setFullYear(date.getFullYear());
+    morningStandardStart.setMonth(date.getMonth());
+    morningStandardStart.setDate(date.getDate());
+    var morningStartResult = applyStartBuffer(morningIn, morningStandardStart, config.graceMinutes);
+
+    var morningMs = morningOut.getTime() - morningStartResult.adjustedTime.getTime();
+    totalMinutes = morningMs / (60 * 1000);
+
+    Logger.log('    ⚠️ NOT SCANNED IN FROM LUNCH - Only counting morning time:');
+    Logger.log('      Morning: ' + formatTime(morningStartResult.adjustedTime) + ' to ' + formatTime(morningOut));
+    Logger.log('      Morning minutes: ' + Math.round(totalMinutes));
+  }
+
+  // Special handling for "No morning clock in" - only count afternoon time
+  if (appliedRules.indexOf('noMorningClockIn') >= 0 && dayData.clockInPunches.length >= 2) {
+    // First punch is around lunch, so count from there
+    // This would be Clock 1 (which should be Clock 2 lunch out) to last out
+    // Actually set to 0 since we can't verify morning attendance
+    totalMinutes = 0;
+    Logger.log('    ⚠️ NO MORNING CLOCK IN - Time not counted');
+  }
+
   Logger.log('    PAID TIME: ' + Math.round(totalMinutes) + ' minutes (' +
              Math.floor(totalMinutes / 60) + 'h ' + Math.round(totalMinutes % 60) + 'm)');
 
