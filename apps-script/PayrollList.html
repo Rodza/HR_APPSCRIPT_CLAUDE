@@ -183,6 +183,18 @@
             return parseFloat(strValue) || 0;
         }
 
+        // Get the loan payment amount based on payment type
+        function getLoanPaymentAmount(payslip) {
+            const paymentType = payslip.LoanDisbursementType || 'Separate';
+            if (paymentType === 'Repayment') {
+                // For repayments, show LoanDeductionThisWeek
+                return parseFloat(payslip.LoanDeductionThisWeek) || 0;
+            } else {
+                // For With Salary or Separate, show NewLoanThisWeek
+                return parseFloat(payslip.NewLoanThisWeek) || 0;
+            }
+        }
+
         function formatDate(date) {
             if (!date) return '';
             const d = new Date(date);
@@ -321,7 +333,7 @@
                         <td>${formatCurrency(extractLoanBalance(p.CurrentLoanBalance))}</td>
                         <td>
                             <input type="number" class="form-control loan-input"
-                                   value="${p.LoanDeductionThisWeek || 0}"
+                                   value="${getLoanPaymentAmount(p)}"
                                    data-record="${p.RECORDNUMBER}"
                                    onchange="updateLoanPayment(${p.RECORDNUMBER}, this)"
                                    ${!isEditable ? 'disabled' : ''}>

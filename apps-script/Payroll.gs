@@ -1202,12 +1202,37 @@ function updatePayslipLoanPayment(recordNumber, loanData) {
     // Get current payslip
     const currentPayslip = buildObjectFromRow(rows[rowIndex], headers);
 
-    // Update loan fields
-    if (loanData.loanPayment !== undefined) {
-      currentPayslip.LoanDeductionThisWeek = parseFloat(loanData.loanPayment) || 0;
-    }
-    if (loanData.paymentType !== undefined) {
-      currentPayslip.LoanDisbursementType = loanData.paymentType;
+    // Get the payment type (use existing if not provided)
+    const paymentType = loanData.paymentType || currentPayslip.LoanDisbursementType || 'Separate';
+    const amount = loanData.loanPayment !== undefined
+      ? parseFloat(loanData.loanPayment) || 0
+      : (paymentType === 'Repayment'
+          ? (parseFloat(currentPayslip.LoanDeductionThisWeek) || 0)
+          : (parseFloat(currentPayslip.NewLoanThisWeek) || 0));
+
+    // Update loan fields based on payment type
+    // Repayment: Deduct from net pay, deduct from loan balance
+    // With Salary: Add to paid to account, add to loan balance
+    // Separate: Does not affect paid to account, add to loan balance
+
+    if (paymentType === 'Repayment') {
+      // This is a loan repayment - employee paying back
+      currentPayslip.LoanDeductionThisWeek = amount;
+      currentPayslip.NewLoanThisWeek = 0;
+      currentPayslip.LoanDisbursementType = 'Repayment';
+      Logger.log('📝 Set as Repayment: ' + amount);
+    } else if (paymentType === 'With Salary') {
+      // This is a new loan disbursed with salary
+      currentPayslip.NewLoanThisWeek = amount;
+      currentPayslip.LoanDeductionThisWeek = 0;
+      currentPayslip.LoanDisbursementType = 'With Salary';
+      Logger.log('📝 Set as New Loan With Salary: ' + amount);
+    } else {
+      // Separate - new loan disbursed separately
+      currentPayslip.NewLoanThisWeek = amount;
+      currentPayslip.LoanDeductionThisWeek = 0;
+      currentPayslip.LoanDisbursementType = 'Separate';
+      Logger.log('📝 Set as New Loan Separate: ' + amount);
     }
 
     // Recalculate payslip
@@ -1224,6 +1249,7 @@ function updatePayslipLoanPayment(recordNumber, loanData) {
     SpreadsheetApp.flush();
 
     Logger.log('✅ Loan payment updated for payslip #' + recordNumber);
+    Logger.log('✅ Paid to Account: ' + formatCurrency(currentPayslip.PaidtoAccount));
     Logger.log('========== UPDATE LOAN PAYMENT COMPLETE ==========\n');
 
     // Sanitize for web
