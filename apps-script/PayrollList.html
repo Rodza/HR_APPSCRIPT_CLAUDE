@@ -311,9 +311,9 @@
                                     data-record="${p.RECORDNUMBER}"
                                     onchange="updatePaymentType(${p.RECORDNUMBER}, this)"
                                     ${!isEditable ? 'disabled' : ''}>
-                                <option value="With Salary" ${(p.LoanPaymentType === 'With Salary') ? 'selected' : ''}>With Salary</option>
-                                <option value="Separate" ${(p.LoanPaymentType === 'Separate' || !p.LoanPaymentType) ? 'selected' : ''}>Separate</option>
-                                <option value="Repayment" ${(p.LoanPaymentType === 'Repayment') ? 'selected' : ''}>Repayment</option>
+                                <option value="With Salary" ${(p.LoanDisbursementType === 'With Salary') ? 'selected' : ''}>With Salary</option>
+                                <option value="Separate" ${(p.LoanDisbursementType === 'Separate' || !p.LoanDisbursementType) ? 'selected' : ''}>Separate</option>
+                                <option value="Repayment" ${(p.LoanDisbursementType === 'Repayment') ? 'selected' : ''}>Repayment</option>
                             </select>
                         </td>
                         <td class="amount-cell">${formatCurrency(p.PaidtoAccount || 0)}</td>

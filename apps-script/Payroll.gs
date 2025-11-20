@@ -1205,7 +1205,7 @@ function updatePayslipLoanPayment(recordNumber, loanData) {
       currentPayslip.LoanDeductionThisWeek = parseFloat(loanData.loanPayment) || 0;
     }
     if (loanData.paymentType !== undefined) {
-      currentPayslip.LoanPaymentType = loanData.paymentType;
+      currentPayslip.LoanDisbursementType = loanData.paymentType;
     }
 
     // Recalculate payslip
