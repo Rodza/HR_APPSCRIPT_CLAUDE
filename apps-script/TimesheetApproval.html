@@ -21,6 +21,27 @@
             border-color: #007bff;
             outline: none;
         }
+        .inline-edit {
+            width: 50px;
+            padding: 2px 4px;
+            border: 1px solid #dee2e6;
+            border-radius: 3px;
+            text-align: right;
+            font-size: 0.875rem;
+        }
+        .inline-edit:focus {
+            border-color: #007bff;
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+        }
+        .inline-edit.modified {
+            background-color: #fff3cd;
+            border-color: #ffc107;
+        }
+        .save-row-btn {
+            padding: 2px 6px;
+            font-size: 0.75rem;
+        }
         .action-buttons { display: flex; gap: 5px; }
         /* Loading Spinner */
         .loading-overlay {
@@ -255,16 +276,44 @@
                     : '-';
 
                 return `
-                    <tr>
+                    <tr data-id="${ts.ID}">
                         <td><strong>${escapeHtml(ts['EMPLOYEE NAME'] || '')}</strong></td>
                         <td>${escapeHtml(ts.EMPLOYEE_CLOCK_REF || '-')}</td>
                         <td>${formatDate(ts.WEEKENDING)}</td>
                         <td class="text-end">${ts.CALCULATED_TOTAL_HOURS || 0}</td>
                         <td class="text-end">${ts.CALCULATED_TOTAL_MINUTES || 0}</td>
-                        <td class="text-end">${ts.HOURS || 0}</td>
-                        <td class="text-end">${ts.MINUTES || 0}</td>
-                        <td class="text-end">${ts.OVERTIMEHOURS || 0}</td>
-                        <td class="text-end">${ts.OVERTIMEMINUTES || 0}</td>
+                        <td>
+                            ${isPending ? `
+                                <input type="number" class="inline-edit" id="hours-${ts.ID}"
+                                       value="${ts.HOURS || 0}" min="0"
+                                       onchange="markModified(this, '${ts.ID}')"
+                                       data-original="${ts.HOURS || 0}">
+                            ` : `<span class="text-end">${ts.HOURS || 0}</span>`}
+                        </td>
+                        <td>
+                            ${isPending ? `
+                                <input type="number" class="inline-edit" id="mins-${ts.ID}"
+                                       value="${ts.MINUTES || 0}" min="0" max="59"
+                                       onchange="markModified(this, '${ts.ID}')"
+                                       data-original="${ts.MINUTES || 0}">
+                            ` : `<span class="text-end">${ts.MINUTES || 0}</span>`}
+                        </td>
+                        <td>
+                            ${isPending ? `
+                                <input type="number" class="inline-edit" id="ot-hours-${ts.ID}"
+                                       value="${ts.OVERTIMEHOURS || 0}" min="0"
+                                       onchange="markModified(this, '${ts.ID}')"
+                                       data-original="${ts.OVERTIMEHOURS || 0}">
+                            ` : `<span class="text-end">${ts.OVERTIMEHOURS || 0}</span>`}
+                        </td>
+                        <td>
+                            ${isPending ? `
+                                <input type="number" class="inline-edit" id="ot-mins-${ts.ID}"
+                                       value="${ts.OVERTIMEMINUTES || 0}" min="0" max="59"
+                                       onchange="markModified(this, '${ts.ID}')"
+                                       data-original="${ts.OVERTIMEMINUTES || 0}">
+                            ` : `<span class="text-end">${ts.OVERTIMEMINUTES || 0}</span>`}
+                        </td>
                         <td class="text-end">${ts.LUNCH_DEDUCTION_MIN || 0}</td>
                         <td class="text-end">${ts.BATHROOM_TIME_MIN || 0}</td>
                         <td>${warningBadge}</td>
@@ -272,8 +321,9 @@
                         <td><small>${formatDate(ts.IMPORTED_DATE)}</small></td>
                         <td class="action-buttons">
                             ${isPending ? `
-                                <button class="btn btn-sm btn-info" onclick="editTimesheet('${ts.ID}')" title="Edit">
-                                    <i class="fas fa-edit"></i>
+                                <button class="btn btn-sm btn-primary save-row-btn" id="save-btn-${ts.ID}"
+                                        onclick="saveInlineEdit('${ts.ID}')" title="Save" style="display:none;">
+                                    <i class="fas fa-save"></i>
                                 </button>
                                 <button class="btn btn-sm btn-success" onclick="approveTimesheet('${ts.ID}')" title="Approve">
                                     <i class="fas fa-check"></i>
@@ -423,6 +473,106 @@
                     showError('Error: ' + error.message);
                 })
                 .rejectTimesheet(timesheetId, reason);
+        }
+
+        // Track which rows have been modified
+        var modifiedRows = {};
+
+        function markModified(input, timesheetId) {
+            const originalValue = input.getAttribute('data-original');
+            const currentValue = input.value;
+
+            if (currentValue !== originalValue) {
+                input.classList.add('modified');
+                modifiedRows[timesheetId] = true;
+            } else {
+                input.classList.remove('modified');
+                // Check if any other inputs in this row are modified
+                const row = input.closest('tr');
+                const inputs = row.querySelectorAll('.inline-edit');
+                let hasModified = false;
+                inputs.forEach(inp => {
+                    if (inp.value !== inp.getAttribute('data-original')) {
+                        hasModified = true;
+                    }
+                });
+                modifiedRows[timesheetId] = hasModified;
+            }
+
+            // Show/hide save button
+            const saveBtn = document.getElementById('save-btn-' + timesheetId);
+            if (saveBtn) {
+                saveBtn.style.display = modifiedRows[timesheetId] ? 'inline-block' : 'none';
+            }
+        }
+
+        function saveInlineEdit(timesheetId) {
+            const hours = document.getElementById('hours-' + timesheetId);
+            const mins = document.getElementById('mins-' + timesheetId);
+            const otHours = document.getElementById('ot-hours-' + timesheetId);
+            const otMins = document.getElementById('ot-mins-' + timesheetId);
+
+            if (!hours || !mins || !otHours || !otMins) {
+                showError('Could not find input fields');
+                return;
+            }
+
+            showLoading();
+
+            const data = {
+                hours: parseInt(hours.value) || 0,
+                minutes: parseInt(mins.value) || 0,
+                overtimeHours: parseInt(otHours.value) || 0,
+                overtimeMinutes: parseInt(otMins.value) || 0,
+                notes: '' // No notes field in inline edit
+            };
+
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    hideLoading();
+                    if (!result) {
+                        showError('Authorization required or server returned no response. Please try again.');
+                        return;
+                    }
+                    if (result.success) {
+                        showSuccess('Timesheet updated successfully');
+
+                        // Update original values and remove modified styling
+                        hours.setAttribute('data-original', hours.value);
+                        mins.setAttribute('data-original', mins.value);
+                        otHours.setAttribute('data-original', otHours.value);
+                        otMins.setAttribute('data-original', otMins.value);
+
+                        hours.classList.remove('modified');
+                        mins.classList.remove('modified');
+                        otHours.classList.remove('modified');
+                        otMins.classList.remove('modified');
+
+                        // Hide save button
+                        const saveBtn = document.getElementById('save-btn-' + timesheetId);
+                        if (saveBtn) {
+                            saveBtn.style.display = 'none';
+                        }
+
+                        modifiedRows[timesheetId] = false;
+
+                        // Update local data
+                        const ts = allTimesheets.find(t => t.ID === timesheetId);
+                        if (ts) {
+                            ts.HOURS = data.hours;
+                            ts.MINUTES = data.minutes;
+                            ts.OVERTIMEHOURS = data.overtimeHours;
+                            ts.OVERTIMEMINUTES = data.overtimeMinutes;
+                        }
+                    } else {
+                        showError(result.error);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    hideLoading();
+                    showError('Error: ' + error.message);
+                })
+                .updatePendingTimesheet(timesheetId, data);
         }
 
         // ==================== UTILITY FUNCTIONS ====================
