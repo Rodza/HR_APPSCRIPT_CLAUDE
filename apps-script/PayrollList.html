@@ -163,6 +163,26 @@
             return 'R' + parseFloat(amount).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
         }
 
+        // Helper to extract loan balance from various formats
+        function extractLoanBalance(value) {
+            if (value === null || value === undefined || value === '') {
+                return 0;
+            }
+            // If it's already a number, return it
+            if (typeof value === 'number') {
+                return value;
+            }
+            // Convert to string and check if it's the object format
+            const strValue = String(value);
+            // Handle format like "{success=true, data=500.0}"
+            const dataMatch = strValue.match(/data[=:]\s*([0-9.]+)/);
+            if (dataMatch) {
+                return parseFloat(dataMatch[1]) || 0;
+            }
+            // Try parsing as regular number
+            return parseFloat(strValue) || 0;
+        }
+
         function formatDate(date) {
             if (!date) return '';
             const d = new Date(date);
@@ -298,7 +318,7 @@
                         <td>${formatCurrency(p.GROSSSALARY || 0)}</td>
                         <td>${formatCurrency(p.TOTALDEDUCTIONS || 0)}</td>
                         <td>${formatCurrency(p.NETTSALARY || 0)}</td>
-                        <td>${formatCurrency(parseFloat(p.CurrentLoanBalance) || 0)}</td>
+                        <td>${formatCurrency(extractLoanBalance(p.CurrentLoanBalance))}</td>
                         <td>
                             <input type="number" class="form-control loan-input"
                                    value="${p.LoanDeductionThisWeek || 0}"
