@@ -119,6 +119,16 @@ function createPayslip(data) {
 
     Logger.log('✅ Payslip created: #' + data.RECORDNUMBER);
     Logger.log('✅ Paid to Account: ' + formatCurrency(data.PaidtoAccount));
+
+    // Sync loan transaction to EmployeeLoans sheet
+    try {
+      syncLoanTransactionFromPayslip(data);
+      Logger.log('✅ Loan transaction synced to EmployeeLoans sheet');
+    } catch (syncError) {
+      Logger.log('⚠️ Warning: Failed to sync loan transaction: ' + syncError.message);
+      // Don't fail the whole operation if sync fails
+    }
+
     Logger.log('========== CREATE PAYSLIP COMPLETE ==========\n');
 
     // Sanitize for web - convert Date objects to strings
