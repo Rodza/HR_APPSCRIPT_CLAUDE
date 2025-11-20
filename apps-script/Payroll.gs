@@ -1235,6 +1235,207 @@ function updatePayslipLoanPayment(recordNumber, loanData) {
 }
 
 /**
+ * Generate a combined PDF with multiple payslips (batch print)
+ *
+ * @param {Array} recordNumbers - Array of record numbers to include
+ * @returns {Object} Result with PDF URL
+ */
+function generateCombinedPayslipPDF(recordNumbers) {
+  try {
+    Logger.log('\n========== GENERATE COMBINED PAYSLIP PDF ==========');
+    Logger.log('ℹ️ Record Numbers: ' + JSON.stringify(recordNumbers));
+
+    if (!recordNumbers || recordNumbers.length === 0) {
+      throw new Error('No payslips selected');
+    }
+
+    // Get all payslips
+    const payslips = [];
+    for (const recordNumber of recordNumbers) {
+      const result = getPayslip(recordNumber);
+      if (result.success) {
+        payslips.push(result.data);
+      } else {
+        Logger.log('⚠️ Could not get payslip #' + recordNumber + ': ' + result.error);
+      }
+    }
+
+    if (payslips.length === 0) {
+      throw new Error('No valid payslips found');
+    }
+
+    // Create a Google Doc with all payslips
+    const docName = `Payslips_Batch_${formatDateForFilename(new Date())}_${payslips.length}_records`;
+    const doc = DocumentApp.create(docName);
+    const body = doc.getBody();
+    body.clear();
+
+    // Add each payslip to the document
+    payslips.forEach((payslip, index) => {
+      // Add page break between payslips (not before first one)
+      if (index > 0) {
+        body.appendPageBreak();
+      }
+
+      // Header
+      body.appendParagraph(payslip.EMPLOYER || 'SA Grinding Wheels')
+        .setAlignment(DocumentApp.HorizontalAlignment.CENTER)
+        .setBold(true)
+        .setFontSize(14);
+
+      body.appendParagraph('PAYSLIP')
+        .setAlignment(DocumentApp.HorizontalAlignment.CENTER)
+        .setFontSize(18)
+        .setBold(true);
+
+      body.appendParagraph('');
+
+      // Employee info
+      body.appendParagraph(`Payslip Number: #${payslip.RECORDNUMBER}`);
+      body.appendParagraph(`Employee: ${payslip['EMPLOYEE NAME'] || ''}`);
+      body.appendParagraph(`Employment Status: ${payslip['EMPLOYMENT STATUS'] || ''}`);
+      body.appendParagraph(`Week Ending: ${formatDateForDisplay(payslip.WEEKENDING)}`);
+      body.appendParagraph(`Hourly Rate: R${formatAmount(payslip.HOURLYRATE)}`);
+      body.appendParagraph('');
+
+      // Earnings table
+      const table = body.appendTable();
+
+      // Header row
+      const headerRow = table.appendTableRow();
+      headerRow.appendTableCell('Description').setBackgroundColor('#f2f2f2').setBold(true);
+      headerRow.appendTableCell('Amount (R)').setBackgroundColor('#f2f2f2').setBold(true);
+
+      // Standard time
+      const row1 = table.appendTableRow();
+      row1.appendTableCell(`Standard Time (${payslip.HOURS || 0}h ${payslip.MINUTES || 0}m)`);
+      row1.appendTableCell(formatAmount(payslip.STANDARDTIME));
+
+      // Overtime
+      const row2 = table.appendTableRow();
+      row2.appendTableCell(`Overtime (${payslip.OVERTIMEHOURS || 0}h ${payslip.OVERTIMEMINUTES || 0}m)`);
+      row2.appendTableCell(formatAmount(payslip.OVERTIME));
+
+      // Leave Pay (if any)
+      if (payslip['LEAVE PAY'] > 0) {
+        const rowLeave = table.appendTableRow();
+        rowLeave.appendTableCell('Leave Pay');
+        rowLeave.appendTableCell(formatAmount(payslip['LEAVE PAY']));
+      }
+
+      // Bonus Pay (if any)
+      if (payslip['BONUS PAY'] > 0) {
+        const rowBonus = table.appendTableRow();
+        rowBonus.appendTableCell('Bonus Pay');
+        rowBonus.appendTableCell(formatAmount(payslip['BONUS PAY']));
+      }
+
+      // Other Income (if any)
+      if (payslip.OTHERINCOME > 0) {
+        const rowOther = table.appendTableRow();
+        rowOther.appendTableCell('Other Income');
+        rowOther.appendTableCell(formatAmount(payslip.OTHERINCOME));
+      }
+
+      // Gross
+      const row3 = table.appendTableRow();
+      row3.appendTableCell('Gross Salary').setBold(true);
+      row3.appendTableCell(formatAmount(payslip.GROSSSALARY)).setBold(true);
+
+      // UIF
+      const row4 = table.appendTableRow();
+      row4.appendTableCell('UIF (1%)');
+      row4.appendTableCell(`(${formatAmount(payslip.UIF)})`);
+
+      // Other Deductions (if any)
+      if (payslip['OTHER DEDUCTIONS'] > 0) {
+        const rowDed = table.appendTableRow();
+        const dedText = payslip['OTHER DEDUCTIONS TEXT']
+          ? `Other Deductions - ${payslip['OTHER DEDUCTIONS TEXT']}`
+          : 'Other Deductions';
+        rowDed.appendTableCell(dedText);
+        rowDed.appendTableCell(`(${formatAmount(payslip['OTHER DEDUCTIONS'])})`);
+      }
+
+      // Total Deductions
+      const rowTotalDed = table.appendTableRow();
+      rowTotalDed.appendTableCell('Total Deductions').setBold(true);
+      rowTotalDed.appendTableCell(`(${formatAmount(payslip.TOTALDEDUCTIONS)})`).setBold(true);
+
+      // Net
+      const row5 = table.appendTableRow();
+      row5.appendTableCell('Net Salary').setBold(true);
+      row5.appendTableCell(formatAmount(payslip.NETTSALARY)).setBold(true);
+
+      // Loan Deduction (if any)
+      if (payslip.LoanDeductionThisWeek > 0) {
+        const rowLoan = table.appendTableRow();
+        rowLoan.appendTableCell('Loan Deduction');
+        rowLoan.appendTableCell(`(${formatAmount(payslip.LoanDeductionThisWeek)})`);
+      }
+
+      // New Loan with Salary (if any)
+      if (payslip.NewLoanThisWeek > 0 && payslip.LoanDisbursementType === 'With Salary') {
+        const rowNewLoan = table.appendTableRow();
+        rowNewLoan.appendTableCell('New Loan (With Salary)');
+        rowNewLoan.appendTableCell(formatAmount(payslip.NewLoanThisWeek));
+      }
+
+      // Paid to Account
+      const row6 = table.appendTableRow();
+      row6.appendTableCell('PAID TO ACCOUNT').setBold(true);
+      row6.appendTableCell(formatAmount(payslip.PaidtoAccount)).setBold(true).setBackgroundColor('#e8f5e9');
+
+      // Notes (if any)
+      if (payslip.NOTES) {
+        body.appendParagraph('');
+        body.appendParagraph('Notes: ' + payslip.NOTES).setItalic(true);
+      }
+    });
+
+    // Footer
+    body.appendParagraph('');
+    body.appendParagraph(`Generated on ${formatDateForDisplay(new Date())} - ${payslips.length} payslip(s)`)
+      .setFontSize(10)
+      .setForegroundColor('#666666');
+
+    doc.saveAndClose();
+
+    // Convert to PDF
+    const docId = doc.getId();
+    const docFile = DriveApp.getFileById(docId);
+    const pdfBlob = docFile.getAs('application/pdf');
+    pdfBlob.setName(docName + '.pdf');
+
+    // Save PDF to Drive
+    const pdfFile = DriveApp.createFile(pdfBlob);
+    const pdfUrl = pdfFile.getUrl();
+
+    // Delete the temporary doc
+    docFile.setTrashed(true);
+
+    Logger.log('✅ Combined PDF generated: ' + pdfFile.getName());
+    Logger.log('✅ Contains ' + payslips.length + ' payslips');
+    Logger.log('✅ PDF URL: ' + pdfUrl);
+    Logger.log('========== GENERATE COMBINED PDF COMPLETE ==========\n');
+
+    return {
+      success: true,
+      data: {
+        url: pdfUrl,
+        filename: pdfFile.getName(),
+        count: payslips.length
+      }
+    };
+
+  } catch (error) {
+    Logger.log('❌ ERROR in generateCombinedPayslipPDF: ' + error.message);
+    Logger.log('Stack: ' + error.stack);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
  * Test Case 4: Overtime calculation
  * Input: 35h + 5h OT @ R30.00, Permanent
  * Expected: Standard=R1,050.00, OT=R225.00, Gross=R1,275.00
