@@ -756,6 +756,19 @@
                         }
                         if (result.success) {
                             showSuccess('Payment type updated');
+                            // Update the Paid to Account value in the row
+                            const row = document.querySelector(`tr[data-record="${recordNumber}"]`);
+                            if (row && result.data) {
+                                const paidCell = row.querySelector('.amount-cell');
+                                if (paidCell) {
+                                    paidCell.textContent = formatCurrency(result.data.PaidtoAccount || 0);
+                                }
+                                // Also update the loan payment input to show correct value for new type
+                                const loanInput = row.querySelector('.loan-input');
+                                if (loanInput) {
+                                    loanInput.value = getLoanPaymentAmount(result.data);
+                                }
+                            }
                         } else {
                             showError('Failed to update: ' + (result.error || 'Unknown error'));
                             loadPayslips(); // Reload to reset values
