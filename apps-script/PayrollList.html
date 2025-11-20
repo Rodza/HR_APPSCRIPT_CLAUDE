@@ -298,7 +298,7 @@
                         <td>${formatCurrency(p.GROSSSALARY || 0)}</td>
                         <td>${formatCurrency(p.TOTALDEDUCTIONS || 0)}</td>
                         <td>${formatCurrency(p.NETTSALARY || 0)}</td>
-                        <td>${formatCurrency(p.CurrentLoanBalance || 0)}</td>
+                        <td>${formatCurrency(parseFloat(p.CurrentLoanBalance) || 0)}</td>
                         <td>
                             <input type="number" class="form-control loan-input"
                                    value="${p.LoanDeductionThisWeek || 0}"
