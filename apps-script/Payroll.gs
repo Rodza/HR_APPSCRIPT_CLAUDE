@@ -125,8 +125,9 @@ function createPayslip(data) {
       syncLoanTransactionFromPayslip(data);
       Logger.log('✅ Loan transaction synced to EmployeeLoans sheet');
     } catch (syncError) {
-      Logger.log('⚠️ Warning: Failed to sync loan transaction: ' + syncError.message);
-      // Don't fail the whole operation if sync fails
+      Logger.log('❌ ERROR: Failed to sync loan transaction: ' + syncError.message);
+      Logger.log('❌ Stack: ' + syncError.stack);
+      // Don't fail the whole operation if sync fails, but log prominently
     }
 
     Logger.log('========== CREATE PAYSLIP COMPLETE ==========\n');
@@ -1266,8 +1267,9 @@ function updatePayslipLoanPayment(recordNumber, loanData) {
       syncLoanTransactionFromPayslip(currentPayslip);
       Logger.log('✅ Loan transaction synced to EmployeeLoans sheet');
     } catch (syncError) {
-      Logger.log('⚠️ Warning: Failed to sync loan transaction: ' + syncError.message);
-      // Don't fail the whole operation if sync fails
+      Logger.log('❌ ERROR: Failed to sync loan transaction: ' + syncError.message);
+      Logger.log('❌ Stack: ' + syncError.stack);
+      // Don't fail the whole operation if sync fails, but log prominently
     }
 
     Logger.log('========== UPDATE LOAN PAYMENT COMPLETE ==========\n');
@@ -1290,14 +1292,27 @@ function updatePayslipLoanPayment(recordNumber, loanData) {
  */
 function syncLoanTransactionFromPayslip(payslip) {
   Logger.log('\n========== SYNC LOAN TRANSACTION ==========');
-  Logger.log('Payslip #' + payslip.RECORDNUMBER);
+  Logger.log('📋 Payslip #' + payslip.RECORDNUMBER);
+  Logger.log('📋 Employee: ' + payslip['EMPLOYEE NAME']);
+  Logger.log('📋 Employee ID: ' + payslip.id);
+  Logger.log('📋 Payment Type: ' + (payslip.LoanDisbursementType || 'Separate'));
+  Logger.log('📋 LoanDeductionThisWeek: ' + payslip.LoanDeductionThisWeek);
+  Logger.log('📋 NewLoanThisWeek: ' + payslip.NewLoanThisWeek);
 
   const sheets = getSheets();
+
+  // Log available sheets for debugging
+  Logger.log('🔍 Available sheets: ' + Object.keys(sheets).join(', '));
+
   const loanSheet = sheets.loans;
 
   if (!loanSheet) {
-    throw new Error('EmployeeLoans sheet not found');
+    Logger.log('❌ ERROR: EmployeeLoans sheet not found in sheets object');
+    Logger.log('❌ sheets.loans is: ' + sheets.loans);
+    throw new Error('EmployeeLoans sheet not found. Please ensure a sheet with "loan" in its name exists.');
   }
+
+  Logger.log('✅ Found loans sheet: ' + loanSheet.getName());
 
   const loanData = loanSheet.getDataRange().getValues();
   const headers = loanData[0];
