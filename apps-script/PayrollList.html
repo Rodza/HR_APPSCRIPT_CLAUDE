@@ -183,6 +183,18 @@
             return parseFloat(strValue) || 0;
         }
 
+        // Get the loan payment amount based on payment type
+        function getLoanPaymentAmount(payslip) {
+            const paymentType = payslip.LoanDisbursementType || 'Separate';
+            if (paymentType === 'Repayment') {
+                // For repayments, show LoanDeductionThisWeek
+                return parseFloat(payslip.LoanDeductionThisWeek) || 0;
+            } else {
+                // For With Salary or Separate, show NewLoanThisWeek
+                return parseFloat(payslip.NewLoanThisWeek) || 0;
+            }
+        }
+
         function formatDate(date) {
             if (!date) return '';
             const d = new Date(date);
@@ -321,7 +333,7 @@
                         <td>${formatCurrency(extractLoanBalance(p.CurrentLoanBalance))}</td>
                         <td>
                             <input type="number" class="form-control loan-input"
-                                   value="${p.LoanDeductionThisWeek || 0}"
+                                   value="${getLoanPaymentAmount(p)}"
                                    data-record="${p.RECORDNUMBER}"
                                    onchange="updateLoanPayment(${p.RECORDNUMBER}, this)"
                                    ${!isEditable ? 'disabled' : ''}>
@@ -744,6 +756,19 @@
                         }
                         if (result.success) {
                             showSuccess('Payment type updated');
+                            // Update the Paid to Account value in the row
+                            const row = document.querySelector(`tr[data-record="${recordNumber}"]`);
+                            if (row && result.data) {
+                                const paidCell = row.querySelector('.amount-cell');
+                                if (paidCell) {
+                                    paidCell.textContent = formatCurrency(result.data.PaidtoAccount || 0);
+                                }
+                                // Also update the loan payment input to show correct value for new type
+                                const loanInput = row.querySelector('.loan-input');
+                                if (loanInput) {
+                                    loanInput.value = getLoanPaymentAmount(result.data);
+                                }
+                            }
                         } else {
                             showError('Failed to update: ' + (result.error || 'Unknown error'));
                             loadPayslips(); // Reload to reset values
