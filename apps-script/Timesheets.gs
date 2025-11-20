@@ -1006,7 +1006,19 @@ function approveTimesheet(id) {
     }
 
     // Check if payslip already exists for this employee/week
-    const weekEnding = parseDate(timesheetRecord['WEEKENDING']);
+    // Calculate week ending as the Friday of the import week
+    const importDate = timesheetRecord['IMPORTED_DATE'] ? new Date(timesheetRecord['IMPORTED_DATE']) : new Date();
+    const dayOfWeek = importDate.getDay();
+    // Calculate days to get to Friday (day 5)
+    // If today is Friday (5), use today. Otherwise find the Friday of this week.
+    let daysToFriday = 5 - dayOfWeek;
+    if (daysToFriday < 0) {
+      daysToFriday += 7; // Go to next Friday if we're past Friday
+    }
+    const weekEndingDate = new Date(importDate);
+    weekEndingDate.setDate(importDate.getDate() + daysToFriday);
+
+    const weekEnding = weekEndingDate;
     const duplicatePayslip = checkDuplicatePayslip(timesheetRecord['EMPLOYEE NAME'], weekEnding);
 
     if (duplicatePayslip) {
