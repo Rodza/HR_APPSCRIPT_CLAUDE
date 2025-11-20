@@ -606,7 +606,7 @@
                     .generateBatchPayslipPDFs(recordNumbers);
             };
 
-            // Print batch PDFs (open all in new tabs for printing)
+            // Print batch PDFs (generate combined PDF with all selected payslips)
             window.printBatchPDFs = function() {
                 const recordNumbers = getSelectedRecordNumbers();
 
@@ -615,26 +615,33 @@
                     return;
                 }
 
-                // Find payslips with existing PDFs
-                const payslipsWithPDFs = window.payrollListData.allPayslips.filter(p =>
-                    recordNumbers.includes(p.RECORDNUMBER) && p.FILELINK
-                );
-
-                if (payslipsWithPDFs.length === 0) {
-                    showError('No PDFs available for selected payslips. Generate PDFs first.');
+                if (!confirm(`Generate combined PDF with ${recordNumbers.length} payslip(s) for printing?`)) {
                     return;
                 }
 
-                if (!confirm(`Open ${payslipsWithPDFs.length} PDF(s) for printing?`)) {
-                    return;
-                }
+                showLoading();
+                showInfo(`Creating combined PDF with ${recordNumbers.length} payslips...`);
 
-                // Open each PDF in a new tab
-                payslipsWithPDFs.forEach(p => {
-                    window.open(p.FILELINK, '_blank');
-                });
-
-                showSuccess(`Opened ${payslipsWithPDFs.length} PDFs for printing`);
+                google.script.run
+                    .withSuccessHandler(function(result) {
+                        hideLoading();
+                        if (!result) {
+                            showError('Failed to generate combined PDF: Server returned null');
+                            return;
+                        }
+                        if (result.success) {
+                            showSuccess(`Combined PDF created with ${result.data.count} payslips`);
+                            // Open the PDF in a new tab for printing
+                            window.open(result.data.url, '_blank');
+                        } else {
+                            showError('Failed to generate PDF: ' + (result.error || 'Unknown error'));
+                        }
+                    })
+                    .withFailureHandler(function(error) {
+                        hideLoading();
+                        showError('Error: ' + error.message);
+                    })
+                    .generateCombinedPayslipPDF(recordNumbers);
             };
 
             // Delete a payslip
