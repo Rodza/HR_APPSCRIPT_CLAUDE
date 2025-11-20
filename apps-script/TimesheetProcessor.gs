@@ -119,12 +119,12 @@ function applyEndBuffer(clockOut, standardEnd, bufferMinutes) {
   var standardMs = standardEnd.getTime();
   var bufferMs = bufferMinutes * 60 * 1000;
 
-  // Clocked out after standard → use actual time
+  // Clocked out after standard → CAP at standard end time (16:30 or 13:00)
   if (clockOutMs > standardMs) {
     return {
-      adjustedTime: clockOut,
-      bufferApplied: false,
-      reason: null
+      adjustedTime: new Date(standardMs),
+      bufferApplied: true,
+      reason: 'Clocked out after standard end, capped at standard time'
     };
   }
 
