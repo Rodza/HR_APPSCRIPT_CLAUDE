@@ -1676,3 +1676,489 @@ function test_calculatePayslip_Overtime() {
 
   Logger.log('========== TEST COMPLETE ==========\n');
 }
+
+/**
+ * Test Case 5: Loan Sync to EmployeeLoans Table
+ * Tests that syncLoanTransactionFromPayslip correctly syncs data to EmployeeLoans sheet
+ *
+ * Run this test from Apps Script editor: test_LoanSync()
+ *
+ * IMPORTANT: This test requires a valid employee ID from your EMPLOYEE DETAILS sheet.
+ * Replace TEST_EMPLOYEE_ID with a real employee ID before running.
+ */
+function test_LoanSync() {
+  Logger.log('\n========== TEST: LOAN SYNC TO EMPLOYEELOANS TABLE ==========');
+  Logger.log('⏱️ Started at: ' + new Date().toISOString());
+
+  // ==============================
+  // CONFIGURATION - UPDATE THIS!
+  // ==============================
+  // Replace with a real employee ID from your EMPLOYEE DETAILS sheet
+  const TEST_EMPLOYEE_ID = 'TEST-EMP-001'; // <-- UPDATE THIS
+  const TEST_EMPLOYEE_NAME = 'Test Employee'; // <-- UPDATE THIS
+
+  const sheets = getSheets();
+  const loanSheet = sheets.loans;
+
+  if (!loanSheet) {
+    Logger.log('❌ FATAL: EmployeeLoans sheet not found!');
+    return;
+  }
+
+  let allTestsPassed = true;
+  let testResults = [];
+
+  // Helper function to get loan records for a specific SalaryLink
+  function getLoanRecordBySalaryLink(salaryLink) {
+    const data = loanSheet.getDataRange().getValues();
+    const headers = data[0];
+    const salaryLinkCol = findColumnIndex(headers, 'SalaryLink');
+
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][salaryLinkCol]) === String(salaryLink)) {
+        return buildObjectFromRow(data[i], headers);
+      }
+    }
+    return null;
+  }
+
+  // Helper function to count loan records for a SalaryLink
+  function countLoanRecordsForSalaryLink(salaryLink) {
+    const data = loanSheet.getDataRange().getValues();
+    const headers = data[0];
+    const salaryLinkCol = findColumnIndex(headers, 'SalaryLink');
+    let count = 0;
+
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][salaryLinkCol]) === String(salaryLink)) {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  // Clean up any test records before starting
+  function cleanupTestRecords(recordNumbers) {
+    const data = loanSheet.getDataRange().getValues();
+    const headers = data[0];
+    const salaryLinkCol = findColumnIndex(headers, 'SalaryLink');
+    const rowsToDelete = [];
+
+    for (let i = 1; i < data.length; i++) {
+      if (recordNumbers.includes(String(data[i][salaryLinkCol]))) {
+        rowsToDelete.push(i + 1);
+      }
+    }
+
+    // Delete from bottom to top
+    rowsToDelete.sort((a, b) => b - a);
+    for (const rowIndex of rowsToDelete) {
+      loanSheet.deleteRow(rowIndex);
+    }
+    SpreadsheetApp.flush();
+  }
+
+  // Test record numbers (use unique numbers that won't conflict with real data)
+  const testRecordNumbers = ['TEST-9999-A', 'TEST-9999-B', 'TEST-9999-C', 'TEST-9999-D'];
+
+  // Clean up before tests
+  Logger.log('🧹 Cleaning up any existing test records...');
+  cleanupTestRecords(testRecordNumbers);
+
+  // ==============================
+  // TEST 1: New Loan Disbursement (With Salary)
+  // ==============================
+  Logger.log('\n--- TEST 1: New Loan Disbursement (With Salary) ---');
+
+  const testPayslip1 = {
+    RECORDNUMBER: testRecordNumbers[0],
+    'EMPLOYEE NAME': TEST_EMPLOYEE_NAME,
+    id: TEST_EMPLOYEE_ID,
+    WEEKENDING: new Date(),
+    LoanDisbursementType: 'With Salary',
+    NewLoanThisWeek: 500,
+    LoanDeductionThisWeek: 0
+  };
+
+  try {
+    syncLoanTransactionFromPayslip(testPayslip1);
+    SpreadsheetApp.flush();
+
+    const record1 = getLoanRecordBySalaryLink(testRecordNumbers[0]);
+
+    if (!record1) {
+      Logger.log('❌ TEST 1 FAILED: No loan record created');
+      allTestsPassed = false;
+      testResults.push({ test: 1, passed: false, reason: 'No record created' });
+    } else {
+      let test1Passed = true;
+
+      // Verify loan amount (positive for disbursement)
+      if (record1.LoanAmount !== 500) {
+        Logger.log('❌ LoanAmount: Expected 500, Got ' + record1.LoanAmount);
+        test1Passed = false;
+      } else {
+        Logger.log('✅ LoanAmount: 500');
+      }
+
+      // Verify loan type
+      if (record1.LoanType !== 'Disbursement') {
+        Logger.log('❌ LoanType: Expected "Disbursement", Got "' + record1.LoanType + '"');
+        test1Passed = false;
+      } else {
+        Logger.log('✅ LoanType: Disbursement');
+      }
+
+      // Verify disbursement mode
+      if (record1.DisbursementMode !== 'With Salary') {
+        Logger.log('❌ DisbursementMode: Expected "With Salary", Got "' + record1.DisbursementMode + '"');
+        test1Passed = false;
+      } else {
+        Logger.log('✅ DisbursementMode: With Salary');
+      }
+
+      // Verify SalaryLink
+      if (String(record1.SalaryLink) !== testRecordNumbers[0]) {
+        Logger.log('❌ SalaryLink: Expected "' + testRecordNumbers[0] + '", Got "' + record1.SalaryLink + '"');
+        test1Passed = false;
+      } else {
+        Logger.log('✅ SalaryLink: ' + testRecordNumbers[0]);
+      }
+
+      // Verify Employee ID
+      if (record1['Employee ID'] !== TEST_EMPLOYEE_ID) {
+        Logger.log('❌ Employee ID: Expected "' + TEST_EMPLOYEE_ID + '", Got "' + record1['Employee ID'] + '"');
+        test1Passed = false;
+      } else {
+        Logger.log('✅ Employee ID: ' + TEST_EMPLOYEE_ID);
+      }
+
+      // Verify balance calculation
+      const expectedBalanceAfter = (record1.BalanceBefore || 0) + 500;
+      if (Math.abs(record1.BalanceAfter - expectedBalanceAfter) > 0.01) {
+        Logger.log('❌ BalanceAfter: Expected ' + expectedBalanceAfter + ', Got ' + record1.BalanceAfter);
+        test1Passed = false;
+      } else {
+        Logger.log('✅ BalanceAfter: ' + record1.BalanceAfter + ' (BalanceBefore: ' + record1.BalanceBefore + ')');
+      }
+
+      if (test1Passed) {
+        Logger.log('✅ TEST 1 PASSED: New Loan Disbursement (With Salary)');
+        testResults.push({ test: 1, passed: true });
+      } else {
+        Logger.log('❌ TEST 1 FAILED');
+        allTestsPassed = false;
+        testResults.push({ test: 1, passed: false, reason: 'Field validation failed' });
+      }
+    }
+  } catch (error) {
+    Logger.log('❌ TEST 1 ERROR: ' + error.message);
+    allTestsPassed = false;
+    testResults.push({ test: 1, passed: false, reason: error.message });
+  }
+
+  // ==============================
+  // TEST 2: New Loan Disbursement (Separate)
+  // ==============================
+  Logger.log('\n--- TEST 2: New Loan Disbursement (Separate) ---');
+
+  const testPayslip2 = {
+    RECORDNUMBER: testRecordNumbers[1],
+    'EMPLOYEE NAME': TEST_EMPLOYEE_NAME,
+    id: TEST_EMPLOYEE_ID,
+    WEEKENDING: new Date(),
+    LoanDisbursementType: 'Separate',
+    NewLoanThisWeek: 750,
+    LoanDeductionThisWeek: 0
+  };
+
+  try {
+    syncLoanTransactionFromPayslip(testPayslip2);
+    SpreadsheetApp.flush();
+
+    const record2 = getLoanRecordBySalaryLink(testRecordNumbers[1]);
+
+    if (!record2) {
+      Logger.log('❌ TEST 2 FAILED: No loan record created');
+      allTestsPassed = false;
+      testResults.push({ test: 2, passed: false, reason: 'No record created' });
+    } else {
+      let test2Passed = true;
+
+      if (record2.LoanAmount !== 750) {
+        Logger.log('❌ LoanAmount: Expected 750, Got ' + record2.LoanAmount);
+        test2Passed = false;
+      } else {
+        Logger.log('✅ LoanAmount: 750');
+      }
+
+      if (record2.DisbursementMode !== 'Separate') {
+        Logger.log('❌ DisbursementMode: Expected "Separate", Got "' + record2.DisbursementMode + '"');
+        test2Passed = false;
+      } else {
+        Logger.log('✅ DisbursementMode: Separate');
+      }
+
+      if (test2Passed) {
+        Logger.log('✅ TEST 2 PASSED: New Loan Disbursement (Separate)');
+        testResults.push({ test: 2, passed: true });
+      } else {
+        Logger.log('❌ TEST 2 FAILED');
+        allTestsPassed = false;
+        testResults.push({ test: 2, passed: false, reason: 'Field validation failed' });
+      }
+    }
+  } catch (error) {
+    Logger.log('❌ TEST 2 ERROR: ' + error.message);
+    allTestsPassed = false;
+    testResults.push({ test: 2, passed: false, reason: error.message });
+  }
+
+  // ==============================
+  // TEST 3: Loan Repayment
+  // ==============================
+  Logger.log('\n--- TEST 3: Loan Repayment ---');
+
+  const testPayslip3 = {
+    RECORDNUMBER: testRecordNumbers[2],
+    'EMPLOYEE NAME': TEST_EMPLOYEE_NAME,
+    id: TEST_EMPLOYEE_ID,
+    WEEKENDING: new Date(),
+    LoanDisbursementType: 'Repayment',
+    NewLoanThisWeek: 0,
+    LoanDeductionThisWeek: 200
+  };
+
+  try {
+    syncLoanTransactionFromPayslip(testPayslip3);
+    SpreadsheetApp.flush();
+
+    const record3 = getLoanRecordBySalaryLink(testRecordNumbers[2]);
+
+    if (!record3) {
+      Logger.log('❌ TEST 3 FAILED: No loan record created');
+      allTestsPassed = false;
+      testResults.push({ test: 3, passed: false, reason: 'No record created' });
+    } else {
+      let test3Passed = true;
+
+      // Verify loan amount (negative for repayment)
+      if (record3.LoanAmount !== -200) {
+        Logger.log('❌ LoanAmount: Expected -200, Got ' + record3.LoanAmount);
+        test3Passed = false;
+      } else {
+        Logger.log('✅ LoanAmount: -200 (negative for repayment)');
+      }
+
+      // Verify loan type
+      if (record3.LoanType !== 'Repayment') {
+        Logger.log('❌ LoanType: Expected "Repayment", Got "' + record3.LoanType + '"');
+        test3Passed = false;
+      } else {
+        Logger.log('✅ LoanType: Repayment');
+      }
+
+      // Verify balance calculation (should decrease)
+      const expectedBalanceAfter3 = (record3.BalanceBefore || 0) - 200;
+      if (Math.abs(record3.BalanceAfter - expectedBalanceAfter3) > 0.01) {
+        Logger.log('❌ BalanceAfter: Expected ' + expectedBalanceAfter3 + ', Got ' + record3.BalanceAfter);
+        test3Passed = false;
+      } else {
+        Logger.log('✅ BalanceAfter: ' + record3.BalanceAfter + ' (decreased by 200)');
+      }
+
+      if (test3Passed) {
+        Logger.log('✅ TEST 3 PASSED: Loan Repayment');
+        testResults.push({ test: 3, passed: true });
+      } else {
+        Logger.log('❌ TEST 3 FAILED');
+        allTestsPassed = false;
+        testResults.push({ test: 3, passed: false, reason: 'Field validation failed' });
+      }
+    }
+  } catch (error) {
+    Logger.log('❌ TEST 3 ERROR: ' + error.message);
+    allTestsPassed = false;
+    testResults.push({ test: 3, passed: false, reason: error.message });
+  }
+
+  // ==============================
+  // TEST 4: Update Existing Loan (Delete & Recreate)
+  // ==============================
+  Logger.log('\n--- TEST 4: Update Existing Loan (Delete & Recreate) ---');
+
+  // Re-sync testPayslip1 with different amount - should delete old and create new
+  const testPayslip4 = {
+    RECORDNUMBER: testRecordNumbers[0], // Same as test 1
+    'EMPLOYEE NAME': TEST_EMPLOYEE_NAME,
+    id: TEST_EMPLOYEE_ID,
+    WEEKENDING: new Date(),
+    LoanDisbursementType: 'With Salary',
+    NewLoanThisWeek: 800, // Changed from 500 to 800
+    LoanDeductionThisWeek: 0
+  };
+
+  try {
+    syncLoanTransactionFromPayslip(testPayslip4);
+    SpreadsheetApp.flush();
+
+    // Verify only one record exists for this SalaryLink
+    const recordCount = countLoanRecordsForSalaryLink(testRecordNumbers[0]);
+    if (recordCount !== 1) {
+      Logger.log('❌ Record count: Expected 1, Got ' + recordCount + ' (duplicate records!)');
+      allTestsPassed = false;
+      testResults.push({ test: 4, passed: false, reason: 'Duplicate records found' });
+    } else {
+      const record4 = getLoanRecordBySalaryLink(testRecordNumbers[0]);
+
+      let test4Passed = true;
+
+      // Verify updated amount
+      if (record4.LoanAmount !== 800) {
+        Logger.log('❌ LoanAmount: Expected 800, Got ' + record4.LoanAmount);
+        test4Passed = false;
+      } else {
+        Logger.log('✅ LoanAmount updated: 800 (was 500)');
+      }
+
+      Logger.log('✅ Only 1 record exists (old record deleted)');
+
+      if (test4Passed) {
+        Logger.log('✅ TEST 4 PASSED: Update Existing Loan');
+        testResults.push({ test: 4, passed: true });
+      } else {
+        Logger.log('❌ TEST 4 FAILED');
+        allTestsPassed = false;
+        testResults.push({ test: 4, passed: false, reason: 'Field validation failed' });
+      }
+    }
+  } catch (error) {
+    Logger.log('❌ TEST 4 ERROR: ' + error.message);
+    allTestsPassed = false;
+    testResults.push({ test: 4, passed: false, reason: error.message });
+  }
+
+  // ==============================
+  // TEST 5: No Loan (Should Not Create Record)
+  // ==============================
+  Logger.log('\n--- TEST 5: No Loan (Should Not Create Record) ---');
+
+  const testPayslip5 = {
+    RECORDNUMBER: testRecordNumbers[3],
+    'EMPLOYEE NAME': TEST_EMPLOYEE_NAME,
+    id: TEST_EMPLOYEE_ID,
+    WEEKENDING: new Date(),
+    LoanDisbursementType: 'Separate',
+    NewLoanThisWeek: 0,
+    LoanDeductionThisWeek: 0
+  };
+
+  try {
+    syncLoanTransactionFromPayslip(testPayslip5);
+    SpreadsheetApp.flush();
+
+    const record5 = getLoanRecordBySalaryLink(testRecordNumbers[3]);
+
+    if (record5) {
+      Logger.log('❌ TEST 5 FAILED: Record was created but should not have been');
+      Logger.log('   LoanAmount: ' + record5.LoanAmount);
+      allTestsPassed = false;
+      testResults.push({ test: 5, passed: false, reason: 'Unexpected record created' });
+    } else {
+      Logger.log('✅ TEST 5 PASSED: No record created (as expected)');
+      testResults.push({ test: 5, passed: true });
+    }
+  } catch (error) {
+    Logger.log('❌ TEST 5 ERROR: ' + error.message);
+    allTestsPassed = false;
+    testResults.push({ test: 5, passed: false, reason: error.message });
+  }
+
+  // ==============================
+  // CLEANUP
+  // ==============================
+  Logger.log('\n🧹 Cleaning up test records...');
+  cleanupTestRecords(testRecordNumbers);
+  Logger.log('✅ Test records cleaned up');
+
+  // ==============================
+  // SUMMARY
+  // ==============================
+  Logger.log('\n========== TEST SUMMARY ==========');
+  const passed = testResults.filter(r => r.passed).length;
+  const total = testResults.length;
+
+  Logger.log('Tests Passed: ' + passed + '/' + total);
+
+  testResults.forEach(function(result) {
+    const status = result.passed ? '✅' : '❌';
+    const reason = result.reason ? ' - ' + result.reason : '';
+    Logger.log('  Test ' + result.test + ': ' + status + reason);
+  });
+
+  if (allTestsPassed) {
+    Logger.log('\n🎉 ALL TESTS PASSED!');
+  } else {
+    Logger.log('\n⚠️ SOME TESTS FAILED - Review errors above');
+  }
+
+  Logger.log('⏱️ Completed at: ' + new Date().toISOString());
+  Logger.log('========== TEST COMPLETE ==========\n');
+
+  return {
+    success: allTestsPassed,
+    passed: passed,
+    total: total,
+    results: testResults
+  };
+}
+
+/**
+ * Quick test helper - run this to test with mock data
+ * This version doesn't require a real employee ID
+ */
+function test_LoanSync_Verification() {
+  Logger.log('\n========== LOAN SYNC VERIFICATION TEST ==========');
+  Logger.log('This test verifies the syncLoanTransactionFromPayslip function exists and is callable.');
+  Logger.log('For full integration testing, run test_LoanSync() with a valid employee ID.');
+
+  // Verify function exists
+  if (typeof syncLoanTransactionFromPayslip === 'function') {
+    Logger.log('✅ syncLoanTransactionFromPayslip function exists');
+  } else {
+    Logger.log('❌ syncLoanTransactionFromPayslip function not found!');
+    return { success: false };
+  }
+
+  // Verify helper functions exist
+  const helpers = ['getSheets', 'getCurrentLoanBalance', 'findColumnIndex', 'buildObjectFromRow', 'generateFullUUID'];
+  let allHelpersExist = true;
+
+  helpers.forEach(function(helper) {
+    if (typeof eval(helper) === 'function') {
+      Logger.log('✅ ' + helper + ' function exists');
+    } else {
+      Logger.log('❌ ' + helper + ' function not found!');
+      allHelpersExist = false;
+    }
+  });
+
+  // Verify EmployeeLoans sheet exists
+  const sheets = getSheets();
+  if (sheets.loans) {
+    Logger.log('✅ EmployeeLoans sheet found');
+
+    // Verify column structure
+    const headers = sheets.loans.getRange(1, 1, 1, 12).getValues()[0];
+    Logger.log('📋 EmployeeLoans columns: ' + headers.join(', '));
+  } else {
+    Logger.log('❌ EmployeeLoans sheet not found!');
+    return { success: false };
+  }
+
+  Logger.log('\n✅ Verification complete - all components are in place');
+  Logger.log('📝 To run full tests, update TEST_EMPLOYEE_ID in test_LoanSync() and run it.');
+  Logger.log('========== VERIFICATION COMPLETE ==========\n');
+
+  return { success: allHelpersExist };
+}
