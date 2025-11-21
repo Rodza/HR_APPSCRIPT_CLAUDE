@@ -1691,11 +1691,10 @@ function test_LoanSync() {
   Logger.log('⏱️ Started at: ' + new Date().toISOString());
 
   // ==============================
-  // CONFIGURATION - UPDATE THIS!
+  // CONFIGURATION
   // ==============================
-  // Replace with a real employee ID from your EMPLOYEE DETAILS sheet
-  const TEST_EMPLOYEE_ID = 'TEST-EMP-001'; // <-- UPDATE THIS
-  const TEST_EMPLOYEE_NAME = 'Test Employee'; // <-- UPDATE THIS
+  const TEST_EMPLOYEE_ID = 'e85a1e99';
+  const TEST_EMPLOYEE_NAME = 'Manfid Bowker';
 
   const sheets = getSheets();
   const loanSheet = sheets.loans;
