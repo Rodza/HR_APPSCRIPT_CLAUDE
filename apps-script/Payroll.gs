@@ -1264,6 +1264,14 @@ function updatePayslipLoanPayment(recordNumber, loanData) {
     Logger.log('✅ Paid to Account: ' + formatCurrency(currentPayslip.PaidtoAccount));
 
     // Sync loan transaction to EmployeeLoans sheet
+    Logger.log('');
+    Logger.log('🔄🔄🔄 SYNC BLOCK START (v2025-11-21-B) 🔄🔄🔄');
+    Logger.log('🔄 Payslip RECORDNUMBER: ' + currentPayslip.RECORDNUMBER);
+    Logger.log('🔄 Payslip id (Employee ID): ' + currentPayslip.id);
+    Logger.log('🔄 Payslip EMPLOYEE NAME: ' + currentPayslip['EMPLOYEE NAME']);
+    Logger.log('🔄 LoanDisbursementType: ' + currentPayslip.LoanDisbursementType);
+    Logger.log('🔄 NewLoanThisWeek: ' + currentPayslip.NewLoanThisWeek);
+    Logger.log('🔄 LoanDeductionThisWeek: ' + currentPayslip.LoanDeductionThisWeek);
     Logger.log('🔄 About to call syncLoanTransactionFromPayslip...');
     try {
       syncLoanTransactionFromPayslip(currentPayslip);
@@ -1273,7 +1281,8 @@ function updatePayslipLoanPayment(recordNumber, loanData) {
       Logger.log('❌ Stack: ' + (syncError.stack || 'No stack'));
       // Don't fail the whole operation if sync fails, but log prominently
     }
-    Logger.log('🔄 Sync attempt completed');
+    Logger.log('🔄🔄🔄 SYNC BLOCK END 🔄🔄🔄');
+    Logger.log('');
 
     Logger.log('========== UPDATE LOAN PAYMENT COMPLETE ==========\n');
 
