@@ -259,7 +259,7 @@ function formatPhoneNumber(phone) {
  */
 function getSheets_v2() {
   try {
-    console.log('★★★ CODE VERSION: NOSYNC-2025-11-21-C ★★★');
+    console.log('★★★ CODE VERSION: SYNC-2025-11-21-D ★★★');
     console.log('=== getSheets_v2() START ===');
 
     // Step 1: Get active spreadsheet
