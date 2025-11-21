@@ -1729,3 +1729,44 @@ function syncLoanTransactionFromPayslip(data) {
     throw error;
   }
 }
+
+/**
+ * TEST FUNCTION - Run this directly from Apps Script editor
+ * to verify code version and sync functionality
+ */
+function test_VerifyCodeVersion() {
+  Logger.log('========== CODE VERSION VERIFICATION TEST ==========');
+  Logger.log('');
+  Logger.log('Expected version markers:');
+  Logger.log('  - PAYROLL.GS: SYNC-2025-11-21-D');
+  Logger.log('  - UTILS.GS: SYNC-2025-11-21-D');
+  Logger.log('');
+
+  // Check if syncLoanTransactionFromPayslip exists
+  Logger.log('Checking if syncLoanTransactionFromPayslip exists...');
+  if (typeof syncLoanTransactionFromPayslip === 'function') {
+    Logger.log('✅ syncLoanTransactionFromPayslip function EXISTS');
+  } else {
+    Logger.log('❌ syncLoanTransactionFromPayslip function NOT FOUND');
+  }
+
+  // Check updatePayslipLoanPayment
+  Logger.log('');
+  Logger.log('Checking updatePayslipLoanPayment function...');
+  const funcStr = updatePayslipLoanPayment.toString();
+
+  if (funcStr.includes('SYNC BLOCK START')) {
+    Logger.log('✅ Sync block EXISTS in updatePayslipLoanPayment');
+  } else {
+    Logger.log('❌ Sync block NOT FOUND in updatePayslipLoanPayment');
+  }
+
+  if (funcStr.includes('PAYROLL.GS VERSION')) {
+    Logger.log('✅ Version marker EXISTS in updatePayslipLoanPayment');
+  } else {
+    Logger.log('❌ Version marker NOT FOUND in updatePayslipLoanPayment');
+  }
+
+  Logger.log('');
+  Logger.log('========== TEST COMPLETE ==========');
+}
