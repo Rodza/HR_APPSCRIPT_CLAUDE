@@ -2562,6 +2562,7 @@ function getTimesheetBreakdownData() {
 
     // Group raw clock data by employee
     const employeeData = {};
+    const deviceTypes = {}; // Track device types for diagnostics
 
     for (let j = 1; j < rawData.length; j++) {
       const rawRow = rawData[j];
@@ -2573,15 +2574,33 @@ function getTimesheetBreakdownData() {
         employeeData[empName] = [];
       }
 
+      const deviceName = rawRow[rawDeviceCol] || 'Main Unit';
+
+      // Track device types for diagnostics
+      if (!deviceTypes[deviceName]) {
+        deviceTypes[deviceName] = 0;
+      }
+      deviceTypes[deviceName]++;
+
       employeeData[empName].push({
         EMPLOYEE_NAME: empName,
         PUNCH_DATE: rawRow[rawPunchDateCol],
         PUNCH_TIME: rawRow[rawPunchTimeCol],
-        DEVICE_NAME: rawRow[rawDeviceCol] || 'Main Unit'
+        DEVICE_NAME: deviceName
       });
     }
 
+    // Log device type distribution
+    const employeeCount = Object.keys(employeeData).length;
+    Logger.log('📊 Found ' + employeeCount + ' employees with data');
+    Logger.log('📊 Device type distribution:');
+    for (const device in deviceTypes) {
+      Logger.log('   - ' + device + ': ' + deviceTypes[device] + ' punches');
+    }
+
     const results = [];
+    let processedCount = 0;
+    let failedCount = 0;
 
     // Process each employee's data
     for (const employeeName in employeeData) {
@@ -2593,6 +2612,7 @@ function getTimesheetBreakdownData() {
       const processResult = processClockData(clockData, config);
 
       if (processResult.success) {
+        processedCount++;
         const data = processResult.data;
 
         // Determine week ending from the data (use last date + days to Friday)
@@ -2617,10 +2637,17 @@ function getTimesheetBreakdownData() {
           status: 'Raw Data',
           dailyBreakdown: data.dailyBreakdown || []
         });
+      } else {
+        // Log when processing fails for an employee
+        failedCount++;
+        Logger.log('⚠️ Processing failed for ' + employeeName + ': ' + (processResult.error || 'Unknown error'));
       }
     }
 
     Logger.log('✅ Retrieved breakdown for ' + results.length + ' employees from RAW_CLOCK_DATA');
+    if (failedCount > 0) {
+      Logger.log('⚠️ Failed to process ' + failedCount + ' employees');
+    }
     Logger.log('========== GET TIMESHEET BREAKDOWN DATA COMPLETE ==========\n');
 
     return {

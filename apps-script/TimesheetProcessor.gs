@@ -396,36 +396,79 @@ function processClockData(clockData, config) {
       return timeA.getTime() - timeB.getTime();
     });
 
-    // Filter out duplicate scans within 2 minutes (keep only first scan)
-    var DUPLICATE_THRESHOLD_MS = 2 * 60 * 1000; // 2 minutes in milliseconds
-    var filteredClockData = [];
-    var lastPunchTime = null;
+    // FIXED: Separate main and bathroom punches BEFORE duplicate detection
+    // This prevents bathroom punches from being filtered out when they're close to main punches
+    var mainPunches = [];
+    var bathroomPunches = [];
 
     for (var i = 0; i < clockData.length; i++) {
       var record = clockData[i];
-      var punchTime = parseTime(record.PUNCH_TIME);
+      var deviceName = record.DEVICE_NAME || '';
 
-      if (lastPunchTime === null) {
-        // First punch, always keep
-        filteredClockData.push(record);
-        lastPunchTime = punchTime;
+      if (deviceName.toLowerCase().indexOf('bathroom') >= 0) {
+        bathroomPunches.push(record);
       } else {
-        var timeDiff = punchTime.getTime() - lastPunchTime.getTime();
-
-        if (timeDiff >= DUPLICATE_THRESHOLD_MS) {
-          // More than 2 minutes apart, keep this punch
-          filteredClockData.push(record);
-          lastPunchTime = punchTime;
-        } else {
-          // Within 2 minutes, skip as duplicate
-          Logger.log('  ⚠️ DUPLICATE SCAN DETECTED: ' + formatTime(punchTime) +
-                     ' (only ' + Math.round(timeDiff / 1000) + 's after previous) - SKIPPED');
-        }
+        mainPunches.push(record);
       }
     }
 
-    Logger.log('\n📋 DIAGNOSTIC: Filtered ' + (clockData.length - filteredClockData.length) +
-               ' duplicate scans (kept ' + filteredClockData.length + ' of ' + clockData.length + ')');
+    Logger.log('\n📋 DIAGNOSTIC: Separated punches - Main: ' + mainPunches.length + ', Bathroom: ' + bathroomPunches.length);
+
+    // Filter out duplicate scans within 2 minutes (keep only first scan)
+    // Apply separately to main and bathroom punches
+    var DUPLICATE_THRESHOLD_MS = 2 * 60 * 1000; // 2 minutes in milliseconds
+
+    // Helper function to filter duplicates within a punch category
+    function filterDuplicates(punches, category) {
+      var filtered = [];
+      var lastPunchTime = null;
+      var duplicatesRemoved = 0;
+
+      for (var i = 0; i < punches.length; i++) {
+        var record = punches[i];
+        var punchTime = parseTime(record.PUNCH_TIME);
+
+        if (lastPunchTime === null) {
+          // First punch, always keep
+          filtered.push(record);
+          lastPunchTime = punchTime;
+        } else {
+          var timeDiff = punchTime.getTime() - lastPunchTime.getTime();
+
+          if (timeDiff >= DUPLICATE_THRESHOLD_MS) {
+            // More than 2 minutes apart, keep this punch
+            filtered.push(record);
+            lastPunchTime = punchTime;
+          } else {
+            // Within 2 minutes, skip as duplicate
+            duplicatesRemoved++;
+            Logger.log('  ⚠️ DUPLICATE ' + category + ' SCAN: ' + formatTime(punchTime) +
+                       ' (only ' + Math.round(timeDiff / 1000) + 's after previous) - SKIPPED');
+          }
+        }
+      }
+
+      if (duplicatesRemoved > 0) {
+        Logger.log('  📋 Filtered ' + duplicatesRemoved + ' duplicate ' + category + ' scans');
+      }
+
+      return filtered;
+    }
+
+    // Apply duplicate detection separately to each category
+    var filteredMainPunches = filterDuplicates(mainPunches, 'MAIN');
+    var filteredBathroomPunches = filterDuplicates(bathroomPunches, 'BATHROOM');
+
+    // Merge back together and sort by time
+    var filteredClockData = filteredMainPunches.concat(filteredBathroomPunches);
+    filteredClockData.sort(function(a, b) {
+      var timeA = parseTime(a.PUNCH_TIME);
+      var timeB = parseTime(b.PUNCH_TIME);
+      return timeA.getTime() - timeB.getTime();
+    });
+
+    Logger.log('\n📋 DIAGNOSTIC: After duplicate filtering - Total: ' + filteredClockData.length +
+               ' (Main: ' + filteredMainPunches.length + ', Bathroom: ' + filteredBathroomPunches.length + ')');
 
     // Use filtered data for processing
     clockData = filteredClockData;
