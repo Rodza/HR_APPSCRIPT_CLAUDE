@@ -1642,20 +1642,41 @@ function syncLoanTransactionFromPayslip(data) {
     }
     Logger.log('✅ Step 5: Column indices found');
 
-    // Step 6: Generate new LoanID
-    Logger.log('🔄 Step 6: Generating new LoanID...');
-    let maxLoanId = 0;
+    // Step 6: Check for existing record with same SalaryLink (payslip)
+    Logger.log('🔄 Step 6: Checking for existing record for payslip #' + data.recordNumber + '...');
+    let existingRowIndex = -1;
+    let existingLoanId = null;
     const rows = allData.slice(1);
-    rows.forEach((row, idx) => {
-      const loanIdVal = row[colIndices.loanId];
-      if (loanIdVal && typeof loanIdVal === 'number' && loanIdVal > maxLoanId) {
-        maxLoanId = loanIdVal;
+
+    if (colIndices.salaryLink !== -1) {
+      for (let i = 0; i < rows.length; i++) {
+        const salaryLinkVal = String(rows[i][colIndices.salaryLink]);
+        if (salaryLinkVal === String(data.recordNumber)) {
+          existingRowIndex = i + 2; // +2 because: +1 for header, +1 for 1-based index
+          existingLoanId = rows[i][colIndices.loanId];
+          Logger.log('🔄 Found existing record at row ' + existingRowIndex + ' with LoanID ' + existingLoanId);
+          break;
+        }
       }
-    });
-    const newLoanId = maxLoanId + 1;
-    Logger.log('🔄 Max existing LoanID: ' + maxLoanId);
-    Logger.log('🔄 New LoanID: ' + newLoanId);
-    Logger.log('✅ Step 6: LoanID generated');
+    }
+
+    // Generate new LoanID only if no existing record
+    let loanId;
+    if (existingRowIndex === -1) {
+      let maxLoanId = 0;
+      rows.forEach((row) => {
+        const loanIdVal = row[colIndices.loanId];
+        if (loanIdVal && typeof loanIdVal === 'number' && loanIdVal > maxLoanId) {
+          maxLoanId = loanIdVal;
+        }
+      });
+      loanId = maxLoanId + 1;
+      Logger.log('🔄 No existing record found. New LoanID: ' + loanId);
+    } else {
+      loanId = existingLoanId;
+      Logger.log('🔄 Will UPDATE existing record with LoanID: ' + loanId);
+    }
+    Logger.log('✅ Step 6: Record check complete');
 
     // Step 7: Calculate balances and transaction details
     Logger.log('🔄 Step 7: Calculating transaction details...');
@@ -1684,31 +1705,38 @@ function syncLoanTransactionFromPayslip(data) {
     Logger.log('🔄 balanceAfter: ' + balanceAfter);
     Logger.log('✅ Step 7: Transaction details calculated');
 
-    // Step 8: Build the new row
-    Logger.log('🔄 Step 8: Building new row...');
-    const newRow = new Array(headers.length).fill('');
+    // Step 8: Build the row data
+    Logger.log('🔄 Step 8: Building row data...');
+    const rowData = new Array(headers.length).fill('');
 
-    if (colIndices.loanId !== -1) newRow[colIndices.loanId] = newLoanId;
-    if (colIndices.employeeName !== -1) newRow[colIndices.employeeName] = data.employeeName;
-    if (colIndices.employeeId !== -1) newRow[colIndices.employeeId] = data.employeeId;
-    if (colIndices.timestamp !== -1) newRow[colIndices.timestamp] = new Date();
-    if (colIndices.transactionDate !== -1) newRow[colIndices.transactionDate] = data.weekEnding || new Date();
-    if (colIndices.loanAmount !== -1) newRow[colIndices.loanAmount] = loanAmount;
-    if (colIndices.loanType !== -1) newRow[colIndices.loanType] = loanType;
-    if (colIndices.disbursementMode !== -1) newRow[colIndices.disbursementMode] = disbursementMode;
-    if (colIndices.salaryLink !== -1) newRow[colIndices.salaryLink] = data.recordNumber || '';
-    if (colIndices.notes !== -1) newRow[colIndices.notes] = 'Auto-synced from payslip #' + (data.recordNumber || 'unknown');
-    if (colIndices.balanceBefore !== -1) newRow[colIndices.balanceBefore] = balanceBefore;
-    if (colIndices.balanceAfter !== -1) newRow[colIndices.balanceAfter] = balanceAfter;
+    if (colIndices.loanId !== -1) rowData[colIndices.loanId] = loanId;
+    if (colIndices.employeeName !== -1) rowData[colIndices.employeeName] = data.employeeName;
+    if (colIndices.employeeId !== -1) rowData[colIndices.employeeId] = data.employeeId;
+    if (colIndices.timestamp !== -1) rowData[colIndices.timestamp] = new Date();
+    if (colIndices.transactionDate !== -1) rowData[colIndices.transactionDate] = data.weekEnding || new Date();
+    if (colIndices.loanAmount !== -1) rowData[colIndices.loanAmount] = loanAmount;
+    if (colIndices.loanType !== -1) rowData[colIndices.loanType] = loanType;
+    if (colIndices.disbursementMode !== -1) rowData[colIndices.disbursementMode] = disbursementMode;
+    if (colIndices.salaryLink !== -1) rowData[colIndices.salaryLink] = data.recordNumber || '';
+    if (colIndices.notes !== -1) rowData[colIndices.notes] = 'Auto-synced from payslip #' + (data.recordNumber || 'unknown');
+    if (colIndices.balanceBefore !== -1) rowData[colIndices.balanceBefore] = balanceBefore;
+    if (colIndices.balanceAfter !== -1) rowData[colIndices.balanceAfter] = balanceAfter;
 
-    Logger.log('🔄 New row data: ' + JSON.stringify(newRow));
+    Logger.log('🔄 Row data: ' + JSON.stringify(rowData));
     Logger.log('✅ Step 8: Row built');
 
-    // Step 9: Append the row to the sheet
-    Logger.log('🔄 Step 9: Appending row to EmployeeLoans sheet...');
-    loansSheet.appendRow(newRow);
-    SpreadsheetApp.flush();
-    Logger.log('✅ Step 9: Row appended successfully');
+    // Step 9: Update existing row OR append new row
+    if (existingRowIndex !== -1) {
+      Logger.log('🔄 Step 9: UPDATING existing row ' + existingRowIndex + '...');
+      loansSheet.getRange(existingRowIndex, 1, 1, headers.length).setValues([rowData]);
+      SpreadsheetApp.flush();
+      Logger.log('✅ Step 9: Row UPDATED successfully');
+    } else {
+      Logger.log('🔄 Step 9: APPENDING new row to EmployeeLoans sheet...');
+      loansSheet.appendRow(rowData);
+      SpreadsheetApp.flush();
+      Logger.log('✅ Step 9: Row APPENDED successfully');
+    }
 
     // Step 10: Verify the row was added
     Logger.log('🔄 Step 10: Verifying row was added...');
