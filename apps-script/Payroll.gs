@@ -1250,6 +1250,40 @@ function updatePayslipLoanPayment(recordNumber, loanData) {
 
     Logger.log('✅ Loan payment updated for payslip #' + recordNumber);
     Logger.log('✅ Paid to Account: ' + formatCurrency(currentPayslip.PaidtoAccount));
+
+    // Sync loan transaction to EmployeeLoans sheet
+    Logger.log('🔄🔄🔄 SYNC BLOCK START 🔄🔄🔄');
+    try {
+      Logger.log('🔄 Step 1: Preparing sync data from currentPayslip');
+      Logger.log('🔄 currentPayslip.RECORDNUMBER: ' + currentPayslip.RECORDNUMBER);
+      Logger.log('🔄 currentPayslip["EMPLOYEE NAME"]: ' + currentPayslip['EMPLOYEE NAME']);
+      Logger.log('🔄 currentPayslip.id: ' + currentPayslip.id);
+      Logger.log('🔄 currentPayslip.NewLoanThisWeek: ' + currentPayslip.NewLoanThisWeek);
+      Logger.log('🔄 currentPayslip.LoanDeductionThisWeek: ' + currentPayslip.LoanDeductionThisWeek);
+      Logger.log('🔄 currentPayslip.LoanDisbursementType: ' + currentPayslip.LoanDisbursementType);
+      Logger.log('🔄 currentPayslip.UpdatedLoanBalance: ' + currentPayslip.UpdatedLoanBalance);
+
+      const syncData = {
+        employeeName: currentPayslip['EMPLOYEE NAME'],
+        employeeId: currentPayslip.id,
+        recordNumber: currentPayslip.RECORDNUMBER,
+        newLoan: parseFloat(currentPayslip.NewLoanThisWeek) || 0,
+        loanDeduction: parseFloat(currentPayslip.LoanDeductionThisWeek) || 0,
+        disbursementType: currentPayslip.LoanDisbursementType || 'Separate',
+        updatedBalance: parseFloat(currentPayslip.UpdatedLoanBalance) || 0,
+        weekEnding: currentPayslip.WEEKENDING
+      };
+
+      Logger.log('🔄 Step 2: Sync data prepared: ' + JSON.stringify(syncData));
+
+      syncLoanTransactionFromPayslip(syncData);
+      Logger.log('✅ Loan transaction synced to EmployeeLoans sheet');
+    } catch (syncError) {
+      Logger.log('❌ ERROR: Failed to sync loan transaction: ' + syncError.message);
+      Logger.log('❌ Stack: ' + syncError.stack);
+    }
+    Logger.log('🔄🔄🔄 SYNC BLOCK END 🔄🔄🔄');
+
     Logger.log('========== UPDATE LOAN PAYMENT COMPLETE ==========\n');
 
     // Sanitize for web
@@ -1517,4 +1551,181 @@ function test_calculatePayslip_Overtime() {
   }
 
   Logger.log('========== TEST COMPLETE ==========\n');
+}
+
+/**
+ * Sync loan transaction from payslip to EmployeeLoans table
+ * With comprehensive debugging to track failures
+ *
+ * @param {Object} data - Sync data from payslip
+ */
+function syncLoanTransactionFromPayslip(data) {
+  Logger.log('🔄🔄🔄 syncLoanTransactionFromPayslip START 🔄🔄🔄');
+  Logger.log('🔄 Input data: ' + JSON.stringify(data));
+
+  try {
+    // Step 1: Validate input
+    Logger.log('🔄 Step 1: Validating input data...');
+    if (!data) {
+      throw new Error('No data provided to syncLoanTransactionFromPayslip');
+    }
+    if (!data.employeeName) {
+      throw new Error('Missing employeeName in sync data');
+    }
+    if (!data.employeeId) {
+      throw new Error('Missing employeeId in sync data');
+    }
+    Logger.log('✅ Step 1: Input validation passed');
+
+    // Step 2: Check if there's actually a loan transaction
+    Logger.log('🔄 Step 2: Checking for loan transaction...');
+    const newLoan = parseFloat(data.newLoan) || 0;
+    const loanDeduction = parseFloat(data.loanDeduction) || 0;
+    Logger.log('🔄 newLoan: ' + newLoan);
+    Logger.log('🔄 loanDeduction: ' + loanDeduction);
+
+    if (newLoan === 0 && loanDeduction === 0) {
+      Logger.log('ℹ️ No loan transaction to sync (both newLoan and loanDeduction are 0)');
+      Logger.log('🔄🔄🔄 syncLoanTransactionFromPayslip END (no transaction) 🔄🔄🔄');
+      return { success: true, message: 'No loan transaction to sync' };
+    }
+    Logger.log('✅ Step 2: Loan transaction found');
+
+    // Step 3: Get the EmployeeLoans sheet
+    Logger.log('🔄 Step 3: Getting EmployeeLoans sheet...');
+    const sheets = getSheets();
+    Logger.log('🔄 sheets object keys: ' + Object.keys(sheets).join(', '));
+
+    const loansSheet = sheets.loans;
+    if (!loansSheet) {
+      Logger.log('❌ Available sheets: ' + Object.keys(sheets).join(', '));
+      throw new Error('EmployeeLoans sheet not found in sheets object');
+    }
+    Logger.log('✅ Step 3: EmployeeLoans sheet found: ' + loansSheet.getName());
+
+    // Step 4: Get headers and existing data
+    Logger.log('🔄 Step 4: Getting sheet headers and data...');
+    const allData = loansSheet.getDataRange().getValues();
+    Logger.log('🔄 Total rows in sheet: ' + allData.length);
+
+    if (allData.length === 0) {
+      throw new Error('EmployeeLoans sheet is empty (no headers)');
+    }
+
+    const headers = allData[0];
+    Logger.log('🔄 Headers: ' + JSON.stringify(headers));
+    Logger.log('✅ Step 4: Headers retrieved (' + headers.length + ' columns)');
+
+    // Step 5: Find column indices
+    Logger.log('🔄 Step 5: Finding column indices...');
+    const colIndices = {
+      loanId: findColumnIndex(headers, 'LoanID'),
+      employeeName: findColumnIndex(headers, 'Employee Name'),
+      employeeId: findColumnIndex(headers, 'Employee ID'),
+      timestamp: findColumnIndex(headers, 'Timestamp'),
+      transactionDate: findColumnIndex(headers, 'TransactionDate'),
+      loanAmount: findColumnIndex(headers, 'LoanAmount'),
+      loanType: findColumnIndex(headers, 'LoanType'),
+      disbursementMode: findColumnIndex(headers, 'DisbursementMode'),
+      salaryLink: findColumnIndex(headers, 'SalaryLink'),
+      notes: findColumnIndex(headers, 'Notes'),
+      balanceBefore: findColumnIndex(headers, 'BalanceBefore'),
+      balanceAfter: findColumnIndex(headers, 'BalanceAfter')
+    };
+    Logger.log('🔄 Column indices: ' + JSON.stringify(colIndices));
+
+    // Check for missing columns
+    for (const [key, value] of Object.entries(colIndices)) {
+      if (value === -1) {
+        Logger.log('⚠️ Warning: Column not found: ' + key);
+      }
+    }
+    Logger.log('✅ Step 5: Column indices found');
+
+    // Step 6: Generate new LoanID
+    Logger.log('🔄 Step 6: Generating new LoanID...');
+    let maxLoanId = 0;
+    const rows = allData.slice(1);
+    rows.forEach((row, idx) => {
+      const loanIdVal = row[colIndices.loanId];
+      if (loanIdVal && typeof loanIdVal === 'number' && loanIdVal > maxLoanId) {
+        maxLoanId = loanIdVal;
+      }
+    });
+    const newLoanId = maxLoanId + 1;
+    Logger.log('🔄 Max existing LoanID: ' + maxLoanId);
+    Logger.log('🔄 New LoanID: ' + newLoanId);
+    Logger.log('✅ Step 6: LoanID generated');
+
+    // Step 7: Calculate balances and transaction details
+    Logger.log('🔄 Step 7: Calculating transaction details...');
+    let loanAmount, loanType, disbursementMode;
+    const updatedBalance = parseFloat(data.updatedBalance) || 0;
+
+    if (newLoan > 0) {
+      // Disbursement
+      loanAmount = newLoan;
+      loanType = 'Disbursement';
+      disbursementMode = data.disbursementType || 'Separate';
+    } else {
+      // Repayment
+      loanAmount = -loanDeduction; // Negative for repayment
+      loanType = 'Repayment';
+      disbursementMode = 'N/A';
+    }
+
+    const balanceBefore = updatedBalance - loanAmount;
+    const balanceAfter = updatedBalance;
+
+    Logger.log('🔄 loanAmount: ' + loanAmount);
+    Logger.log('🔄 loanType: ' + loanType);
+    Logger.log('🔄 disbursementMode: ' + disbursementMode);
+    Logger.log('🔄 balanceBefore: ' + balanceBefore);
+    Logger.log('🔄 balanceAfter: ' + balanceAfter);
+    Logger.log('✅ Step 7: Transaction details calculated');
+
+    // Step 8: Build the new row
+    Logger.log('🔄 Step 8: Building new row...');
+    const newRow = new Array(headers.length).fill('');
+
+    if (colIndices.loanId !== -1) newRow[colIndices.loanId] = newLoanId;
+    if (colIndices.employeeName !== -1) newRow[colIndices.employeeName] = data.employeeName;
+    if (colIndices.employeeId !== -1) newRow[colIndices.employeeId] = data.employeeId;
+    if (colIndices.timestamp !== -1) newRow[colIndices.timestamp] = new Date();
+    if (colIndices.transactionDate !== -1) newRow[colIndices.transactionDate] = data.weekEnding || new Date();
+    if (colIndices.loanAmount !== -1) newRow[colIndices.loanAmount] = loanAmount;
+    if (colIndices.loanType !== -1) newRow[colIndices.loanType] = loanType;
+    if (colIndices.disbursementMode !== -1) newRow[colIndices.disbursementMode] = disbursementMode;
+    if (colIndices.salaryLink !== -1) newRow[colIndices.salaryLink] = data.recordNumber || '';
+    if (colIndices.notes !== -1) newRow[colIndices.notes] = 'Auto-synced from payslip #' + (data.recordNumber || 'unknown');
+    if (colIndices.balanceBefore !== -1) newRow[colIndices.balanceBefore] = balanceBefore;
+    if (colIndices.balanceAfter !== -1) newRow[colIndices.balanceAfter] = balanceAfter;
+
+    Logger.log('🔄 New row data: ' + JSON.stringify(newRow));
+    Logger.log('✅ Step 8: Row built');
+
+    // Step 9: Append the row to the sheet
+    Logger.log('🔄 Step 9: Appending row to EmployeeLoans sheet...');
+    loansSheet.appendRow(newRow);
+    SpreadsheetApp.flush();
+    Logger.log('✅ Step 9: Row appended successfully');
+
+    // Step 10: Verify the row was added
+    Logger.log('🔄 Step 10: Verifying row was added...');
+    const newData = loansSheet.getDataRange().getValues();
+    Logger.log('🔄 New total rows: ' + newData.length);
+    Logger.log('✅ Step 10: Verification complete');
+
+    Logger.log('✅✅✅ LOAN TRANSACTION SYNCED SUCCESSFULLY ✅✅✅');
+    Logger.log('🔄🔄🔄 syncLoanTransactionFromPayslip END 🔄🔄🔄');
+
+    return { success: true, loanId: newLoanId };
+
+  } catch (error) {
+    Logger.log('❌❌❌ ERROR in syncLoanTransactionFromPayslip ❌❌❌');
+    Logger.log('❌ Error message: ' + error.message);
+    Logger.log('❌ Error stack: ' + error.stack);
+    Logger.log('🔄🔄🔄 syncLoanTransactionFromPayslip END (with error) 🔄🔄🔄');
+    throw error;
+  }
 }
