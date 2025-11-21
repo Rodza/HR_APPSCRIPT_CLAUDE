@@ -19,6 +19,45 @@
  */
 
 /**
+ * Clear all Apps Script caches and properties
+ * Run this function to force cache bust the deployment
+ */
+function clearAllCaches() {
+  Logger.log('========== CLEARING ALL CACHES ==========');
+
+  // Clear script cache
+  try {
+    const cache = CacheService.getScriptCache();
+    cache.removeAll(['sheets', 'employees', 'payslips', 'loans']); // Remove known keys
+    Logger.log('✅ Script cache cleared');
+  } catch (e) {
+    Logger.log('⚠️ Could not clear script cache: ' + e.message);
+  }
+
+  // Clear script properties (be careful - this removes all stored properties)
+  try {
+    PropertiesService.getScriptProperties().deleteAllProperties();
+    Logger.log('✅ Script properties cleared');
+  } catch (e) {
+    Logger.log('⚠️ Could not clear script properties: ' + e.message);
+  }
+
+  // Clear user cache
+  try {
+    const userCache = CacheService.getUserCache();
+    userCache.removeAll(['sheets', 'employees', 'payslips', 'loans']);
+    Logger.log('✅ User cache cleared');
+  } catch (e) {
+    Logger.log('⚠️ Could not clear user cache: ' + e.message);
+  }
+
+  Logger.log('========== CACHE CLEARING COMPLETE ==========');
+  Logger.log('⚠️ You may need to create a NEW deployment for changes to take effect');
+
+  return { success: true, message: 'All caches cleared' };
+}
+
+/**
  * Create a new payslip
  * CRITICAL: This triggers auto-sync for loan transactions
  */
