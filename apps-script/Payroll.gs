@@ -1171,7 +1171,7 @@ function generateBatchPayslipPDFs(recordNumbers) {
  */
 function updatePayslipLoanPayment(recordNumber, loanData) {
   try {
-    Logger.log('>>> PAYROLL_GS_VERSION: 2025-11-21-A <<<');
+    Logger.log('★★★ PAYROLL VERSION: NOSYNC-2025-11-21-C ★★★');
     Logger.log('\n========== UPDATE LOAN PAYMENT ==========');
     Logger.log('Record Number: ' + recordNumber);
     Logger.log('Loan Data: ' + JSON.stringify(loanData));
