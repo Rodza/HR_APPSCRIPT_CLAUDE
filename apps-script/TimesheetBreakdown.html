@@ -432,6 +432,46 @@
                 `;
             }
 
+            // Generate bathroom breaks display
+            let bathroomHtml = '';
+            const bathroomBreaks = day.bathroomBreaks || [];
+            const unpairedEntries = day.bathroomUnpairedEntries || [];
+            const unpairedExits = day.bathroomUnpairedExits || [];
+            const hasBathroomData = bathroomBreaks.length > 0 || unpairedEntries.length > 0 || unpairedExits.length > 0;
+
+            if (hasBathroomData) {
+                // Show individual breaks
+                bathroomBreaks.forEach((brk, idx) => {
+                    const breakClass = brk.warning ? 'style="color: #f59e0b;"' : '';
+                    bathroomHtml += `<div class="detail-item" ${breakClass}>
+                        Break ${idx + 1}: ${brk.entry} - ${brk.exit} (${brk.minutes}m)
+                    </div>`;
+                });
+
+                // Show unpaired entries
+                unpairedEntries.forEach(time => {
+                    bathroomHtml += `<div class="detail-item" style="color: #ef4444;">
+                        ⚠️ Entry ${time} - No exit
+                    </div>`;
+                });
+
+                // Show unpaired exits
+                unpairedExits.forEach(time => {
+                    bathroomHtml += `<div class="detail-item" style="color: #ef4444;">
+                        ⚠️ Exit ${time} - No entry
+                    </div>`;
+                });
+
+                // Add total
+                if (day.bathroomMinutes > 0) {
+                    bathroomHtml += `<div class="detail-item" style="font-weight: 600; margin-top: 4px;">
+                        Total: ${day.bathroomMinutes}m
+                    </div>`;
+                }
+            } else {
+                bathroomHtml = '<div class="detail-item" style="color: #6b7280;">No bathroom breaks</div>';
+            }
+
             return `
                 <div class="${rowClass}">
                     <div class="day-header">
@@ -447,6 +487,10 @@
                             <h4>Adjusted Times</h4>
                             <div class="detail-item adjusted">In: ${day.adjustedIn || 'N/A'}</div>
                             <div class="detail-item adjusted">Out: ${day.adjustedOut || 'N/A'}</div>
+                        </div>
+                        <div class="detail-group">
+                            <h4>Bathroom Breaks</h4>
+                            ${bathroomHtml}
                         </div>
                         <div class="detail-group">
                             <h4>Notes</h4>
