@@ -248,13 +248,20 @@
         }
 
         function handleDataLoaded(data) {
+            console.log('handleDataLoaded called with:', data);
+            console.log('data type:', typeof data);
+            console.log('data is null:', data === null);
+            console.log('data is undefined:', data === undefined);
+
             if (!data || !data.success) {
+                console.error('Data loading failed:', data);
                 document.getElementById('content').innerHTML =
                     '<div class="no-data"><h3>No Data Available</h3><p>' +
                     (data ? data.error : 'Failed to load data') + '</p></div>';
                 return;
             }
 
+            console.log('Data loaded successfully:', data.data.length, 'employees');
             allData = data.data;
             populateWeekFilter(allData);
             updateStats(allData);
@@ -262,6 +269,7 @@
         }
 
         function handleError(error) {
+            console.error('handleError called:', error);
             document.getElementById('content').innerHTML =
                 '<div class="no-data"><h3>Error Loading Data</h3><p>' + error.message + '</p></div>';
         }
