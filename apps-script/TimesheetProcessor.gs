@@ -327,8 +327,8 @@ function calculateBathroomTime(bathroomPunches, config) {
       totalMinutes += duration;
 
       var breakInfo = {
-        entry: entry.time,
-        exit: exit.time,
+        entry: formatTime(entry.time),
+        exit: formatTime(exit.time),
         minutes: Math.round(duration)
       };
 
