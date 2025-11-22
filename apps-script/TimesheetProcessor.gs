@@ -406,7 +406,39 @@ function calculateBathroomTime(bathroomPunches, config, clockPunches, isFriday) 
     }
   }
 
-  Logger.log('  🚻 Bathroom punches - Entries: ' + entries.length + ', Exits: ' + exits.length);
+  // Filter duplicates within each category (within 60 seconds)
+  function filterBathroomDuplicates(punches) {
+    if (punches.length === 0) return [];
+
+    // Sort by time first
+    punches.sort(function(a, b) {
+      return a.time.getTime() - b.time.getTime();
+    });
+
+    var filtered = [punches[0]];
+    var DUPLICATE_THRESHOLD_MS = 60 * 1000; // 60 seconds
+
+    for (var i = 1; i < punches.length; i++) {
+      var lastTime = filtered[filtered.length - 1].time.getTime();
+      var currentTime = punches[i].time.getTime();
+
+      if (currentTime - lastTime >= DUPLICATE_THRESHOLD_MS) {
+        filtered.push(punches[i]);
+      } else {
+        Logger.log('    🚻 Duplicate bathroom scan at ' + formatTime(punches[i].time) + ' - skipped');
+      }
+    }
+
+    return filtered;
+  }
+
+  var originalEntries = entries.length;
+  var originalExits = exits.length;
+
+  entries = filterBathroomDuplicates(entries);
+  exits = filterBathroomDuplicates(exits);
+
+  Logger.log('  🚻 Bathroom punches - Entries: ' + entries.length + ' (was ' + originalEntries + '), Exits: ' + exits.length + ' (was ' + originalExits + ')');
 
   // Match entries with exits
   var usedExits = [];
