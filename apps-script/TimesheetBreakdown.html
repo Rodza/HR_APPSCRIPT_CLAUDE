@@ -190,6 +190,57 @@
             color: #6b7280;
         }
         .no-data h3 { margin: 0 0 10px 0; color: #374151; }
+
+        /* Print Styles */
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+                margin: 0;
+            }
+            .header {
+                background: #4f46e5 !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+                border-radius: 0;
+                margin-bottom: 10px;
+                padding: 15px;
+            }
+            .filter-bar {
+                display: none !important;
+            }
+            .stats-grid {
+                margin-bottom: 10px;
+            }
+            .stat-card {
+                box-shadow: none;
+                border: 1px solid #e5e7eb;
+                padding: 10px;
+            }
+            .employee-card {
+                box-shadow: none;
+                border: 1px solid #e5e7eb;
+                margin-bottom: 10px;
+                page-break-inside: avoid;
+            }
+            .day-row {
+                page-break-inside: avoid;
+                margin-bottom: 5px;
+                padding: 10px;
+            }
+            .day-details {
+                font-size: 11px;
+            }
+            .detail-group h4 {
+                font-size: 10px;
+            }
+            .badge {
+                font-size: 9px;
+            }
+            .warning-item {
+                font-size: 10px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -216,6 +267,11 @@
                 <option value="warnings">With Warnings Only</option>
                 <option value="no-lunch">No Lunch Detected</option>
             </select>
+        </div>
+        <div style="margin-left: auto;">
+            <button onclick="exportPDF()" style="padding: 8px 16px; background: #4f46e5; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;">
+                Export PDF
+            </button>
         </div>
     </div>
 
@@ -283,6 +339,13 @@
                 option.textContent = formatDate(week);
                 select.appendChild(option);
             });
+
+            // Default to the most recent week (first in reversed sorted list)
+            if (weeks.length > 0) {
+                select.value = weeks[0];
+                // Apply the filter to show only the selected week
+                filterData();
+            }
         }
 
         function updateStats(data) {
@@ -529,6 +592,145 @@
             if (!dateStr) return false;
             const date = new Date(dateStr);
             return date.getDay() === 5;
+        }
+
+        function exportPDF() {
+            // Create a new window with just the report content for clean PDF export
+            const printWindow = window.open('', '_blank');
+
+            // Get the current filter selection for the title
+            const weekFilter = document.getElementById('weekFilter');
+            const weekText = weekFilter.options[weekFilter.selectedIndex].text;
+
+            // Build the print content
+            const printContent = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Timesheet Breakdown - ${weekText}</title>
+                    <style>
+                        * { box-sizing: border-box; }
+                        body {
+                            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                            margin: 0;
+                            padding: 20px;
+                            background: white;
+                        }
+                        .header {
+                            background: #4f46e5;
+                            color: white;
+                            padding: 15px 20px;
+                            border-radius: 8px;
+                            margin-bottom: 15px;
+                        }
+                        .header h1 { margin: 0 0 5px 0; font-size: 20px; }
+                        .header p { margin: 0; opacity: 0.9; font-size: 12px; }
+                        .stats-grid {
+                            display: grid;
+                            grid-template-columns: repeat(4, 1fr);
+                            gap: 10px;
+                            margin-bottom: 15px;
+                        }
+                        .stat-card {
+                            background: #f8fafc;
+                            padding: 10px;
+                            border-radius: 6px;
+                            border: 1px solid #e5e7eb;
+                        }
+                        .stat-card .label { font-size: 10px; color: #666; margin-bottom: 3px; }
+                        .stat-card .value { font-size: 18px; font-weight: bold; color: #333; }
+                        .employee-card {
+                            border: 1px solid #e5e7eb;
+                            border-radius: 8px;
+                            margin-bottom: 15px;
+                            page-break-inside: avoid;
+                        }
+                        .employee-header {
+                            background: #f8fafc;
+                            padding: 10px 15px;
+                            border-bottom: 1px solid #e5e7eb;
+                            display: flex;
+                            justify-content: space-between;
+                            align-items: center;
+                        }
+                        .employee-name { font-size: 14px; font-weight: 600; color: #1f2937; }
+                        .employee-total { font-size: 12px; color: #6b7280; }
+                        .employee-total strong { color: #4f46e5; font-size: 14px; }
+                        .employee-body { padding: 10px 15px; }
+                        .day-row {
+                            background: #f9fafb;
+                            border-radius: 6px;
+                            padding: 10px;
+                            margin-bottom: 8px;
+                            border-left: 3px solid #4f46e5;
+                            page-break-inside: avoid;
+                        }
+                        .day-row.friday { border-left-color: #8b5cf6; }
+                        .day-row.warning { border-left-color: #f59e0b; }
+                        .day-row.error { border-left-color: #ef4444; }
+                        .day-header {
+                            display: flex;
+                            justify-content: space-between;
+                            align-items: center;
+                            margin-bottom: 8px;
+                        }
+                        .day-date { font-weight: 600; color: #374151; font-size: 12px; }
+                        .day-paid { font-weight: 600; color: #4f46e5; font-size: 12px; }
+                        .day-details {
+                            display: grid;
+                            grid-template-columns: repeat(4, 1fr);
+                            gap: 10px;
+                            font-size: 11px;
+                        }
+                        .detail-group h4 {
+                            margin: 0 0 5px 0;
+                            font-size: 9px;
+                            color: #6b7280;
+                            text-transform: uppercase;
+                        }
+                        .detail-item { color: #374151; margin-bottom: 2px; }
+                        .detail-item.adjusted { color: #4f46e5; }
+                        .warning-item {
+                            background: #fef3c7;
+                            color: #92400e;
+                            padding: 4px 6px;
+                            border-radius: 3px;
+                            font-size: 10px;
+                            margin-top: 3px;
+                        }
+                        .badge {
+                            display: inline-block;
+                            padding: 2px 6px;
+                            border-radius: 10px;
+                            font-size: 9px;
+                            font-weight: 500;
+                        }
+                        .badge-lunch { background: #dcfce7; color: #166534; }
+                        .badge-no-lunch { background: #fee2e2; color: #991b1b; }
+                        .badge-friday { background: #ede9fe; color: #5b21b6; }
+                        @media print {
+                            body { padding: 10px; }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <h1>Timesheet Breakdown Report</h1>
+                        <p>${weekText} - Generated ${new Date().toLocaleDateString()}</p>
+                    </div>
+                    ${document.getElementById('statsGrid').innerHTML}
+                    ${document.getElementById('content').innerHTML}
+                </body>
+                </html>
+            `;
+
+            printWindow.document.write(printContent);
+            printWindow.document.close();
+
+            // Wait for content to load then print
+            printWindow.onload = function() {
+                printWindow.print();
+            };
         }
     </script>
 </body>
