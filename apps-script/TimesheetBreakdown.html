@@ -190,6 +190,57 @@
             color: #6b7280;
         }
         .no-data h3 { margin: 0 0 10px 0; color: #374151; }
+
+        /* Print Styles */
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+                margin: 0;
+            }
+            .header {
+                background: #4f46e5 !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+                border-radius: 0;
+                margin-bottom: 10px;
+                padding: 15px;
+            }
+            .filter-bar {
+                display: none !important;
+            }
+            .stats-grid {
+                margin-bottom: 10px;
+            }
+            .stat-card {
+                box-shadow: none;
+                border: 1px solid #e5e7eb;
+                padding: 10px;
+            }
+            .employee-card {
+                box-shadow: none;
+                border: 1px solid #e5e7eb;
+                margin-bottom: 10px;
+                page-break-inside: avoid;
+            }
+            .day-row {
+                page-break-inside: avoid;
+                margin-bottom: 5px;
+                padding: 10px;
+            }
+            .day-details {
+                font-size: 11px;
+            }
+            .detail-group h4 {
+                font-size: 10px;
+            }
+            .badge {
+                font-size: 9px;
+            }
+            .warning-item {
+                font-size: 10px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -216,6 +267,11 @@
                 <option value="warnings">With Warnings Only</option>
                 <option value="no-lunch">No Lunch Detected</option>
             </select>
+        </div>
+        <div style="margin-left: auto;">
+            <button onclick="exportPDF()" style="padding: 8px 16px; background: #4f46e5; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;">
+                Export PDF
+            </button>
         </div>
     </div>
 
@@ -283,6 +339,13 @@
                 option.textContent = formatDate(week);
                 select.appendChild(option);
             });
+
+            // Default to the most recent week (first in reversed sorted list)
+            if (weeks.length > 0) {
+                select.value = weeks[0];
+                // Apply the filter to show only the selected week
+                filterData();
+            }
         }
 
         function updateStats(data) {
@@ -529,6 +592,11 @@
             if (!dateStr) return false;
             const date = new Date(dateStr);
             return date.getDay() === 5;
+        }
+
+        function exportPDF() {
+            // Use browser's print functionality which allows saving as PDF
+            window.print();
         }
     </script>
 </body>
