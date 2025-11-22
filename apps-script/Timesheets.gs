@@ -2550,11 +2550,25 @@ function getTimesheetBreakdownData() {
     const rawData = rawClockSheet.getDataRange().getValues();
     const rawHeaders = rawData[0];
 
+    Logger.log('📊 Raw data rows: ' + rawData.length);
+    Logger.log('📊 Headers: ' + JSON.stringify(rawHeaders));
+
     // Find column indices for raw clock data
     const rawEmpNameCol = findColumnIndex(rawHeaders, 'EMPLOYEE_NAME');
     const rawPunchDateCol = findColumnIndex(rawHeaders, 'PUNCH_DATE');
     const rawPunchTimeCol = findColumnIndex(rawHeaders, 'PUNCH_TIME');
     const rawDeviceCol = findColumnIndex(rawHeaders, 'DEVICE_NAME');
+
+    // Log column indices for debugging
+    Logger.log('📊 Column indices - EMPLOYEE_NAME: ' + rawEmpNameCol +
+               ', PUNCH_DATE: ' + rawPunchDateCol +
+               ', PUNCH_TIME: ' + rawPunchTimeCol +
+               ', DEVICE_NAME: ' + rawDeviceCol);
+
+    // Check if critical columns were found
+    if (rawEmpNameCol === -1 || rawPunchTimeCol === -1) {
+      throw new Error('Required columns not found. EMPLOYEE_NAME: ' + rawEmpNameCol + ', PUNCH_TIME: ' + rawPunchTimeCol);
+    }
 
     // Get time config
     const configResult = getTimeConfig();
@@ -2650,10 +2664,14 @@ function getTimesheetBreakdownData() {
     }
     Logger.log('========== GET TIMESHEET BREAKDOWN DATA COMPLETE ==========\n');
 
-    return {
+    const returnValue = {
       success: true,
       data: results
     };
+
+    Logger.log('🔄 Returning: success=' + returnValue.success + ', employees=' + returnValue.data.length);
+
+    return returnValue;
 
   } catch (error) {
     Logger.log('❌ ERROR in getTimesheetBreakdownData: ' + error.message);
