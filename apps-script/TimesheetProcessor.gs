@@ -294,12 +294,15 @@ function parseTimeString(timeString) {
 
 /**
  * Calculate bathroom time from bathroom entry/exit punches
+ * Only counts breaks during work periods (not before clock-in, during lunch, or after clock-out)
  *
  * @param {Array} bathroomPunches - Array of bathroom punch objects
  * @param {Object} config - Time configuration
+ * @param {Array} clockPunches - Array of clock in/out punches for determining work periods
+ * @param {boolean} isFriday - Whether this is a Friday
  * @returns {Object} Bathroom time details
  */
-function calculateBathroomTime(bathroomPunches, config) {
+function calculateBathroomTime(bathroomPunches, config, clockPunches, isFriday) {
   if (!bathroomPunches || bathroomPunches.length === 0) {
     return {
       totalMinutes: 0,
@@ -315,6 +318,66 @@ function calculateBathroomTime(bathroomPunches, config) {
   var warnings = [];
   var unpairedEntries = [];
   var unpairedExits = [];
+
+  // Determine work periods from clock punches
+  // Mon-Thu: Morning (Clock1-Clock2), Afternoon (Clock3-Clock4)
+  // Friday: Full day (Clock1-Clock2)
+  var workPeriods = [];
+
+  if (clockPunches && clockPunches.length > 0) {
+    // Sort clock punches by time
+    var sortedClocks = clockPunches.slice().sort(function(a, b) {
+      return a.time.getTime() - b.time.getTime();
+    });
+
+    if (isFriday) {
+      // Friday: one work period from first to last punch
+      if (sortedClocks.length >= 2) {
+        workPeriods.push({
+          start: sortedClocks[0].time,
+          end: sortedClocks[sortedClocks.length - 1].time
+        });
+      } else if (sortedClocks.length === 1) {
+        // Only one punch - no valid work period
+        workPeriods = [];
+      }
+    } else {
+      // Mon-Thu: Morning and Afternoon periods
+      if (sortedClocks.length >= 2) {
+        // Morning: Clock 1 to Clock 2
+        workPeriods.push({
+          start: sortedClocks[0].time,
+          end: sortedClocks[1].time
+        });
+      }
+      if (sortedClocks.length >= 4) {
+        // Afternoon: Clock 3 to Clock 4
+        workPeriods.push({
+          start: sortedClocks[2].time,
+          end: sortedClocks[3].time
+        });
+      } else if (sortedClocks.length === 3) {
+        // Only 3 punches - afternoon period is Clock 3 to end of day (but we don't have Clock 4)
+        // Don't count afternoon bathroom breaks
+      }
+    }
+  }
+
+  Logger.log('  🚻 Work periods for bathroom filtering: ' + workPeriods.length);
+  workPeriods.forEach(function(period, idx) {
+    Logger.log('    Period ' + (idx + 1) + ': ' + formatTime(period.start) + ' - ' + formatTime(period.end));
+  });
+
+  // Helper function to check if a time falls within work periods
+  function isWithinWorkPeriods(time) {
+    for (var i = 0; i < workPeriods.length; i++) {
+      var period = workPeriods[i];
+      if (time.getTime() >= period.start.getTime() && time.getTime() <= period.end.getTime()) {
+        return true;
+      }
+    }
+    return false;
+  }
 
   // Sort punches by time
   bathroomPunches.sort(function(a, b) {
@@ -347,6 +410,7 @@ function calculateBathroomTime(bathroomPunches, config) {
 
   // Match entries with exits
   var usedExits = [];
+  var outsideWorkPeriodBreaks = [];
 
   for (var i = 0; i < entries.length; i++) {
     var entry = entries[i];
@@ -360,7 +424,6 @@ function calculateBathroomTime(bathroomPunches, config) {
       if (exit.time.getTime() > entry.time.getTime()) {
         // Found a matching exit
         var duration = (exit.time.getTime() - entry.time.getTime()) / (60 * 1000);
-        totalMinutes += duration;
 
         var breakInfo = {
           entry: formatTime(entry.time),
@@ -368,13 +431,28 @@ function calculateBathroomTime(bathroomPunches, config) {
           minutes: Math.round(duration)
         };
 
-        // Check for long bathroom break
-        if (duration > config.longBathroomThreshold) {
-          breakInfo.warning = 'Long bathroom break (' + Math.round(duration) + ' min)';
-          warnings.push(breakInfo.warning);
+        // Check if break is within work periods
+        var entryInWorkPeriod = isWithinWorkPeriods(entry.time);
+        var exitInWorkPeriod = isWithinWorkPeriods(exit.time);
+
+        if (entryInWorkPeriod || exitInWorkPeriod) {
+          // Count this break (at least partially during work)
+          totalMinutes += duration;
+
+          // Check for long bathroom break
+          if (duration > config.longBathroomThreshold) {
+            breakInfo.warning = 'Long bathroom break (' + Math.round(duration) + ' min)';
+            warnings.push(breakInfo.warning);
+          }
+
+          breaks.push(breakInfo);
+        } else {
+          // Break is outside work periods - track but don't count
+          breakInfo.outsideWorkPeriod = true;
+          outsideWorkPeriodBreaks.push(breakInfo);
+          Logger.log('    🚻 Bathroom break ' + breakInfo.entry + '-' + breakInfo.exit + ' outside work periods - not counted');
         }
 
-        breaks.push(breakInfo);
         usedExits.push(j);
         matched = true;
         break;
@@ -382,17 +460,26 @@ function calculateBathroomTime(bathroomPunches, config) {
     }
 
     if (!matched) {
-      // Entry without exit
-      unpairedEntries.push(formatTime(entry.time));
-      warnings.push('Bathroom entry at ' + formatTime(entry.time) + ' without exit');
+      // Entry without exit - only report if during work hours
+      if (isWithinWorkPeriods(entry.time)) {
+        unpairedEntries.push(formatTime(entry.time));
+        warnings.push('Bathroom entry at ' + formatTime(entry.time) + ' without exit');
+      } else {
+        Logger.log('    🚻 Unpaired entry at ' + formatTime(entry.time) + ' outside work periods - ignored');
+      }
     }
   }
 
   // Find exits without entries
   for (var j = 0; j < exits.length; j++) {
     if (usedExits.indexOf(j) === -1) {
-      unpairedExits.push(formatTime(exits[j].time));
-      warnings.push('Bathroom exit at ' + formatTime(exits[j].time) + ' without entry');
+      // Only report if during work hours
+      if (isWithinWorkPeriods(exits[j].time)) {
+        unpairedExits.push(formatTime(exits[j].time));
+        warnings.push('Bathroom exit at ' + formatTime(exits[j].time) + ' without entry');
+      } else {
+        Logger.log('    🚻 Unpaired exit at ' + formatTime(exits[j].time) + ' outside work periods - ignored');
+      }
     }
   }
 
@@ -889,8 +976,8 @@ function processDayData(dayData, config) {
     appliedRules.push('lunchDeducted');
   }
 
-  // Calculate bathroom time
-  var bathroomResult = calculateBathroomTime(dayData.bathroomPunches, config);
+  // Calculate bathroom time - pass clock punches to filter by work periods
+  var bathroomResult = calculateBathroomTime(dayData.bathroomPunches, config, dayData.clockInPunches, isFriday);
   if (bathroomResult.warnings.length > 0) {
     warnings = warnings.concat(bathroomResult.warnings);
   }
