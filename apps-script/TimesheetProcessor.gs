@@ -667,12 +667,14 @@ function processClockData(clockData, config) {
       return filtered;
     }
 
-    // Apply duplicate detection separately to each category
+    // Apply duplicate detection to main punches only
+    // Bathroom duplicates will be filtered later in calculateBathroomTime
+    // where entries and exits are separated (filtering them here causes
+    // exits to be incorrectly filtered when they're close to entries)
     var filteredMainPunches = filterDuplicates(mainPunches, 'MAIN');
-    var filteredBathroomPunches = filterDuplicates(bathroomPunches, 'BATHROOM');
 
     // Merge back together and sort by time
-    var filteredClockData = filteredMainPunches.concat(filteredBathroomPunches);
+    var filteredClockData = filteredMainPunches.concat(bathroomPunches);
     filteredClockData.sort(function(a, b) {
       try {
         var timeA = parseTime(a.PUNCH_TIME);
@@ -684,7 +686,7 @@ function processClockData(clockData, config) {
     });
 
     Logger.log('\n📋 DIAGNOSTIC: After duplicate filtering - Total: ' + filteredClockData.length +
-               ' (Main: ' + filteredMainPunches.length + ', Bathroom: ' + filteredBathroomPunches.length + ')');
+               ' (Main: ' + filteredMainPunches.length + ', Bathroom: ' + bathroomPunches.length + ')');
 
     // Use filtered data for processing
     clockData = filteredClockData;
