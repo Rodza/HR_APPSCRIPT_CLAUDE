@@ -1244,3 +1244,111 @@ function test_timesheetProcessor() {
 
   Logger.log('========== TEST COMPLETE ==========\n');
 }
+
+/**
+ * Test function to debug bathroom matching for Eric Moses Sithole on 2025-11-20
+ */
+function test_EricSitholeBathroom() {
+  Logger.log('\n========== TEST: ERIC SITHOLE BATHROOM DEBUG ==========');
+
+  var sheets = getSheets_v2();
+  var rawClockSheet = sheets.rawClockData;
+
+  if (!rawClockSheet) {
+    Logger.log('❌ RAW_CLOCK_DATA sheet not found');
+    return;
+  }
+
+  // Get raw clock data
+  var rawData = rawClockSheet.getDataRange().getValues();
+  var rawHeaders = rawData[0];
+
+  // Find column indices
+  var empNameCol = -1, empClockRefCol = -1, punchDateCol = -1, punchTimeCol = -1, deviceCol = -1;
+  for (var i = 0; i < rawHeaders.length; i++) {
+    var header = String(rawHeaders[i]).toUpperCase().trim();
+    if (header === 'EMPLOYEE_NAME') empNameCol = i;
+    if (header === 'EMPLOYEE_CLOCK_REF') empClockRefCol = i;
+    if (header === 'PUNCH_DATE') punchDateCol = i;
+    if (header === 'PUNCH_TIME') punchTimeCol = i;
+    if (header === 'DEVICE_NAME') deviceCol = i;
+  }
+
+  Logger.log('Column indices - Name: ' + empNameCol + ', ClockRef: ' + empClockRefCol +
+             ', PunchDate: ' + punchDateCol + ', PunchTime: ' + punchTimeCol + ', Device: ' + deviceCol);
+
+  // Filter for Eric Moses Sithole (clock ref 1008) on 2025-11-20
+  var targetClockRef = '1008';
+  var targetDate = '2025-11-20';
+  var clockData = [];
+
+  for (var j = 1; j < rawData.length; j++) {
+    var row = rawData[j];
+    var clockRef = String(row[empClockRefCol]).trim();
+    var punchTime = row[punchTimeCol];
+
+    if (clockRef === targetClockRef && punchTime) {
+      var punchDate;
+      if (punchTime instanceof Date) {
+        punchDate = Utilities.formatDate(punchTime, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+      } else {
+        punchDate = String(row[punchDateCol]).substring(0, 10);
+      }
+
+      if (punchDate === targetDate) {
+        clockData.push({
+          EMPLOYEE_NAME: row[empNameCol],
+          PUNCH_DATE: row[punchDateCol],
+          PUNCH_TIME: punchTime,
+          DEVICE_NAME: row[deviceCol] || 'Main Unit'
+        });
+      }
+    }
+  }
+
+  Logger.log('\n📊 Found ' + clockData.length + ' punches for Eric Moses Sithole on 2025-11-20');
+
+  // Log all punches
+  Logger.log('\n📋 All punches (sorted by time):');
+  clockData.sort(function(a, b) {
+    var timeA = parseTime(a.PUNCH_TIME);
+    var timeB = parseTime(b.PUNCH_TIME);
+    return timeA.getTime() - timeB.getTime();
+  });
+
+  for (var i = 0; i < clockData.length; i++) {
+    var punch = clockData[i];
+    var time = parseTime(punch.PUNCH_TIME);
+    Logger.log('  ' + (i + 1) + '. ' + formatTime(time) + ' - ' + punch.DEVICE_NAME);
+  }
+
+  // Get config and process
+  var configResult = getTimeConfig();
+  var config = configResult.success ? configResult.data : DEFAULT_TIME_CONFIG;
+
+  Logger.log('\n🔄 Processing clock data...');
+  var result = processClockData(clockData, config);
+
+  if (result.success) {
+    Logger.log('\n✅ Processing complete');
+    Logger.log('Total paid time: ' + result.data.calculatedTotalHours + 'h ' + result.data.calculatedTotalMinutes + 'm');
+    Logger.log('Total bathroom time: ' + result.data.bathroomTimeMinutes + 'm');
+
+    // Show daily breakdown
+    if (result.data.dailyBreakdown && result.data.dailyBreakdown.length > 0) {
+      var day = result.data.dailyBreakdown[0];
+      Logger.log('\n📅 Day breakdown for ' + day.date + ':');
+      Logger.log('  Bathroom breaks counted: ' + (day.bathroomBreaks ? day.bathroomBreaks.length : 0));
+      if (day.bathroomBreaks) {
+        day.bathroomBreaks.forEach(function(brk, idx) {
+          Logger.log('    Break ' + (idx + 1) + ': ' + brk.entry + ' - ' + brk.exit + ' (' + brk.minutes + 'm)');
+        });
+      }
+      Logger.log('  Total bathroom minutes: ' + day.bathroomMinutes);
+    }
+  } else {
+    Logger.log('❌ Processing failed: ' + result.error);
+  }
+
+  Logger.log('\n========== TEST COMPLETE ==========');
+}
