@@ -304,41 +304,95 @@ function calculateBathroomTime(bathroomPunches, config) {
     return {
       totalMinutes: 0,
       breaks: [],
-      warnings: []
+      warnings: [],
+      unpairedEntries: [],
+      unpairedExits: []
     };
   }
 
   var breaks = [];
   var totalMinutes = 0;
   var warnings = [];
+  var unpairedEntries = [];
+  var unpairedExits = [];
 
   // Sort punches by time
   bathroomPunches.sort(function(a, b) {
     return a.time.getTime() - b.time.getTime();
   });
 
-  // Pair entry/exit punches
-  for (var i = 0; i < bathroomPunches.length; i += 2) {
-    if (i + 1 < bathroomPunches.length) {
-      var entry = bathroomPunches[i];
-      var exit = bathroomPunches[i + 1];
+  // Separate entries and exits based on device name
+  var entries = [];
+  var exits = [];
 
-      var duration = (exit.time.getTime() - entry.time.getTime()) / (60 * 1000);
-      totalMinutes += duration;
+  for (var i = 0; i < bathroomPunches.length; i++) {
+    var punch = bathroomPunches[i];
+    var deviceLower = (punch.device || '').toLowerCase();
 
-      var breakInfo = {
-        entry: formatTime(entry.time),
-        exit: formatTime(exit.time),
-        minutes: Math.round(duration)
-      };
-
-      // Check for long bathroom break
-      if (duration > config.longBathroomThreshold) {
-        breakInfo.warning = 'Long bathroom break (' + Math.round(duration) + ' min)';
-        warnings.push(breakInfo.warning);
+    if (deviceLower.indexOf('entry') >= 0) {
+      entries.push(punch);
+    } else if (deviceLower.indexOf('exit') >= 0) {
+      exits.push(punch);
+    } else {
+      // Unknown bathroom device - treat as entry if even index, exit if odd
+      if (i % 2 === 0) {
+        entries.push(punch);
+      } else {
+        exits.push(punch);
       }
+    }
+  }
 
-      breaks.push(breakInfo);
+  Logger.log('  🚻 Bathroom punches - Entries: ' + entries.length + ', Exits: ' + exits.length);
+
+  // Match entries with exits
+  var usedExits = [];
+
+  for (var i = 0; i < entries.length; i++) {
+    var entry = entries[i];
+    var matched = false;
+
+    // Find the first exit that comes after this entry
+    for (var j = 0; j < exits.length; j++) {
+      if (usedExits.indexOf(j) >= 0) continue; // Already used
+
+      var exit = exits[j];
+      if (exit.time.getTime() > entry.time.getTime()) {
+        // Found a matching exit
+        var duration = (exit.time.getTime() - entry.time.getTime()) / (60 * 1000);
+        totalMinutes += duration;
+
+        var breakInfo = {
+          entry: formatTime(entry.time),
+          exit: formatTime(exit.time),
+          minutes: Math.round(duration)
+        };
+
+        // Check for long bathroom break
+        if (duration > config.longBathroomThreshold) {
+          breakInfo.warning = 'Long bathroom break (' + Math.round(duration) + ' min)';
+          warnings.push(breakInfo.warning);
+        }
+
+        breaks.push(breakInfo);
+        usedExits.push(j);
+        matched = true;
+        break;
+      }
+    }
+
+    if (!matched) {
+      // Entry without exit
+      unpairedEntries.push(formatTime(entry.time));
+      warnings.push('Bathroom entry at ' + formatTime(entry.time) + ' without exit');
+    }
+  }
+
+  // Find exits without entries
+  for (var j = 0; j < exits.length; j++) {
+    if (usedExits.indexOf(j) === -1) {
+      unpairedExits.push(formatTime(exits[j].time));
+      warnings.push('Bathroom exit at ' + formatTime(exits[j].time) + ' without entry');
     }
   }
 
@@ -350,7 +404,9 @@ function calculateBathroomTime(bathroomPunches, config) {
   return {
     totalMinutes: Math.round(totalMinutes),
     breaks: breaks,
-    warnings: warnings
+    warnings: warnings,
+    unpairedEntries: unpairedEntries,
+    unpairedExits: unpairedExits
   };
 }
 
@@ -913,6 +969,8 @@ function processDayData(dayData, config) {
     lunchMinutes: lunchResult.lunchMinutes,
     bathroomMinutes: bathroomResult.totalMinutes,
     bathroomBreaks: bathroomResult.breaks,
+    bathroomUnpairedEntries: bathroomResult.unpairedEntries,
+    bathroomUnpairedExits: bathroomResult.unpairedExits,
     totalMinutes: Math.round(totalMinutes),
     warnings: warnings,
     appliedRules: appliedRules
