@@ -391,9 +391,14 @@ function processClockData(clockData, config) {
     // CRITICAL: Sort clock data by date and time FIRST before assigning in/out types
     // The alternating pattern only works if punches are processed in chronological order
     clockData.sort(function(a, b) {
-      var timeA = parseTime(a.PUNCH_TIME);
-      var timeB = parseTime(b.PUNCH_TIME);
-      return timeA.getTime() - timeB.getTime();
+      try {
+        var timeA = parseTime(a.PUNCH_TIME);
+        var timeB = parseTime(b.PUNCH_TIME);
+        return timeA.getTime() - timeB.getTime();
+      } catch (e) {
+        Logger.log('  ❌ ERROR in sort comparing: ' + a.PUNCH_TIME + ' vs ' + b.PUNCH_TIME);
+        return 0; // Keep original order if parsing fails
+      }
     });
 
     // FIXED: Separate main and bathroom punches BEFORE duplicate detection
@@ -426,7 +431,15 @@ function processClockData(clockData, config) {
 
       for (var i = 0; i < punches.length; i++) {
         var record = punches[i];
-        var punchTime = parseTime(record.PUNCH_TIME);
+
+        // Safely parse punch time with error handling
+        var punchTime;
+        try {
+          punchTime = parseTime(record.PUNCH_TIME);
+        } catch (e) {
+          Logger.log('  ❌ ERROR parsing PUNCH_TIME for ' + category + ': ' + record.PUNCH_TIME + ' - ' + e.message);
+          continue; // Skip this record
+        }
 
         if (lastPunchTime === null) {
           // First punch, always keep
@@ -462,9 +475,13 @@ function processClockData(clockData, config) {
     // Merge back together and sort by time
     var filteredClockData = filteredMainPunches.concat(filteredBathroomPunches);
     filteredClockData.sort(function(a, b) {
-      var timeA = parseTime(a.PUNCH_TIME);
-      var timeB = parseTime(b.PUNCH_TIME);
-      return timeA.getTime() - timeB.getTime();
+      try {
+        var timeA = parseTime(a.PUNCH_TIME);
+        var timeB = parseTime(b.PUNCH_TIME);
+        return timeA.getTime() - timeB.getTime();
+      } catch (e) {
+        return 0; // Keep original order if parsing fails
+      }
     });
 
     Logger.log('\n📋 DIAGNOSTIC: After duplicate filtering - Total: ' + filteredClockData.length +
