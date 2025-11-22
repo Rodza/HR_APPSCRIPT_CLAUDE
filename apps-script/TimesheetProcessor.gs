@@ -440,9 +440,21 @@ function calculateBathroomTime(bathroomPunches, config, clockPunches, isFriday) 
 
   Logger.log('  🚻 Bathroom punches - Entries: ' + entries.length + ' (was ' + originalEntries + '), Exits: ' + exits.length + ' (was ' + originalExits + ')');
 
+  // Log all entries and exits after filtering
+  Logger.log('  📋 Filtered entries:');
+  for (var i = 0; i < entries.length; i++) {
+    Logger.log('    ' + (i + 1) + '. ' + formatTime(entries[i].time));
+  }
+  Logger.log('  📋 Filtered exits:');
+  for (var i = 0; i < exits.length; i++) {
+    Logger.log('    ' + (i + 1) + '. ' + formatTime(exits[i].time));
+  }
+
   // Match entries with exits
   var usedExits = [];
   var outsideWorkPeriodBreaks = [];
+
+  Logger.log('  🔗 Matching entries to exits:');
 
   for (var i = 0; i < entries.length; i++) {
     var entry = entries[i];
@@ -456,6 +468,8 @@ function calculateBathroomTime(bathroomPunches, config, clockPunches, isFriday) 
       if (exit.time.getTime() > entry.time.getTime()) {
         // Found a matching exit
         var duration = (exit.time.getTime() - entry.time.getTime()) / (60 * 1000);
+
+        Logger.log('    Entry ' + formatTime(entry.time) + ' → Exit ' + formatTime(exit.time) + ' (' + Math.round(duration) + 'm)');
 
         var breakInfo = {
           entry: formatTime(entry.time),
