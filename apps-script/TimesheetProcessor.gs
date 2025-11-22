@@ -406,7 +406,39 @@ function calculateBathroomTime(bathroomPunches, config, clockPunches, isFriday) 
     }
   }
 
-  Logger.log('  🚻 Bathroom punches - Entries: ' + entries.length + ', Exits: ' + exits.length);
+  // Filter duplicates within each category (within 60 seconds)
+  function filterBathroomDuplicates(punches) {
+    if (punches.length === 0) return [];
+
+    // Sort by time first
+    punches.sort(function(a, b) {
+      return a.time.getTime() - b.time.getTime();
+    });
+
+    var filtered = [punches[0]];
+    var DUPLICATE_THRESHOLD_MS = 60 * 1000; // 60 seconds
+
+    for (var i = 1; i < punches.length; i++) {
+      var lastTime = filtered[filtered.length - 1].time.getTime();
+      var currentTime = punches[i].time.getTime();
+
+      if (currentTime - lastTime >= DUPLICATE_THRESHOLD_MS) {
+        filtered.push(punches[i]);
+      } else {
+        Logger.log('    🚻 Duplicate bathroom scan at ' + formatTime(punches[i].time) + ' - skipped');
+      }
+    }
+
+    return filtered;
+  }
+
+  var originalEntries = entries.length;
+  var originalExits = exits.length;
+
+  entries = filterBathroomDuplicates(entries);
+  exits = filterBathroomDuplicates(exits);
+
+  Logger.log('  🚻 Bathroom punches - Entries: ' + entries.length + ' (was ' + originalEntries + '), Exits: ' + exits.length + ' (was ' + originalExits + ')');
 
   // Match entries with exits
   var usedExits = [];
@@ -432,11 +464,12 @@ function calculateBathroomTime(bathroomPunches, config, clockPunches, isFriday) 
         };
 
         // Check if break is within work periods
+        // Both entry AND exit must be within work periods to count
         var entryInWorkPeriod = isWithinWorkPeriods(entry.time);
         var exitInWorkPeriod = isWithinWorkPeriods(exit.time);
 
-        if (entryInWorkPeriod || exitInWorkPeriod) {
-          // Count this break (at least partially during work)
+        if (entryInWorkPeriod && exitInWorkPeriod) {
+          // Count this break - both entry and exit during work
           totalMinutes += duration;
 
           // Check for long bathroom break
@@ -446,11 +479,20 @@ function calculateBathroomTime(bathroomPunches, config, clockPunches, isFriday) 
           }
 
           breaks.push(breakInfo);
+          Logger.log('    ✓ Bathroom break ' + breakInfo.entry + '-' + breakInfo.exit + ' (' + breakInfo.minutes + 'm) - COUNTED');
         } else {
           // Break is outside work periods - track but don't count
           breakInfo.outsideWorkPeriod = true;
           outsideWorkPeriodBreaks.push(breakInfo);
-          Logger.log('    🚻 Bathroom break ' + breakInfo.entry + '-' + breakInfo.exit + ' outside work periods - not counted');
+          var reason = '';
+          if (!entryInWorkPeriod && !exitInWorkPeriod) {
+            reason = 'both entry and exit outside work';
+          } else if (!entryInWorkPeriod) {
+            reason = 'entry outside work (before clock-in or during lunch)';
+          } else {
+            reason = 'exit outside work (during lunch or after clock-out)';
+          }
+          Logger.log('    ✗ Bathroom break ' + breakInfo.entry + '-' + breakInfo.exit + ' (' + breakInfo.minutes + 'm) - NOT COUNTED: ' + reason);
         }
 
         usedExits.push(j);
