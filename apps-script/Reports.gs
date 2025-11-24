@@ -373,7 +373,7 @@ function generateWeeklyPayrollSummaryReport(weekEnding) {
       totals.otherDeductions += p['OTHER DEDUCTIONS'] || 0;
       totals.loanDeductions += p['LoanDeductionThisWeek'] || 0;
       totals.netPay += p['NETTSALARY'] || 0;
-      totals.paidToAccounts += p['PaidToAccount'] || 0;
+      totals.paidToAccounts += p['PaidtoAccount'] || 0;
 
       // Track by employer
       const employer = p['EMPLOYER'];
@@ -389,7 +389,7 @@ function generateWeeklyPayrollSummaryReport(weekEnding) {
       byEmployer[employer].count++;
       byEmployer[employer].grossPay += p['GROSSSALARY'] || 0;
       byEmployer[employer].netPay += p['NETTSALARY'] || 0;
-      byEmployer[employer].paidToAccounts += p['PaidToAccount'] || 0;
+      byEmployer[employer].paidToAccounts += p['PaidtoAccount'] || 0;
     }
 
     // Create Google Sheet
@@ -441,7 +441,7 @@ function generateWeeklyPayrollSummaryReport(weekEnding) {
         p['LoanDeductionThisWeek'] || 0,
         p['NETTSALARY'] || 0,
         p['NewLoanThisWeek'] || 0,
-        p['PaidToAccount'] || 0
+        p['PaidtoAccount'] || 0
       ]]);
       rowNum++;
     }
