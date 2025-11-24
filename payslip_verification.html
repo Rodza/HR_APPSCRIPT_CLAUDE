@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+  </head>
+  <body>
+    <h1>Payslip Verification</h1>
+    <iframe id="payslip-frame" width="100%" height="800px" style="border: 1px solid #ccc;"></iframe>
+    <script>
+      document.addEventListener("DOMContentLoaded", function() {
+        google.script.run
+          .withSuccessHandler(function(htmlContent) {
+            var iframe = document.getElementById('payslip-frame');
+            // Setting srcdoc is generally better for inline HTML
+            // but for wider compatibility, the data URI approach is fine.
+            iframe.src = "data:text/html;charset=utf-8," + encodeURIComponent(htmlContent);
+          })
+          .withFailureHandler(function(error) {
+            document.body.innerHTML = '<h1>Error</h1><p>Failed to get payslip HTML: ' + error.message + '</p>';
+          })
+          .getTestPayslipHtml();
+      });
+    </script>
+  </body>
+</html>
