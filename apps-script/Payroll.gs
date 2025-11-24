@@ -610,25 +610,24 @@ function generatePayslipPDF(recordNumber) {
     headerTable.setBorderWidth(0);
 
     const headerRow1 = headerTable.appendTableRow();
-    headerRow1.appendTableCell(`Payslip No: #${payslip.RECORDNUMBER}`).setBold(true);
-    headerRow1.appendTableCell(payslip.EMPLOYER || 'SA Grinding Wheels')
-      .setAlignment(DocumentApp.HorizontalAlignment.RIGHT)
-      .setBold(true);
+    headerRow1.appendTableCell(`Payslip No: #${payslip.RECORDNUMBER}`).getChild(0).asParagraph().setBold(true);
+    const employerCell1 = headerRow1.appendTableCell(payslip.EMPLOYER || 'SA Grinding Wheels');
+    employerCell1.getChild(0).asParagraph().setAlignment(DocumentApp.HorizontalAlignment.RIGHT).setBold(true);
 
     const headerRow2 = headerTable.appendTableRow();
     headerRow2.appendTableCell('');
-    headerRow2.appendTableCell('18 DODGE STREET, AUREUS, RANDFONTEIN')
-      .setAlignment(DocumentApp.HorizontalAlignment.RIGHT);
+    const addressCell = headerRow2.appendTableCell('18 DODGE STREET, AUREUS, RANDFONTEIN');
+    addressCell.getChild(0).asParagraph().setAlignment(DocumentApp.HorizontalAlignment.RIGHT);
 
     const headerRow3 = headerTable.appendTableRow();
     headerRow3.appendTableCell('');
-    headerRow3.appendTableCell('(011) 693 4278 / 083 338 5609')
-      .setAlignment(DocumentApp.HorizontalAlignment.RIGHT);
+    const phoneCell = headerRow3.appendTableCell('(011) 693 4278 / 083 338 5609');
+    phoneCell.getChild(0).asParagraph().setAlignment(DocumentApp.HorizontalAlignment.RIGHT);
 
     const headerRow4 = headerTable.appendTableRow();
     headerRow4.appendTableCell('');
-    headerRow4.appendTableCell('INFO@SAGRINDING.CO.ZA')
-      .setAlignment(DocumentApp.HorizontalAlignment.RIGHT);
+    const emailCell = headerRow4.appendTableCell('INFO@SAGRINDING.CO.ZA');
+    emailCell.getChild(0).asParagraph().setAlignment(DocumentApp.HorizontalAlignment.RIGHT);
 
     body.appendParagraph('');
 
@@ -637,15 +636,21 @@ function generatePayslipPDF(recordNumber) {
     empInfoTable.setBorderWidth(1);
 
     const empRow1 = empInfoTable.appendTableRow();
-    empRow1.appendTableCell('Employee:').setBold(true).setBackgroundColor('#f2f2f2');
+    const empLabel1 = empRow1.appendTableCell('Employee:');
+    empLabel1.setBackgroundColor('#f2f2f2');
+    empLabel1.getChild(0).asParagraph().setBold(true);
     empRow1.appendTableCell(payslip['EMPLOYEE NAME'] || '');
 
     const empRow2 = empInfoTable.appendTableRow();
-    empRow2.appendTableCell('Week Ending:').setBold(true).setBackgroundColor('#f2f2f2');
+    const empLabel2 = empRow2.appendTableCell('Week Ending:');
+    empLabel2.setBackgroundColor('#f2f2f2');
+    empLabel2.getChild(0).asParagraph().setBold(true);
     empRow2.appendTableCell(formatDateForDisplay(payslip.WEEKENDING));
 
     const empRow3 = empInfoTable.appendTableRow();
-    empRow3.appendTableCell('Employment Status:').setBold(true).setBackgroundColor('#f2f2f2');
+    const empLabel3 = empRow3.appendTableCell('Employment Status:');
+    empLabel3.setBackgroundColor('#f2f2f2');
+    empLabel3.getChild(0).asParagraph().setBold(true);
     empRow3.appendTableCell(payslip['EMPLOYMENT STATUS'] || '');
 
     body.appendParagraph('');
@@ -658,11 +663,20 @@ function generatePayslipPDF(recordNumber) {
 
     // Earnings header
     const earningsHeader = earningsTable.appendTableRow();
-    earningsHeader.appendTableCell('').setBackgroundColor('#f2f2f2').setBold(true);
-    earningsHeader.appendTableCell('HOURS').setBackgroundColor('#f2f2f2').setBold(true);
-    earningsHeader.appendTableCell('MINUTES').setBackgroundColor('#f2f2f2').setBold(true);
-    earningsHeader.appendTableCell('RATE').setBackgroundColor('#f2f2f2').setBold(true);
-    earningsHeader.appendTableCell('AMOUNT').setBackgroundColor('#f2f2f2').setBold(true);
+    const eh1 = earningsHeader.appendTableCell('');
+    eh1.setBackgroundColor('#f2f2f2');
+    const eh2 = earningsHeader.appendTableCell('HOURS');
+    eh2.setBackgroundColor('#f2f2f2');
+    eh2.getChild(0).asParagraph().setBold(true);
+    const eh3 = earningsHeader.appendTableCell('MINUTES');
+    eh3.setBackgroundColor('#f2f2f2');
+    eh3.getChild(0).asParagraph().setBold(true);
+    const eh4 = earningsHeader.appendTableCell('RATE');
+    eh4.setBackgroundColor('#f2f2f2');
+    eh4.getChild(0).asParagraph().setBold(true);
+    const eh5 = earningsHeader.appendTableCell('AMOUNT');
+    eh5.setBackgroundColor('#f2f2f2');
+    eh5.getChild(0).asParagraph().setBold(true);
 
     // Normal Time
     const normalTimeRow = earningsTable.appendTableRow();
@@ -714,9 +728,15 @@ function generatePayslipPDF(recordNumber) {
 
     // Deductions header
     const deductionsHeader = deductionsTable.appendTableRow();
-    deductionsHeader.appendTableCell('UIF').setBackgroundColor('#f2f2f2').setBold(true);
-    deductionsHeader.appendTableCell('OTHER DEDUCTIONS').setBackgroundColor('#f2f2f2').setBold(true);
-    deductionsHeader.appendTableCell('NOTES').setBackgroundColor('#f2f2f2').setBold(true);
+    const dh1 = deductionsHeader.appendTableCell('UIF');
+    dh1.setBackgroundColor('#f2f2f2');
+    dh1.getChild(0).asParagraph().setBold(true);
+    const dh2 = deductionsHeader.appendTableCell('OTHER DEDUCTIONS');
+    dh2.setBackgroundColor('#f2f2f2');
+    dh2.getChild(0).asParagraph().setBold(true);
+    const dh3 = deductionsHeader.appendTableCell('NOTES');
+    dh3.setBackgroundColor('#f2f2f2');
+    dh3.getChild(0).asParagraph().setBold(true);
 
     // Deductions values
     const deductionsValueRow = deductionsTable.appendTableRow();
@@ -734,17 +754,23 @@ function generatePayslipPDF(recordNumber) {
 
     // Opening Balance
     const openingBalanceRow = loansTable.appendTableRow();
-    openingBalanceRow.appendTableCell('Opening Balance').setBackgroundColor('#f2f2f2').setBold(true);
+    const lh1 = openingBalanceRow.appendTableCell('Opening Balance');
+    lh1.setBackgroundColor('#f2f2f2');
+    lh1.getChild(0).asParagraph().setBold(true);
     openingBalanceRow.appendTableCell(`R${formatAmount(payslip.CurrentLoanBalance)}`);
 
     // Loan/Repayment
     const loanTypeRow = loansTable.appendTableRow();
-    loanTypeRow.appendTableCell('Loan/Repayment').setBackgroundColor('#f2f2f2').setBold(true);
+    const lh2 = loanTypeRow.appendTableCell('Loan/Repayment');
+    lh2.setBackgroundColor('#f2f2f2');
+    lh2.getChild(0).asParagraph().setBold(true);
     loanTypeRow.appendTableCell(payslip.LoanDisbursementType || 'Separate');
 
     // Deduction This Week
     const loanDeductionRow = loansTable.appendTableRow();
-    loanDeductionRow.appendTableCell('Deduction This Week').setBackgroundColor('#f2f2f2').setBold(true);
+    const lh3 = loanDeductionRow.appendTableCell('Deduction This Week');
+    lh3.setBackgroundColor('#f2f2f2');
+    lh3.getChild(0).asParagraph().setBold(true);
     const deductionText = payslip.NewLoanThisWeek > 0
       ? `R${formatAmount(payslip.LoanDeductionThisWeek)} / New: R${formatAmount(payslip.NewLoanThisWeek)}`
       : `R${formatAmount(payslip.LoanDeductionThisWeek)}`;
@@ -752,7 +778,9 @@ function generatePayslipPDF(recordNumber) {
 
     // Closing Balance
     const closingBalanceRow = loansTable.appendTableRow();
-    closingBalanceRow.appendTableCell('Closing Balance').setBackgroundColor('#f2f2f2').setBold(true);
+    const lh4 = closingBalanceRow.appendTableCell('Closing Balance');
+    lh4.setBackgroundColor('#f2f2f2');
+    lh4.getChild(0).asParagraph().setBold(true);
     closingBalanceRow.appendTableCell(`R${formatAmount(payslip.UpdatedLoanBalance)}`);
 
     body.appendParagraph('');
@@ -763,23 +791,36 @@ function generatePayslipPDF(recordNumber) {
 
     // Gross Pay
     const grossRow = summaryTable.appendTableRow();
-    grossRow.appendTableCell('GROSS PAY').setBold(true).setBackgroundColor('#f2f2f2');
-    grossRow.appendTableCell(`R${formatAmount(payslip.GROSSSALARY)}`).setBold(true);
+    const grossLabel = grossRow.appendTableCell('GROSS PAY');
+    grossLabel.setBackgroundColor('#f2f2f2');
+    grossLabel.getChild(0).asParagraph().setBold(true);
+    const grossValue = grossRow.appendTableCell(`R${formatAmount(payslip.GROSSSALARY)}`);
+    grossValue.getChild(0).asParagraph().setBold(true);
 
     // Total Deductions
     const totalDeductionsRow = summaryTable.appendTableRow();
-    totalDeductionsRow.appendTableCell('TOTAL DEDUCTIONS').setBold(true).setBackgroundColor('#f2f2f2');
-    totalDeductionsRow.appendTableCell(`R${formatAmount(payslip.TOTALDEDUCTIONS)}`).setBold(true);
+    const tdLabel = totalDeductionsRow.appendTableCell('TOTAL DEDUCTIONS');
+    tdLabel.setBackgroundColor('#f2f2f2');
+    tdLabel.getChild(0).asParagraph().setBold(true);
+    const tdValue = totalDeductionsRow.appendTableCell(`R${formatAmount(payslip.TOTALDEDUCTIONS)}`);
+    tdValue.getChild(0).asParagraph().setBold(true);
 
     // Nett Pay
     const nettPayRow = summaryTable.appendTableRow();
-    nettPayRow.appendTableCell('NETT PAY').setBold(true).setBackgroundColor('#f2f2f2');
-    nettPayRow.appendTableCell(`R${formatAmount(payslip.NETTSALARY)}`).setBold(true);
+    const nettLabel = nettPayRow.appendTableCell('NETT PAY');
+    nettLabel.setBackgroundColor('#f2f2f2');
+    nettLabel.getChild(0).asParagraph().setBold(true);
+    const nettValue = nettPayRow.appendTableCell(`R${formatAmount(payslip.NETTSALARY)}`);
+    nettValue.getChild(0).asParagraph().setBold(true);
 
     // Amount Paid to Account
     const paidRow = summaryTable.appendTableRow();
-    paidRow.appendTableCell('AMOUNT PAID TO ACCOUNT').setBold(true).setBackgroundColor('#e8f5e9');
-    paidRow.appendTableCell(`R${formatAmount(payslip.PaidtoAccount)}`).setBold(true).setBackgroundColor('#e8f5e9');
+    const paidLabel = paidRow.appendTableCell('AMOUNT PAID TO ACCOUNT');
+    paidLabel.setBackgroundColor('#e8f5e9');
+    paidLabel.getChild(0).asParagraph().setBold(true);
+    const paidValue = paidRow.appendTableCell(`R${formatAmount(payslip.PaidtoAccount)}`);
+    paidValue.setBackgroundColor('#e8f5e9');
+    paidValue.getChild(0).asParagraph().setBold(true);
 
     // === NOTES SECTION ===
     if (payslip.NOTES) {
