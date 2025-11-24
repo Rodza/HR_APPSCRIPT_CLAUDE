@@ -78,7 +78,7 @@ function generateOutstandingLoansReport(asOfDate) {
     reportData.sort((a, b) => b.balance - a.balance);
 
     // Create Google Sheet
-    const fileName = 'Outstanding Loans Report - ' + formatDateShort(reportDate);
+    const fileName = 'Outstanding Loans Report - ' + formatDate(reportDate);
     const spreadsheet = SpreadsheetApp.create(fileName);
     const sheet = spreadsheet.getActiveSheet();
 
@@ -220,7 +220,7 @@ function generateIndividualStatementReport(employeeId, startDate, endDate) {
 
     // Create Google Sheet
     const fileName = 'Loan Statement - ' + employee.REFNAME + ' - ' +
-                    formatDateShort(start) + ' to ' + formatDateShort(end);
+                    formatDate(start) + ' to ' + formatDate(end);
     const spreadsheet = SpreadsheetApp.create(fileName);
     const sheet = spreadsheet.getActiveSheet();
 
@@ -393,7 +393,7 @@ function generateWeeklyPayrollSummaryReport(weekEnding) {
     }
 
     // Create Google Sheet
-    const fileName = 'Weekly Payroll Summary - ' + formatDateShort(weekEnd);
+    const fileName = 'Weekly Payroll Summary - ' + formatDate(weekEnd);
     const spreadsheet = SpreadsheetApp.create(fileName);
 
     // ===== TAB 1: Payroll Register =====
