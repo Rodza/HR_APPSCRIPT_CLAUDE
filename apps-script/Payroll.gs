@@ -441,10 +441,11 @@ function listPayslips(filters) {
     }
 
     if (filters.weekEnding) {
-      const targetDate = parseDate(filters.weekEnding);
+      const targetDateStr = formatDate(parseDate(filters.weekEnding));
       payslips = payslips.filter(p => {
-        const payslipDate = parseDate(p.WEEKENDING);
-        return payslipDate.getTime() === targetDate.getTime();
+        if (!p.WEEKENDING) return false;
+        const payslipDateStr = formatDate(parseDate(p.WEEKENDING));
+        return payslipDateStr === targetDateStr;
       });
     }
 
