@@ -508,7 +508,7 @@ function validatePayslip(data) {
     const empName = data.employeeName || data['EMPLOYEE NAME'];
     const isDuplicate = checkDuplicatePayslip(empName, data.WEEKENDING);
     if (isDuplicate) {
-      errors.push('Payslip already exists for ' + empName + ' on ' + formatDateShort(data.WEEKENDING));
+      errors.push('Payslip already exists for ' + empName + ' on ' + formatDate(data.WEEKENDING));
     }
   }
 
