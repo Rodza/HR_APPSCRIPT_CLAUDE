@@ -586,262 +586,71 @@ function generatePayslipPDF(recordNumber) {
 
     const payslip = result.data;
 
-    // Create a temporary Google Doc
+    // Create PDF filename
     const docName = `Payslip_${payslip.RECORDNUMBER}_${payslip['EMPLOYEE NAME']}_${formatDateForFilename(payslip.WEEKENDING)}`;
+
+    // HTML template for payslip
+    const htmlTemplate = `<html><head><meta content="text/html; charset=UTF-8" http-equiv="content-type"><style type="text/css">ol{margin:0;padding:0}table td,table th{padding:0}.c32{border-right-style:solid;padding:5pt 5pt 5pt 5pt;border-bottom-color:#000000;border-top-width:1pt;border-right-width:1pt;border-left-color:#000000;vertical-align:top;border-right-color:#000000;border-left-width:1pt;border-top-style:solid;border-left-style:solid;border-bottom-width:1pt;width:57.6pt;border-top-color:#000000;border-bottom-style:solid}.c47{border-right-style:solid;padding:5pt 5pt 5pt 5pt;border-bottom-color:#000000;border-top-width:1.5pt;border-right-width:1pt;border-left-color:#000000;vertical-align:top;border-right-color:#000000;border-left-width:1.5pt;border-top-style:solid;border-left-style:solid;border-bottom-width:1pt;width:165pt;border-top-color:#000000;border-bottom-style:solid}.c25{border-right-style:solid;padding:5pt 5pt 5pt 5pt;border-bottom-color:#000000;border-top-width:1pt;border-right-width:1pt;border-left-color:#000000;vertical-align:top;border-right-color:#000000;border-left-width:1pt;border-top-style:solid;border-left-style:solid;border-bottom-width:1pt;width:320.2pt;border-top-color:#000000;border-bottom-style:solid}.c28{border-right-style:solid;padding:5pt 5pt 5pt 5pt;border-bottom-color:#000000;border-top-width:1.5pt;border-right-width:1.5pt;border-left-color:#000000;vertical-align:top;border-right-color:#000000;border-left-width:1pt;border-top-style:solid;border-left-style:solid;border-bottom-width:1pt;width:142.5pt;border-top-color:#000000;border-bottom-style:solid}.c52{border-right-style:solid;padding:5pt 5pt 5pt 5pt;border-bottom-color:#ffffff;border-top-width:0pt;border-right-width:0pt;border-left-color:#ffffff;vertical-align:top;border-right-color:#ffffff;border-left-width:1pt;border-top-style:solid;border-left-style:solid;border-bottom-width:0pt;width:12pt;border-top-color:#ffffff;border-bottom-style:solid}.c44{border-right-style:solid;padding:5pt 5pt 5pt 5pt;border-bottom-color:#000000;border-top-width:1pt;border-right-width:1pt;border-left-color:#000000;vertical-align:top;border-right-color:#000000;border-left-width:1pt;border-top-style:solid;border-left-style:solid;border-bottom-width:1pt;width:193.5pt;border-top-color:#000000;border-bottom-style:solid}.c41{border-right-style:solid;padding:5pt 5pt 5pt 5pt;border-bottom-color:#000000;border-top-width:1pt;border-right-width:1pt;border-left-color:#000000;vertical-align:top;border-right-color:#000000;border-left-width:1pt;border-top-style:solid;border-left-style:solid;border-bottom-width:1pt;width:142.5pt;border-top-color:#000000;border-bottom-style:solid}.c53{border-right-style:solid;padding:5pt 5pt 5pt 5pt;border-bottom-color:#000000;border-top-width:1pt;border-right-width:1pt;border-left-color:#000000;vertical-align:top;border-right-color:#000000;border-left-width:1.5pt;border-top-style:solid;border-left-style:solid;border-bottom-width:1pt;width:165pt;border-top-color:#000000;border-bottom-style:solid}.c6{border-right-style:solid;padding:5pt 5pt 5pt 5pt;border-bottom-color:#ffffff;border-top-width:0pt;border-right-width:0pt;border-left-color:#ffffff;vertical-align:top;border-right-color:#ffffff;border-left-width:0pt;border-top-style:solid;border-left-style:solid;border-bottom-width:0pt;width:204.8pt;border-top-color:#ffffff;border-bottom-style:solid}.c48{border-right-style:solid;padding:5pt 5pt 5pt 5pt;border-bottom-color:#000000;border-top-width:1pt;border-right-width:1pt;border-left-color:#000000;vertical-align:top;border-right-color:#000000;border-left-width:1pt;border-top-style:solid;border-left-style:solid;border-bottom-width:0pt;width:414pt;border-top-color:#000000;border-bottom-style:solid}.c42{border-right-style:solid;padding:5pt 5pt 5pt 5pt;border-bottom-color:#000000;border-top-width:1pt;border-right-width:1.5pt;border-left-color:#000000;vertical-align:top;border-right-color:#000000;border-left-width:1pt;border-top-style:solid;border-left-style:solid;border-bottom-width:1pt;width:142.5pt;border-top-color:#000000;border-bottom-style:dotted}.c39{border-right-style:solid;padding:5pt 5pt 5pt 5pt;border-bottom-color:#000000;border-top-width:0pt;border-right-width:1pt;border-left-color:#000000;vertical-align:top;border-right-color:#000000;border-left-width:1pt;border-top-style:solid;border-left-style:solid;border-bottom-width:1pt;width:114pt;border-top-color:#000000;border-bottom-style:solid}.c30{border-right-style:solid;padding:5pt 5pt 5pt 5pt;border-bottom-color:#000000;border-top-width:1pt;border-right-width:1pt;border-left-color:#000000;vertical-align:top;border-right-color:#000000;border-left-width:1pt;border-top-style:solid;border-left-style:solid;border-bottom-width:1pt;width:177.8pt;border-top-color:#000000;border-bottom-style:solid}.c15{border-right-style:solid;padding:5pt 5pt 5pt 5pt;border-bottom-color:#000000;border-top-width:1pt;border-right-width:1pt;border-left-color:#000000;vertical-align:top;border-right-color:#000000;border-left-width:0pt;border-top-style:solid;border-left-style:solid;border-bottom-width:1pt;width:126pt;border-top-color:#000000;border-bottom-style:solid}.c21{border-right-style:solid;padding:5pt 5pt 5pt 5pt;border-bottom-color:#000000;border-top-width:1pt;border-right-width:1pt;border-left-color:#000000;vertical-align:top;border-right-color:#000000;border-left-width:1pt;border-top-style:solid;border-left-style:solid;border-bottom-width:1pt;width:64.5pt;border-top-color:#000000;border-bottom-style:solid}.c4{border-right-style:solid;padding:5pt 5pt 5pt 5pt;border-bottom-color:#000000;border-top-width:1pt;border-right-width:1pt;border-left-color:#000000;vertical-align:top;border-right-color:#000000;border-left-width:1pt;border-top-style:solid;border-left-style:solid;border-bottom-width:1pt;width:676.8pt;border-top-color:#000000;border-bottom-style:solid}.c40{border-right-style:solid;padding:5pt 5pt 5pt 5pt;border-bottom-color:#ffffff;border-top-width:1pt;border-right-width:1pt;border-left-color:#ffffff;vertical-align:top;border-right-color:#ffffff;border-left-width:0pt;border-top-style:solid;border-left-style:solid;border-bottom-width:1pt;width:225.8pt;border-top-color:#ffffff;border-bottom-style:solid}.c23{border-right-style:solid;padding:5pt 5pt 5pt 5pt;border-bottom-color:#ffffff;border-top-width:0pt;border-right-width:0pt;border-left-color:#ffffff;vertical-align:top;border-right-color:#ffffff;border-left-width:0pt;border-top-style:solid;border-left-style:solid;border-bottom-width:0pt;width:12pt;border-top-color:#ffffff;border-bottom-style:solid}.c11{border-right-style:solid;padding:5pt 5pt 5pt 5pt;border-bottom-color:#000000;border-top-width:1pt;border-right-width:1pt;border-left-color:#000000;vertical-align:top;border-right-color:#000000;border-left-width:0pt;border-top-style:solid;border-left-style:solid;border-bottom-width:1pt;width:165.6pt;border-top-color:#000000;border-bottom-style:solid}.c14{border-right-style:solid;padding:5pt 5pt 5pt 5pt;border-bottom-color:#000000;border-top-width:1pt;border-right-width:1.5pt;border-left-color:#000000;vertical-align:top;border-right-color:#000000;border-left-width:1pt;border-top-style:solid;border-left-style:solid;border-bottom-width:1pt;width:142.5pt;border-top-color:#000000;border-bottom-style:solid}.c45{border-right-style:solid;padding:5pt 5pt 5pt 5pt;border-bottom-color:#000000;border-top-width:1pt;border-right-width:1pt;border-left-color:#000000;vertical-align:top;border-right-color:#000000;border-left-width:1pt;border-top-style:solid;border-left-style:solid;border-bottom-width:1pt;width:165pt;border-top-color:#000000;border-bottom-style:solid}.c19{border-right-style:solid;padding:5pt 5pt 5pt 5pt;border-bottom-color:#000000;border-top-width:1pt;border-right-width:1pt;border-left-color:#000000;vertical-align:top;border-right-color:#000000;border-left-width:1pt;border-top-style:solid;border-left-style:solid;border-bottom-width:1.5pt;width:142.5pt;border-top-color:#000000;border-bottom-style:solid}.c18{border-right-style:solid;padding:5pt 5pt 5pt 5pt;border-bottom-color:#000000;border-top-width:1pt;border-right-width:0pt;border-left-color:#000000;vertical-align:top;border-right-color:#000000;border-left-width:1pt;border-top-style:solid;border-left-style:solid;border-bottom-width:1pt;width:288pt;border-top-color:#000000;border-bottom-style:solid}.c26{border-right-style:solid;padding:5pt 5pt 5pt 5pt;border-bottom-color:#000000;border-top-width:1pt;border-right-width:1pt;border-left-color:#000000;vertical-align:top;border-right-color:#000000;border-left-width:1.5pt;border-top-style:solid;border-left-style:solid;border-bottom-width:1pt;width:165pt;border-top-color:#000000;border-bottom-style:dotted}.c31{border-right-style:solid;padding:5pt 5pt 5pt 5pt;border-bottom-color:#000000;border-top-width:1pt;border-right-width:1pt;border-left-color:#000000;vertical-align:top;border-right-color:#000000;border-left-width:1pt;border-top-style:solid;border-left-style:solid;border-bottom-width:1.5pt;width:165pt;border-top-color:#000000;border-bottom-style:solid}.c46{border-right-style:solid;padding:5pt 5pt 5pt 5pt;border-bottom-color:#ffffff;border-top-width:1pt;border-right-width:1pt;border-left-color:#ffffff;vertical-align:top;border-right-color:#ffffff;border-left-width:1pt;border-top-style:solid;border-left-style:solid;border-bottom-width:1pt;width:291pt;border-top-color:#ffffff;border-bottom-style:solid}.c0{border-right-style:solid;padding:5pt 5pt 5pt 5pt;border-bottom-color:#000000;border-top-width:1pt;border-right-width:1pt;border-left-color:#000000;vertical-align:top;border-right-color:#000000;border-left-width:1pt;border-top-style:solid;border-left-style:solid;border-bottom-width:1pt;width:12.8pt;border-top-color:#000000;border-bottom-style:solid}.c17{border-right-style:solid;padding:5pt 5pt 5pt 5pt;border-bottom-color:#000000;border-top-width:1pt;border-right-width:1pt;border-left-color:#000000;vertical-align:top;border-right-color:#000000;border-left-width:1pt;border-top-style:solid;border-left-style:solid;border-bottom-width:1pt;width:114pt;border-top-color:#000000;border-bottom-style:solid}.c49{border-right-style:solid;padding:5pt 5pt 5pt 5pt;border-bottom-color:#000000;border-top-width:1pt;border-right-width:1pt;border-left-color:#000000;vertical-align:top;border-right-color:#000000;border-left-width:1pt;border-top-style:solid;border-left-style:solid;border-bottom-width:1pt;width:106.5pt;border-top-color:#000000;border-bottom-style:solid}.c20{border-right-style:solid;padding:5pt 5pt 5pt 5pt;border-bottom-color:#000000;border-top-width:1pt;border-right-width:1.5pt;border-left-color:#000000;vertical-align:top;border-right-color:#000000;border-left-width:1pt;border-top-style:solid;border-left-style:solid;border-bottom-width:0pt;width:12.8pt;border-top-color:#000000;border-bottom-style:solid}.c35{border-right-style:solid;padding:5pt 5pt 5pt 5pt;border-bottom-color:#000000;border-top-width:1pt;border-right-width:0pt;border-left-color:#000000;vertical-align:top;border-right-color:#000000;border-left-width:1pt;border-top-style:solid;border-left-style:solid;border-bottom-width:1pt;width:154.8pt;border-top-color:#000000;border-bottom-style:solid}.c10{border-right-style:solid;padding:5pt 5pt 5pt 5pt;border-bottom-color:#000000;border-top-width:0pt;border-right-width:1.5pt;border-left-color:#000000;vertical-align:top;border-right-color:#000000;border-left-width:1pt;border-top-style:solid;border-left-style:solid;border-bottom-width:0pt;width:12.8pt;border-top-color:#000000;border-bottom-style:solid}.c43{border-right-style:solid;padding:5pt 5pt 5pt 5pt;border-bottom-color:#000000;border-top-width:1pt;border-right-width:0pt;border-left-color:#000000;vertical-align:top;border-right-color:#000000;border-left-width:1pt;border-top-style:solid;border-left-style:solid;border-bottom-width:1pt;width:568.8pt;border-top-color:#000000;border-bottom-style:solid}.c27{border-right-style:solid;border-bottom-color:#ffffff;border-top-width:1pt;border-right-width:0pt;border-left-color:#ffffff;vertical-align:top;border-right-color:#ffffff;border-left-width:0pt;border-top-style:solid;border-left-style:solid;border-bottom-width:1pt;width:291pt;border-top-color:#ffffff;border-bottom-style:solid}.c51{padding-top:32pt;padding-bottom:18pt;line-height:1.149999976158142;page-break-after:avoid;orphans:2;widows:2;text-align:left}.c3{color:#000000;font-weight:400;text-decoration:none;vertical-align:baseline;font-size:4pt;font-family:"Arial";font-style:normal}.c34{color:#000000;text-decoration:none;vertical-align:baseline;font-size:10pt;font-family:"Arial";font-style:normal}.c36{color:#000000;text-decoration:none;vertical-align:baseline;font-size:1pt;font-family:"Arial";font-style:normal}.c8{color:#000000;text-decoration:none;vertical-align:baseline;font-size:11pt;font-family:"Arial";font-style:normal}.c13{padding-top:0pt;padding-bottom:0pt;line-height:1.15;orphans:2;widows:2;text-align:left}.c37{color:#000000;text-decoration:none;vertical-align:baseline;font-family:"Arial";font-style:normal}.c22{border-spacing:0;border-collapse:collapse;margin-right:auto}.c12{padding-top:0pt;padding-bottom:0pt;line-height:1.0;text-align:center}.c55{padding-top:0pt;padding-bottom:0pt;line-height:1.0;text-align:right}.c5{padding-top:0pt;padding-bottom:0pt;line-height:1.0;text-align:left}.c57{background-color:#ffffff;max-width:451.3pt;padding:0pt 72pt 0pt 72pt}.c16{color:inherit;text-decoration:inherit}.c2{height:21pt}.c9{font-weight:400}.c29{height:0pt}.c33{height:44.2pt}.c7{height:11pt}.c50{height:31.5pt}.c1{font-weight:700}.c56{font-size:19pt}.c58{font-size:10pt}.c24{font-size:9pt}.c38{font-size:17pt}.c54{font-size:13pt}.title{padding-top:0pt;color:#000000;font-size:26pt;padding-bottom:3pt;font-family:"Arial";line-height:1.15;page-break-after:avoid;orphans:2;widows:2;text-align:left}.subtitle{padding-top:0pt;color:#666666;font-size:15pt;padding-bottom:16pt;font-family:"Arial";line-height:1.15;page-break-after:avoid;orphans:2;widows:2;text-align:left}li{color:#000000;font-size:11pt;font-family:"Arial"}p{margin:0;color:#000000;font-size:11pt;font-family:"Arial"}h1{padding-top:20pt;color:#000000;font-size:20pt;padding-bottom:6pt;font-family:"Arial";line-height:1.15;page-break-after:avoid;orphans:2;widows:2;text-align:left}h2{padding-top:18pt;color:#000000;font-size:16pt;padding-bottom:6pt;font-family:"Arial";line-height:1.15;page-break-after:avoid;orphans:2;widows:2;text-align:left}h3{padding-top:16pt;color:#434343;font-size:14pt;padding-bottom:4pt;font-family:"Arial";line-height:1.15;page-break-after:avoid;orphans:2;widows:2;text-align:left}h4{padding-top:14pt;color:#666666;font-size:12pt;padding-bottom:4pt;font-family:"Arial";line-height:1.15;page-break-after:avoid;orphans:2;widows:2;text-align:left}h5{padding-top:12pt;color:#666666;font-size:11pt;padding-bottom:4pt;font-family:"Arial";line-height:1.15;page-break-after:avoid;orphans:2;widows:2;text-align:left}h6{padding-top:12pt;color:#666666;font-size:11pt;padding-bottom:4pt;font-family:"Arial";line-height:1.15;page-break-after:avoid;font-style:italic;orphans:2;widows:2;text-align:left}</style></head><body class="c57 doc-content"><h1 class="c51"><span class="c37 c1 c38">WEEKLY PAY REMITTANCE</span></h1><table class="c22"><tr class="c2"><td class="c46" colspan="1" rowspan="1"><p class="c5"><span class="c1">PAYSLIP NUMBER:</span><span class="c8 c9">&nbsp;{{RECORDNUMBER}}</span></p></td><td class="c52" colspan="1" rowspan="1"><p class="c5 c7"><span class="c8 c9"></span></p></td><td class="c6" colspan="1" rowspan="1"><p class="c5 c7"><span class="c8 c9"></span></p></td><td class="c40" colspan="1" rowspan="1"><p class="c13"><span class="c1 c38">{{EMPLOYER}}</span></p></td></tr><tr class="c29"><td class="c27" colspan="1" rowspan="1"><p class="c5 c7"><span class="c36 c9"></span></p></td><td class="c23" colspan="1" rowspan="1"><p class="c5 c7"><span class="c36 c9"></span></p></td><td class="c6" colspan="1" rowspan="2"><p class="c5 c7"><span class="c9 c24 c37"></span></p></td><td class="c40" colspan="1" rowspan="2"><p class="c5"><span class="c37 c9 c24">18 DODGE STREET</span></p><p class="c5"><span class="c37 c9 c24">AUREUS</span></p><p class="c5"><span class="c37 c9 c24">RANDFONTEIN</span></p><p class="c5"><span class="c37 c9 c24">(011) 693 4278 / 083 338 5609</span></p><p class="c5"><span class="c24">INFO@SAGRINDING.CO.ZA</span><span class="c37 c9 c24">&nbsp;/ INFO@SCORPIOABRASIVES.CO.ZA</span></p></td></tr><tr class="c50"><td class="c46" colspan="1" rowspan="1"><p class="c5"><span class="c1">EMPLOYEE:</span><span class="c8 c9">&nbsp;{{EMPLOYEE NAME}}</span></p><p class="c5 c7"><span class="c36 c9"></span></p><p class="c5"><span class="c1">WEEKENDING:</span><span class="c8 c9">&nbsp;{{WEEKENDING}}</span></p><p class="c5 c7"><span class="c36 c9"></span></p><p class="c5"><span class="c1">EMPLOYMENT STATUS:</span><span>&nbsp;{{EMPLOYMENT STATUS}}</span></p></td><td class="c52" colspan="1" rowspan="1"><p class="c5 c7"><span class="c8 c9"></span></p></td></tr></table><p class="c5 c7"><span class="c3"></span></p><table class="c22"><tr class="c2"><td class="c48" colspan="5" rowspan="1"><p class="c12"><span class="c37 c1 c54">EARNINGS</span></p></td><td class="c25" colspan="3" rowspan="1"><p class="c12"><span class="c37 c1 c54">DEDUCTIONS</span></p></td></tr><tr class="c2"><td class="c39" colspan="1" rowspan="1"><p class="c5 c7"><span class="c8 c1"></span></p></td><td class="c21" colspan="1" rowspan="1"><p class="c5"><span class="c8 c1">HOURS</span></p></td><td class="c21" colspan="1" rowspan="1"><p class="c5"><span class="c8 c1">MINUTES</span></p></td><td class="c21" colspan="1" rowspan="1"><p class="c5"><span class="c8 c1">RATE</span></p></td><td class="c49" colspan="1" rowspan="1"><p class="c5"><span class="c8 c1">AMOUNT</span></p></td><td class="c30" colspan="2" rowspan="3"><p class="c5"><span class="c1 c8">UIF</span></p><p class="c5 c7"><span class="c36 c1"></span></p><p class="c5 c7"><span class="c1 c36"></span></p><p class="c5"><span class="c8 c1">OTHER DEDUCTIONS</span></p><p class="c5 c7"><span class="c8 c1"></span></p><p class="c5"><span class="c8 c1">OTHER DEDUCTIONS NOTES</span></p></td><td class="c41" colspan="1" rowspan="3"><p class="c13"><span class="c8 c9">{{UIF}}</span></p><p class="c5 c7"><span class="c36 c9"></span></p><p class="c5 c7"><span class="c36 c9"></span></p><p class="c13"><span class="c8 c9">{{OTHER DEDUCTIONS}}<br></span></p><p class="c13"><span class="c8 c9">{{OTHER DEDUCTIONS TEXT}}</span></p></td></tr><tr class="c2"><td class="c17" colspan="1" rowspan="1"><p class="c5"><span class="c1">NORMAL TIME</span></p></td><td class="c21" colspan="1" rowspan="1"><p class="c13"><span class="c8 c9">{{HOURS}}</span></p></td><td class="c21" colspan="1" rowspan="1"><p class="c13"><span class="c8 c9">{{MINUTES}}</span></p></td><td class="c21" colspan="1" rowspan="1"><p class="c5"><span class="c8 c9">R{{HOURLYRATE}}</span></p></td><td class="c49" colspan="1" rowspan="1"><p class="c5"><span class="c8 c9">R{{STANDARDTIME}}</span></p></td></tr><tr class="c33"><td class="c17" colspan="1" rowspan="1"><p class="c5"><span class="c8 c1">OVER TIME</span></p></td><td class="c21" colspan="1" rowspan="1"><p class="c13"><span class="c8 c9">{{OVERTIMEHOURS}}</span></p></td><td class="c21" colspan="1" rowspan="1"><p class="c13"><span class="c8 c9">{{OVERTIMEMINUTES}}</span></p></td><td class="c21" colspan="1" rowspan="1"><p class="c5 c7"><span class="c8 c9"></span></p></td><td class="c49" colspan="1" rowspan="1"><p class="c5"><span class="c8 c9">R{{OVERTIME}}</span></p></td></tr><tr class="c2"><td class="c17" colspan="1" rowspan="3"><p class="c5"><span class="c8 c1">ADDITIONAL PAY</span></p></td><td class="c44" colspan="3" rowspan="1"><p class="c5"><span class="c8 c1">BONUS</span></p></td><td class="c49" colspan="1" rowspan="1"><p class="c13"><span class="c8 c9">{{BONUS PAY}}</span></p></td><td class="c20" colspan="1" rowspan="1"><p class="c5 c7"><span class="c8 c9"></span></p></td><td class="c47" colspan="1" rowspan="1"><p class="c5"><span class="c34 c1">LOANS OPENING BALANCE</span></p></td><td class="c28" colspan="1" rowspan="1"><p class="c13"><span>{{CurrentLoanBalance}}</span></p></td></tr><tr class="c2"><td class="c44" colspan="3" rowspan="1"><p class="c5"><span class="c8 c1">LEAVE</span></p></td><td class="c49" colspan="1" rowspan="1"><p class="c13"><span class="c8 c9">{{LEAVE PAY}}</span></p></td><td class="c10" colspan="1" rowspan="1"><p class="c5 c7"><span class="c8 c9"></span></p></td><td class="c53" colspan="1" rowspan="1"><p class="c5"><span class="c1 c58">LOAN/REPAYMENT:<br></span><span>{{LoanDisbursementType}}</span></p></td><td class="c14" colspan="1" rowspan="1"><p class="c13"><span>{{LoanDeductionThisWeek}} {{NewLoanThisWeek}}</span></p></td></tr><tr class="c2"><td class="c44" colspan="3" rowspan="1"><p class="c5"><span class="c8 c1">OTHER</span></p></td><td class="c49" colspan="1" rowspan="1"><p class="c13"><span class="c8 c9">{{OTHERINCOME}}</span></p></td><td class="c10" colspan="1" rowspan="1"><p class="c5 c7"><span class="c8 c9"></span></p></td><td class="c26" colspan="1" rowspan="1"><p class="c5"><span class="c34 c1">LOANS CLOSING BALANCE</span></p></td><td class="c42" colspan="1" rowspan="1"><p class="c13"><span>{{UpdatedLoanBalance}}</span></p></td></tr></table><p class="c5 c7"><span class="c36 c9"></span></p><table class="c22"><tr class="c29"><td class="c32" colspan="1" rowspan="1"><p class="c5"><span class="c8 c1">NOTES</span></p></td><td class="c4" colspan="1" rowspan="1"><p class="c13"><span class="c8 c9">{{NOTES}}</span></p></td></tr></table><p class="c5 c7"><span class="c36 c9"></span></p><table class="c22"><tr class="c29"><td class="c18" colspan="1" rowspan="1"><p class="c5"><span class="c8 c1">GROSS PAY</span></p></td><td class="c15" colspan="1" rowspan="1"><p class="c55"><span class="c8 c9">{{GROSSSALARY}}</span></p></td><td class="c35" colspan="1" rowspan="1"><p class="c5"><span class="c8 c1">TOTAL DEDUCTIONS</span></p></td><td class="c11" colspan="1" rowspan="1"><p class="c13"><span class="c8 c9">{{TOTALDEDUCTIONS}}</span></p></td></tr></table><p class="c5 c7"><span class="c3"></span></p><table class="c22"><tr class="c29"><td class="c43" colspan="1" rowspan="1"><p class="c5"><span class="c8 c1">NETT PAY</span></p></td><td class="c11" colspan="1" rowspan="1"><p class="c13"><span class="c8 c9">{{NETTSALARY}}</span></p></td></tr><tr class="c29"><td class="c43" colspan="1" rowspan="1"><p class="c5"><span class="c8 c1">AMOUNT PAID TO ACCOUNT </span></p></td><td class="c11" colspan="1" rowspan="1"><p class="c13"><span class="c8 c9">{{PaidtoAccount}}</span></p></td></tr></table></body></html>`;
+
+    // Replace placeholders with actual values
+    let htmlContent = htmlTemplate
+      .replace(/\{\{RECORDNUMBER\}\}/g, payslip.RECORDNUMBER || '')
+      .replace(/\{\{EMPLOYER\}\}/g, payslip.EMPLOYER || 'SA Grinding Wheels')
+      .replace(/\{\{EMPLOYEE NAME\}\}/g, payslip['EMPLOYEE NAME'] || '')
+      .replace(/\{\{WEEKENDING\}\}/g, formatDateForDisplay(payslip.WEEKENDING))
+      .replace(/\{\{EMPLOYMENT STATUS\}\}/g, payslip['EMPLOYMENT STATUS'] || '')
+      .replace(/\{\{HOURS\}\}/g, payslip.HOURS || '0')
+      .replace(/\{\{MINUTES\}\}/g, payslip.MINUTES || '0')
+      .replace(/\{\{HOURLYRATE\}\}/g, formatAmount(payslip.HOURLYRATE))
+      .replace(/\{\{STANDARDTIME\}\}/g, formatAmount(payslip.STANDARDTIME))
+      .replace(/\{\{OVERTIMEHOURS\}\}/g, payslip.OVERTIMEHOURS || '0')
+      .replace(/\{\{OVERTIMEMINUTES\}\}/g, payslip.OVERTIMEMINUTES || '0')
+      .replace(/\{\{OVERTIME\}\}/g, formatAmount(payslip.OVERTIME))
+      .replace(/\{\{BONUS PAY\}\}/g, formatAmount(payslip['BONUS PAY']))
+      .replace(/\{\{LEAVE PAY\}\}/g, formatAmount(payslip['LEAVE PAY']))
+      .replace(/\{\{OTHERINCOME\}\}/g, formatAmount(payslip.OTHERINCOME))
+      .replace(/\{\{UIF\}\}/g, formatAmount(payslip.UIF))
+      .replace(/\{\{OTHER DEDUCTIONS\}\}/g, formatAmount(payslip['OTHER DEDUCTIONS']))
+      .replace(/\{\{OTHER DEDUCTIONS TEXT\}\}/g, payslip['OTHER DEDUCTIONS TEXT'] || '')
+      .replace(/\{\{CurrentLoanBalance\}\}/g, formatAmount(payslip.CurrentLoanBalance))
+      .replace(/\{\{LoanDisbursementType\}\}/g, payslip.LoanDisbursementType || 'Separate')
+      .replace(/\{\{LoanDeductionThisWeek\}\}/g, formatAmount(payslip.LoanDeductionThisWeek))
+      .replace(/\{\{NewLoanThisWeek\}\}/g, payslip.NewLoanThisWeek > 0 ? formatAmount(payslip.NewLoanThisWeek) : '')
+      .replace(/\{\{UpdatedLoanBalance\}\}/g, formatAmount(payslip.UpdatedLoanBalance))
+      .replace(/\{\{NOTES\}\}/g, payslip.NOTES || '')
+      .replace(/\{\{GROSSSALARY\}\}/g, formatAmount(payslip.GROSSSALARY))
+      .replace(/\{\{TOTALDEDUCTIONS\}\}/g, formatAmount(payslip.TOTALDEDUCTIONS))
+      .replace(/\{\{NETTSALARY\}\}/g, formatAmount(payslip.NETTSALARY))
+      .replace(/\{\{PaidtoAccount\}\}/g, formatAmount(payslip.PaidtoAccount));
+
+    // Create a temporary Google Doc from HTML
     const doc = DocumentApp.create(docName);
     const docId = doc.getId();
-
-    // Clear default content and build payslip
     const body = doc.getBody();
+
+    // Clear default content
     body.clear();
 
-    // Set default font
-    body.setFontFamily('Arial');
-
-    // === HEADER SECTION ===
-    // Title
-    body.appendParagraph('WEEKLY PAY REMITTANCE')
-      .setAlignment(DocumentApp.HorizontalAlignment.CENTER)
-      .setFontSize(16)
-      .setBold(true);
-
-    // Payslip number and employer info
-    const headerTable = body.appendTable();
-    headerTable.setBorderWidth(0);
-
-    const headerRow1 = headerTable.appendTableRow();
-    headerRow1.appendTableCell(`Payslip No: #${payslip.RECORDNUMBER}`).getChild(0).asParagraph().setBold(true);
-    const employerCell1 = headerRow1.appendTableCell(payslip.EMPLOYER || 'SA Grinding Wheels');
-    employerCell1.getChild(0).asParagraph().setAlignment(DocumentApp.HorizontalAlignment.RIGHT).setBold(true);
-
-    const headerRow2 = headerTable.appendTableRow();
-    headerRow2.appendTableCell('');
-    const addressCell = headerRow2.appendTableCell('18 DODGE STREET, AUREUS, RANDFONTEIN');
-    addressCell.getChild(0).asParagraph().setAlignment(DocumentApp.HorizontalAlignment.RIGHT);
-
-    const headerRow3 = headerTable.appendTableRow();
-    headerRow3.appendTableCell('');
-    const phoneCell = headerRow3.appendTableCell('(011) 693 4278 / 083 338 5609');
-    phoneCell.getChild(0).asParagraph().setAlignment(DocumentApp.HorizontalAlignment.RIGHT);
-
-    const headerRow4 = headerTable.appendTableRow();
-    headerRow4.appendTableCell('');
-    const emailCell = headerRow4.appendTableCell('INFO@SAGRINDING.CO.ZA');
-    emailCell.getChild(0).asParagraph().setAlignment(DocumentApp.HorizontalAlignment.RIGHT);
-
-    body.appendParagraph('');
-
-    // === EMPLOYEE INFO SECTION ===
-    const empInfoTable = body.appendTable();
-    empInfoTable.setBorderWidth(1);
-
-    const empRow1 = empInfoTable.appendTableRow();
-    const empLabel1 = empRow1.appendTableCell('Employee:');
-    empLabel1.setBackgroundColor('#f2f2f2');
-    empLabel1.getChild(0).asParagraph().setBold(true);
-    empRow1.appendTableCell(payslip['EMPLOYEE NAME'] || '');
-
-    const empRow2 = empInfoTable.appendTableRow();
-    const empLabel2 = empRow2.appendTableCell('Week Ending:');
-    empLabel2.setBackgroundColor('#f2f2f2');
-    empLabel2.getChild(0).asParagraph().setBold(true);
-    empRow2.appendTableCell(formatDateForDisplay(payslip.WEEKENDING));
-
-    const empRow3 = empInfoTable.appendTableRow();
-    const empLabel3 = empRow3.appendTableCell('Employment Status:');
-    empLabel3.setBackgroundColor('#f2f2f2');
-    empLabel3.getChild(0).asParagraph().setBold(true);
-    empRow3.appendTableCell(payslip['EMPLOYMENT STATUS'] || '');
-
-    body.appendParagraph('');
-
-    // === EARNINGS SECTION ===
-    body.appendParagraph('EARNINGS').setBold(true).setFontSize(11);
-
-    const earningsTable = body.appendTable();
-    earningsTable.setBorderWidth(1);
-
-    // Earnings header
-    const earningsHeader = earningsTable.appendTableRow();
-    const eh1 = earningsHeader.appendTableCell('');
-    eh1.setBackgroundColor('#f2f2f2');
-    const eh2 = earningsHeader.appendTableCell('HOURS');
-    eh2.setBackgroundColor('#f2f2f2');
-    eh2.getChild(0).asParagraph().setBold(true);
-    const eh3 = earningsHeader.appendTableCell('MINUTES');
-    eh3.setBackgroundColor('#f2f2f2');
-    eh3.getChild(0).asParagraph().setBold(true);
-    const eh4 = earningsHeader.appendTableCell('RATE');
-    eh4.setBackgroundColor('#f2f2f2');
-    eh4.getChild(0).asParagraph().setBold(true);
-    const eh5 = earningsHeader.appendTableCell('AMOUNT');
-    eh5.setBackgroundColor('#f2f2f2');
-    eh5.getChild(0).asParagraph().setBold(true);
-
-    // Normal Time
-    const normalTimeRow = earningsTable.appendTableRow();
-    normalTimeRow.appendTableCell('Normal Time');
-    normalTimeRow.appendTableCell(String(payslip.HOURS || 0));
-    normalTimeRow.appendTableCell(String(payslip.MINUTES || 0));
-    normalTimeRow.appendTableCell(`R${formatAmount(payslip.HOURLYRATE)}`);
-    normalTimeRow.appendTableCell(`R${formatAmount(payslip.STANDARDTIME)}`);
-
-    // Overtime
-    const overtimeRow = earningsTable.appendTableRow();
-    overtimeRow.appendTableCell('Over Time');
-    overtimeRow.appendTableCell(String(payslip.OVERTIMEHOURS || 0));
-    overtimeRow.appendTableCell(String(payslip.OVERTIMEMINUTES || 0));
-    overtimeRow.appendTableCell('x1.5');
-    overtimeRow.appendTableCell(`R${formatAmount(payslip.OVERTIME)}`);
-
-    // Bonus
-    const bonusRow = earningsTable.appendTableRow();
-    bonusRow.appendTableCell('Bonus');
-    bonusRow.appendTableCell('');
-    bonusRow.appendTableCell('');
-    bonusRow.appendTableCell('');
-    bonusRow.appendTableCell(`R${formatAmount(payslip['BONUS PAY'])}`);
-
-    // Leave
-    const leaveRow = earningsTable.appendTableRow();
-    leaveRow.appendTableCell('Leave');
-    leaveRow.appendTableCell('');
-    leaveRow.appendTableCell('');
-    leaveRow.appendTableCell('');
-    leaveRow.appendTableCell(`R${formatAmount(payslip['LEAVE PAY'])}`);
-
-    // Other Income
-    const otherIncomeRow = earningsTable.appendTableRow();
-    otherIncomeRow.appendTableCell('Other');
-    otherIncomeRow.appendTableCell('');
-    otherIncomeRow.appendTableCell('');
-    otherIncomeRow.appendTableCell('');
-    otherIncomeRow.appendTableCell(`R${formatAmount(payslip.OTHERINCOME)}`);
-
-    body.appendParagraph('');
-
-    // === DEDUCTIONS SECTION ===
-    body.appendParagraph('DEDUCTIONS').setBold(true).setFontSize(11);
-
-    const deductionsTable = body.appendTable();
-    deductionsTable.setBorderWidth(1);
-
-    // Deductions header
-    const deductionsHeader = deductionsTable.appendTableRow();
-    const dh1 = deductionsHeader.appendTableCell('UIF');
-    dh1.setBackgroundColor('#f2f2f2');
-    dh1.getChild(0).asParagraph().setBold(true);
-    const dh2 = deductionsHeader.appendTableCell('OTHER DEDUCTIONS');
-    dh2.setBackgroundColor('#f2f2f2');
-    dh2.getChild(0).asParagraph().setBold(true);
-    const dh3 = deductionsHeader.appendTableCell('NOTES');
-    dh3.setBackgroundColor('#f2f2f2');
-    dh3.getChild(0).asParagraph().setBold(true);
-
-    // Deductions values
-    const deductionsValueRow = deductionsTable.appendTableRow();
-    deductionsValueRow.appendTableCell(`R${formatAmount(payslip.UIF)}`);
-    deductionsValueRow.appendTableCell(`R${formatAmount(payslip['OTHER DEDUCTIONS'])}`);
-    deductionsValueRow.appendTableCell(payslip['OTHER DEDUCTIONS TEXT'] || '');
-
-    body.appendParagraph('');
-
-    // === LOANS SECTION ===
-    body.appendParagraph('LOANS').setBold(true).setFontSize(11);
-
-    const loansTable = body.appendTable();
-    loansTable.setBorderWidth(1);
-
-    // Opening Balance
-    const openingBalanceRow = loansTable.appendTableRow();
-    const lh1 = openingBalanceRow.appendTableCell('Opening Balance');
-    lh1.setBackgroundColor('#f2f2f2');
-    lh1.getChild(0).asParagraph().setBold(true);
-    openingBalanceRow.appendTableCell(`R${formatAmount(payslip.CurrentLoanBalance)}`);
-
-    // Loan/Repayment
-    const loanTypeRow = loansTable.appendTableRow();
-    const lh2 = loanTypeRow.appendTableCell('Loan/Repayment');
-    lh2.setBackgroundColor('#f2f2f2');
-    lh2.getChild(0).asParagraph().setBold(true);
-    loanTypeRow.appendTableCell(payslip.LoanDisbursementType || 'Separate');
-
-    // Deduction This Week
-    const loanDeductionRow = loansTable.appendTableRow();
-    const lh3 = loanDeductionRow.appendTableCell('Deduction This Week');
-    lh3.setBackgroundColor('#f2f2f2');
-    lh3.getChild(0).asParagraph().setBold(true);
-    const deductionText = payslip.NewLoanThisWeek > 0
-      ? `R${formatAmount(payslip.LoanDeductionThisWeek)} / New: R${formatAmount(payslip.NewLoanThisWeek)}`
-      : `R${formatAmount(payslip.LoanDeductionThisWeek)}`;
-    loanDeductionRow.appendTableCell(deductionText);
-
-    // Closing Balance
-    const closingBalanceRow = loansTable.appendTableRow();
-    const lh4 = closingBalanceRow.appendTableCell('Closing Balance');
-    lh4.setBackgroundColor('#f2f2f2');
-    lh4.getChild(0).asParagraph().setBold(true);
-    closingBalanceRow.appendTableCell(`R${formatAmount(payslip.UpdatedLoanBalance)}`);
-
-    body.appendParagraph('');
-
-    // === SUMMARY SECTION ===
-    const summaryTable = body.appendTable();
-    summaryTable.setBorderWidth(1);
-
-    // Gross Pay
-    const grossRow = summaryTable.appendTableRow();
-    const grossLabel = grossRow.appendTableCell('GROSS PAY');
-    grossLabel.setBackgroundColor('#f2f2f2');
-    grossLabel.getChild(0).asParagraph().setBold(true);
-    const grossValue = grossRow.appendTableCell(`R${formatAmount(payslip.GROSSSALARY)}`);
-    grossValue.getChild(0).asParagraph().setBold(true);
-
-    // Total Deductions
-    const totalDeductionsRow = summaryTable.appendTableRow();
-    const tdLabel = totalDeductionsRow.appendTableCell('TOTAL DEDUCTIONS');
-    tdLabel.setBackgroundColor('#f2f2f2');
-    tdLabel.getChild(0).asParagraph().setBold(true);
-    const tdValue = totalDeductionsRow.appendTableCell(`R${formatAmount(payslip.TOTALDEDUCTIONS)}`);
-    tdValue.getChild(0).asParagraph().setBold(true);
-
-    // Nett Pay
-    const nettPayRow = summaryTable.appendTableRow();
-    const nettLabel = nettPayRow.appendTableCell('NETT PAY');
-    nettLabel.setBackgroundColor('#f2f2f2');
-    nettLabel.getChild(0).asParagraph().setBold(true);
-    const nettValue = nettPayRow.appendTableCell(`R${formatAmount(payslip.NETTSALARY)}`);
-    nettValue.getChild(0).asParagraph().setBold(true);
-
-    // Amount Paid to Account
-    const paidRow = summaryTable.appendTableRow();
-    const paidLabel = paidRow.appendTableCell('AMOUNT PAID TO ACCOUNT');
-    paidLabel.setBackgroundColor('#e8f5e9');
-    paidLabel.getChild(0).asParagraph().setBold(true);
-    const paidValue = paidRow.appendTableCell(`R${formatAmount(payslip.PaidtoAccount)}`);
-    paidValue.setBackgroundColor('#e8f5e9');
-    paidValue.getChild(0).asParagraph().setBold(true);
-
-    // === NOTES SECTION ===
-    if (payslip.NOTES) {
-      body.appendParagraph('');
-      body.appendParagraph('NOTES').setBold(true).setFontSize(11);
-      body.appendParagraph(payslip.NOTES);
-    }
-
+    // We need to use a different approach - create HTML file and convert
     doc.saveAndClose();
 
-    // Convert to PDF
-    const docFile = DriveApp.getFileById(docId);
-    const pdfBlob = docFile.getAs('application/pdf');
+    // Create HTML blob and convert to PDF via Google Drive
+    const htmlBlob = Utilities.newBlob(htmlContent, 'text/html', docName + '.html');
+
+    // Create temporary HTML file
+    const htmlFile = DriveApp.createFile(htmlBlob);
+
+    // Get the file and convert to PDF using export
+    const pdfBlob = htmlFile.getAs('application/pdf');
     pdfBlob.setName(docName + '.pdf');
 
-    // Save PDF to Drive (in root or specific folder)
+    // Save PDF to Drive
     const pdfFile = DriveApp.createFile(pdfBlob);
     const pdfUrl = pdfFile.getUrl();
 
-    // Delete the temporary doc
-    docFile.setTrashed(true);
+    // Delete temporary files
+    htmlFile.setTrashed(true);
+    DriveApp.getFileById(docId).setTrashed(true);
 
     // Update payslip record with PDF link
     const sheets = getSheets();
