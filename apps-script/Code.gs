@@ -176,14 +176,14 @@ function diagnoseAuthorization() {
 function doGet() {
   try {
     return HtmlService.createHtmlOutputFromFile('Dashboard')
-      .setTitle('HR Payroll System')
+      .setTitle('SA HR Payroll System')
       .setSandboxMode(HtmlService.SandboxMode.IFRAME)
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
       .addMetaTag('viewport', 'width=device-width, initial-scale=1');
   } catch (error) {
     // If Dashboard.html doesn't exist, return error page
     return HtmlService.createHtmlOutput(
-      '<h1>Error</h1><p>Failed to load main application: ' + error.toString() + '</p>'
+      '<h1>Error</h1><p>Failed to load dashboard: ' + error.toString() + '</p>'
     ).setTitle('Error');
   }
 }
