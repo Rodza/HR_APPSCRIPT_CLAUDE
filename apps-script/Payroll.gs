@@ -586,163 +586,207 @@ function generatePayslipPDF(recordNumber) {
 
     const payslip = result.data;
 
-    // Create PDF content as HTML
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <style>
-          body { font-family: Arial, sans-serif; padding: 20px; }
-          .header { text-align: center; margin-bottom: 30px; }
-          .company { font-size: 18px; font-weight: bold; }
-          .title { font-size: 24px; font-weight: bold; margin: 10px 0; }
-          .info-section { margin: 20px 0; }
-          .info-row { display: flex; margin: 5px 0; }
-          .label { width: 200px; font-weight: bold; }
-          .value { flex: 1; }
-          table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-          th, td { padding: 10px; text-align: left; border: 1px solid #ddd; }
-          th { background-color: #f2f2f2; font-weight: bold; }
-          .amount { text-align: right; }
-          .total-row { font-weight: bold; background-color: #f9f9f9; }
-          .footer { margin-top: 30px; font-size: 12px; color: #666; }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <div class="company">${payslip.EMPLOYER || 'SA Grinding Wheels'}</div>
-          <div class="title">PAYSLIP</div>
-        </div>
-
-        <div class="info-section">
-          <div class="info-row">
-            <div class="label">Payslip Number:</div>
-            <div class="value">#${payslip.RECORDNUMBER}</div>
-          </div>
-          <div class="info-row">
-            <div class="label">Employee:</div>
-            <div class="value">${payslip['EMPLOYEE NAME'] || ''}</div>
-          </div>
-          <div class="info-row">
-            <div class="label">Employment Status:</div>
-            <div class="value">${payslip['EMPLOYMENT STATUS'] || ''}</div>
-          </div>
-          <div class="info-row">
-            <div class="label">Week Ending:</div>
-            <div class="value">${formatDateForDisplay(payslip.WEEKENDING)}</div>
-          </div>
-          <div class="info-row">
-            <div class="label">Date Generated:</div>
-            <div class="value">${formatDateForDisplay(new Date())}</div>
-          </div>
-        </div>
-
-        <table>
-          <thead>
-            <tr>
-              <th>Description</th>
-              <th class="amount">Amount (R)</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>Standard Time (${payslip.HOURS || 0}h ${payslip.MINUTES || 0}m)</td>
-              <td class="amount">${formatAmount(payslip.STANDARDTIME)}</td>
-            </tr>
-            <tr>
-              <td>Overtime (${payslip.OVERTIMEHOURS || 0}h ${payslip.OVERTIMEMINUTES || 0}m)</td>
-              <td class="amount">${formatAmount(payslip.OVERTIME)}</td>
-            </tr>
-            ${payslip['LEAVE PAY'] > 0 ? `<tr><td>Leave Pay</td><td class="amount">${formatAmount(payslip['LEAVE PAY'])}</td></tr>` : ''}
-            ${payslip['BONUS PAY'] > 0 ? `<tr><td>Bonus Pay</td><td class="amount">${formatAmount(payslip['BONUS PAY'])}</td></tr>` : ''}
-            ${payslip.OTHERINCOME > 0 ? `<tr><td>Other Income</td><td class="amount">${formatAmount(payslip.OTHERINCOME)}</td></tr>` : ''}
-            <tr class="total-row">
-              <td><strong>Gross Salary</strong></td>
-              <td class="amount"><strong>${formatAmount(payslip.GROSSSALARY)}</strong></td>
-            </tr>
-            <tr>
-              <td>UIF (1%)</td>
-              <td class="amount">(${formatAmount(payslip.UIF)})</td>
-            </tr>
-            ${payslip['OTHER DEDUCTIONS'] > 0 ? `<tr><td>Other Deductions${payslip['OTHER DEDUCTIONS TEXT'] ? ' - ' + payslip['OTHER DEDUCTIONS TEXT'] : ''}</td><td class="amount">(${formatAmount(payslip['OTHER DEDUCTIONS'])})</td></tr>` : ''}
-            <tr class="total-row">
-              <td><strong>Total Deductions</strong></td>
-              <td class="amount"><strong>(${formatAmount(payslip.TOTALDEDUCTIONS)})</strong></td>
-            </tr>
-            <tr class="total-row">
-              <td><strong>Net Salary</strong></td>
-              <td class="amount"><strong>${formatAmount(payslip.NETTSALARY)}</strong></td>
-            </tr>
-            ${payslip.LoanDeductionThisWeek > 0 ? `<tr><td>Loan Deduction</td><td class="amount">(${formatAmount(payslip.LoanDeductionThisWeek)})</td></tr>` : ''}
-            ${payslip.NewLoanThisWeek > 0 && payslip.LoanDisbursementType === 'With Salary' ? `<tr><td>New Loan (With Salary)</td><td class="amount">${formatAmount(payslip.NewLoanThisWeek)}</td></tr>` : ''}
-            <tr class="total-row" style="background-color: #e8f5e9;">
-              <td><strong>PAID TO ACCOUNT</strong></td>
-              <td class="amount"><strong>${formatAmount(payslip.PaidtoAccount)}</strong></td>
-            </tr>
-          </tbody>
-        </table>
-
-        ${payslip.NOTES ? `<div class="info-section"><div class="label">Notes:</div><div class="value">${payslip.NOTES}</div></div>` : ''}
-
-        <div class="footer">
-          Generated on ${formatDateForDisplay(new Date())} by HR Payroll System
-        </div>
-      </body>
-      </html>
-    `;
-
     // Create a temporary Google Doc
     const docName = `Payslip_${payslip.RECORDNUMBER}_${payslip['EMPLOYEE NAME']}_${formatDateForFilename(payslip.WEEKENDING)}`;
     const doc = DocumentApp.create(docName);
     const docId = doc.getId();
 
-    // Clear default content and add HTML
+    // Clear default content and build payslip
     const body = doc.getBody();
     body.clear();
-    body.appendParagraph(payslip.EMPLOYER || 'SA Grinding Wheels').setAlignment(DocumentApp.HorizontalAlignment.CENTER).setBold(true);
-    body.appendParagraph('PAYSLIP').setAlignment(DocumentApp.HorizontalAlignment.CENTER).setFontSize(18).setBold(true);
-    body.appendParagraph('');
-    body.appendParagraph(`Payslip Number: #${payslip.RECORDNUMBER}`);
-    body.appendParagraph(`Employee: ${payslip['EMPLOYEE NAME'] || ''}`);
-    body.appendParagraph(`Employment Status: ${payslip['EMPLOYMENT STATUS'] || ''}`);
-    body.appendParagraph(`Week Ending: ${formatDateForDisplay(payslip.WEEKENDING)}`);
+
+    // Set default font
+    body.setFontFamily('Arial');
+
+    // === HEADER SECTION ===
+    // Title
+    body.appendParagraph('WEEKLY PAY REMITTANCE')
+      .setAlignment(DocumentApp.HorizontalAlignment.CENTER)
+      .setFontSize(16)
+      .setBold(true);
+
+    // Payslip number and employer info
+    const headerTable = body.appendTable();
+    headerTable.setBorderWidth(0);
+
+    const headerRow1 = headerTable.appendTableRow();
+    headerRow1.appendTableCell(`Payslip No: #${payslip.RECORDNUMBER}`).setBold(true);
+    headerRow1.appendTableCell(payslip.EMPLOYER || 'SA Grinding Wheels')
+      .setAlignment(DocumentApp.HorizontalAlignment.RIGHT)
+      .setBold(true);
+
+    const headerRow2 = headerTable.appendTableRow();
+    headerRow2.appendTableCell('');
+    headerRow2.appendTableCell('18 DODGE STREET, AUREUS, RANDFONTEIN')
+      .setAlignment(DocumentApp.HorizontalAlignment.RIGHT);
+
+    const headerRow3 = headerTable.appendTableRow();
+    headerRow3.appendTableCell('');
+    headerRow3.appendTableCell('(011) 693 4278 / 083 338 5609')
+      .setAlignment(DocumentApp.HorizontalAlignment.RIGHT);
+
+    const headerRow4 = headerTable.appendTableRow();
+    headerRow4.appendTableCell('');
+    headerRow4.appendTableCell('INFO@SAGRINDING.CO.ZA')
+      .setAlignment(DocumentApp.HorizontalAlignment.RIGHT);
+
     body.appendParagraph('');
 
-    // Add earnings table
-    const table = body.appendTable();
-    const headerRow = table.appendTableRow();
-    headerRow.appendTableCell('Description').setBackgroundColor('#f2f2f2');
-    headerRow.appendTableCell('Amount (R)').setBackgroundColor('#f2f2f2');
+    // === EMPLOYEE INFO SECTION ===
+    const empInfoTable = body.appendTable();
+    empInfoTable.setBorderWidth(1);
 
-    // Standard time
-    const row1 = table.appendTableRow();
-    row1.appendTableCell(`Standard Time (${payslip.HOURS || 0}h ${payslip.MINUTES || 0}m)`);
-    row1.appendTableCell(formatAmount(payslip.STANDARDTIME));
+    const empRow1 = empInfoTable.appendTableRow();
+    empRow1.appendTableCell('Employee:').setBold(true).setBackgroundColor('#f2f2f2');
+    empRow1.appendTableCell(payslip['EMPLOYEE NAME'] || '');
+
+    const empRow2 = empInfoTable.appendTableRow();
+    empRow2.appendTableCell('Week Ending:').setBold(true).setBackgroundColor('#f2f2f2');
+    empRow2.appendTableCell(formatDateForDisplay(payslip.WEEKENDING));
+
+    const empRow3 = empInfoTable.appendTableRow();
+    empRow3.appendTableCell('Employment Status:').setBold(true).setBackgroundColor('#f2f2f2');
+    empRow3.appendTableCell(payslip['EMPLOYMENT STATUS'] || '');
+
+    body.appendParagraph('');
+
+    // === EARNINGS SECTION ===
+    body.appendParagraph('EARNINGS').setBold(true).setFontSize(11);
+
+    const earningsTable = body.appendTable();
+    earningsTable.setBorderWidth(1);
+
+    // Earnings header
+    const earningsHeader = earningsTable.appendTableRow();
+    earningsHeader.appendTableCell('').setBackgroundColor('#f2f2f2').setBold(true);
+    earningsHeader.appendTableCell('HOURS').setBackgroundColor('#f2f2f2').setBold(true);
+    earningsHeader.appendTableCell('MINUTES').setBackgroundColor('#f2f2f2').setBold(true);
+    earningsHeader.appendTableCell('RATE').setBackgroundColor('#f2f2f2').setBold(true);
+    earningsHeader.appendTableCell('AMOUNT').setBackgroundColor('#f2f2f2').setBold(true);
+
+    // Normal Time
+    const normalTimeRow = earningsTable.appendTableRow();
+    normalTimeRow.appendTableCell('Normal Time');
+    normalTimeRow.appendTableCell(String(payslip.HOURS || 0));
+    normalTimeRow.appendTableCell(String(payslip.MINUTES || 0));
+    normalTimeRow.appendTableCell(`R${formatAmount(payslip.HOURLYRATE)}`);
+    normalTimeRow.appendTableCell(`R${formatAmount(payslip.STANDARDTIME)}`);
 
     // Overtime
-    const row2 = table.appendTableRow();
-    row2.appendTableCell(`Overtime (${payslip.OVERTIMEHOURS || 0}h ${payslip.OVERTIMEMINUTES || 0}m)`);
-    row2.appendTableCell(formatAmount(payslip.OVERTIME));
+    const overtimeRow = earningsTable.appendTableRow();
+    overtimeRow.appendTableCell('Over Time');
+    overtimeRow.appendTableCell(String(payslip.OVERTIMEHOURS || 0));
+    overtimeRow.appendTableCell(String(payslip.OVERTIMEMINUTES || 0));
+    overtimeRow.appendTableCell('x1.5');
+    overtimeRow.appendTableCell(`R${formatAmount(payslip.OVERTIME)}`);
 
-    // Gross
-    const row3 = table.appendTableRow();
-    row3.appendTableCell('Gross Salary').setBold(true);
-    row3.appendTableCell(formatAmount(payslip.GROSSSALARY)).setBold(true);
+    // Bonus
+    const bonusRow = earningsTable.appendTableRow();
+    bonusRow.appendTableCell('Bonus');
+    bonusRow.appendTableCell('');
+    bonusRow.appendTableCell('');
+    bonusRow.appendTableCell('');
+    bonusRow.appendTableCell(`R${formatAmount(payslip['BONUS PAY'])}`);
 
-    // UIF
-    const row4 = table.appendTableRow();
-    row4.appendTableCell('UIF (1%)');
-    row4.appendTableCell(`(${formatAmount(payslip.UIF)})`);
+    // Leave
+    const leaveRow = earningsTable.appendTableRow();
+    leaveRow.appendTableCell('Leave');
+    leaveRow.appendTableCell('');
+    leaveRow.appendTableCell('');
+    leaveRow.appendTableCell('');
+    leaveRow.appendTableCell(`R${formatAmount(payslip['LEAVE PAY'])}`);
 
-    // Net
-    const row5 = table.appendTableRow();
-    row5.appendTableCell('Net Salary').setBold(true);
-    row5.appendTableCell(formatAmount(payslip.NETTSALARY)).setBold(true);
+    // Other Income
+    const otherIncomeRow = earningsTable.appendTableRow();
+    otherIncomeRow.appendTableCell('Other');
+    otherIncomeRow.appendTableCell('');
+    otherIncomeRow.appendTableCell('');
+    otherIncomeRow.appendTableCell('');
+    otherIncomeRow.appendTableCell(`R${formatAmount(payslip.OTHERINCOME)}`);
 
-    // Paid to Account
-    const row6 = table.appendTableRow();
-    row6.appendTableCell('PAID TO ACCOUNT').setBold(true);
-    row6.appendTableCell(formatAmount(payslip.PaidtoAccount)).setBold(true).setBackgroundColor('#e8f5e9');
+    body.appendParagraph('');
+
+    // === DEDUCTIONS SECTION ===
+    body.appendParagraph('DEDUCTIONS').setBold(true).setFontSize(11);
+
+    const deductionsTable = body.appendTable();
+    deductionsTable.setBorderWidth(1);
+
+    // Deductions header
+    const deductionsHeader = deductionsTable.appendTableRow();
+    deductionsHeader.appendTableCell('UIF').setBackgroundColor('#f2f2f2').setBold(true);
+    deductionsHeader.appendTableCell('OTHER DEDUCTIONS').setBackgroundColor('#f2f2f2').setBold(true);
+    deductionsHeader.appendTableCell('NOTES').setBackgroundColor('#f2f2f2').setBold(true);
+
+    // Deductions values
+    const deductionsValueRow = deductionsTable.appendTableRow();
+    deductionsValueRow.appendTableCell(`R${formatAmount(payslip.UIF)}`);
+    deductionsValueRow.appendTableCell(`R${formatAmount(payslip['OTHER DEDUCTIONS'])}`);
+    deductionsValueRow.appendTableCell(payslip['OTHER DEDUCTIONS TEXT'] || '');
+
+    body.appendParagraph('');
+
+    // === LOANS SECTION ===
+    body.appendParagraph('LOANS').setBold(true).setFontSize(11);
+
+    const loansTable = body.appendTable();
+    loansTable.setBorderWidth(1);
+
+    // Opening Balance
+    const openingBalanceRow = loansTable.appendTableRow();
+    openingBalanceRow.appendTableCell('Opening Balance').setBackgroundColor('#f2f2f2').setBold(true);
+    openingBalanceRow.appendTableCell(`R${formatAmount(payslip.CurrentLoanBalance)}`);
+
+    // Loan/Repayment
+    const loanTypeRow = loansTable.appendTableRow();
+    loanTypeRow.appendTableCell('Loan/Repayment').setBackgroundColor('#f2f2f2').setBold(true);
+    loanTypeRow.appendTableCell(payslip.LoanDisbursementType || 'Separate');
+
+    // Deduction This Week
+    const loanDeductionRow = loansTable.appendTableRow();
+    loanDeductionRow.appendTableCell('Deduction This Week').setBackgroundColor('#f2f2f2').setBold(true);
+    const deductionText = payslip.NewLoanThisWeek > 0
+      ? `R${formatAmount(payslip.LoanDeductionThisWeek)} / New: R${formatAmount(payslip.NewLoanThisWeek)}`
+      : `R${formatAmount(payslip.LoanDeductionThisWeek)}`;
+    loanDeductionRow.appendTableCell(deductionText);
+
+    // Closing Balance
+    const closingBalanceRow = loansTable.appendTableRow();
+    closingBalanceRow.appendTableCell('Closing Balance').setBackgroundColor('#f2f2f2').setBold(true);
+    closingBalanceRow.appendTableCell(`R${formatAmount(payslip.UpdatedLoanBalance)}`);
+
+    body.appendParagraph('');
+
+    // === SUMMARY SECTION ===
+    const summaryTable = body.appendTable();
+    summaryTable.setBorderWidth(1);
+
+    // Gross Pay
+    const grossRow = summaryTable.appendTableRow();
+    grossRow.appendTableCell('GROSS PAY').setBold(true).setBackgroundColor('#f2f2f2');
+    grossRow.appendTableCell(`R${formatAmount(payslip.GROSSSALARY)}`).setBold(true);
+
+    // Total Deductions
+    const totalDeductionsRow = summaryTable.appendTableRow();
+    totalDeductionsRow.appendTableCell('TOTAL DEDUCTIONS').setBold(true).setBackgroundColor('#f2f2f2');
+    totalDeductionsRow.appendTableCell(`R${formatAmount(payslip.TOTALDEDUCTIONS)}`).setBold(true);
+
+    // Nett Pay
+    const nettPayRow = summaryTable.appendTableRow();
+    nettPayRow.appendTableCell('NETT PAY').setBold(true).setBackgroundColor('#f2f2f2');
+    nettPayRow.appendTableCell(`R${formatAmount(payslip.NETTSALARY)}`).setBold(true);
+
+    // Amount Paid to Account
+    const paidRow = summaryTable.appendTableRow();
+    paidRow.appendTableCell('AMOUNT PAID TO ACCOUNT').setBold(true).setBackgroundColor('#e8f5e9');
+    paidRow.appendTableCell(`R${formatAmount(payslip.PaidtoAccount)}`).setBold(true).setBackgroundColor('#e8f5e9');
+
+    // === NOTES SECTION ===
+    if (payslip.NOTES) {
+      body.appendParagraph('');
+      body.appendParagraph('NOTES').setBold(true).setFontSize(11);
+      body.appendParagraph(payslip.NOTES);
+    }
 
     doc.saveAndClose();
 
