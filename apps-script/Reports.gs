@@ -360,11 +360,24 @@ function generateWeeklyPayrollSummaryReport(weekEnding) {
 
     const byEmployer = {};
 
+    // DEBUG: Log first payslip to see what fields are available
+    if (payslips.length > 0) {
+      Logger.log('🔍 DEBUG: First payslip keys: ' + Object.keys(payslips[0]).join(', '));
+      Logger.log('🔍 DEBUG: First payslip PaidtoAccount value: ' + payslips[0]['PaidtoAccount']);
+      Logger.log('🔍 DEBUG: First payslip PaidtoAccount type: ' + typeof payslips[0]['PaidtoAccount']);
+      Logger.log('🔍 DEBUG: First payslip NETTSALARY: ' + payslips[0]['NETTSALARY']);
+    }
+
     for (let i = 0; i < payslips.length; i++) {
       const p = payslips[i];
 
       const totalHours = (p['HOURS'] || 0) + ((p['MINUTES'] || 0) / 60);
       const totalOvertimeHours = (p['OVERTIMEHOURS'] || 0) + ((p['OVERTIMEMINUTES'] || 0) / 60);
+
+      // DEBUG: Log PaidtoAccount for first 3 payslips
+      if (i < 3) {
+        Logger.log('🔍 Payslip ' + (i + 1) + ' (' + p['EMPLOYEE NAME'] + '): PaidtoAccount = ' + p['PaidtoAccount'] + ', Net = ' + p['NETTSALARY']);
+      }
 
       totals.standardHours += totalHours;
       totals.overtimeHours += totalOvertimeHours;
@@ -373,7 +386,14 @@ function generateWeeklyPayrollSummaryReport(weekEnding) {
       totals.otherDeductions += p['OTHER DEDUCTIONS'] || 0;
       totals.loanDeductions += p['LoanDeductionThisWeek'] || 0;
       totals.netPay += p['NETTSALARY'] || 0;
-      totals.paidToAccounts += p['PaidtoAccount'] || 0;
+
+      const paidToAccountValue = p['PaidtoAccount'] || 0;
+      totals.paidToAccounts += paidToAccountValue;
+
+      // DEBUG: Log the running total
+      if (i < 3) {
+        Logger.log('🔍   Added ' + paidToAccountValue + ' to total, running total now: ' + totals.paidToAccounts);
+      }
 
       // Track by employer
       const employer = p['EMPLOYER'];
@@ -523,6 +543,13 @@ function generateWeeklyPayrollSummaryReport(weekEnding) {
 
     // Move to reports folder and set sharing
     const reportUrl = moveToReportsFolder(spreadsheet);
+
+    // DEBUG: Log final totals before returning
+    Logger.log('🔍 DEBUG: Final totals before return:');
+    Logger.log('🔍   Total Employees: ' + totals.employees);
+    Logger.log('🔍   Total Gross Pay: ' + totals.grossPay);
+    Logger.log('🔍   Total Net Pay: ' + totals.netPay);
+    Logger.log('🔍   Total Paid to Accounts: ' + totals.paidToAccounts);
 
     Logger.log('✅ Report generated: ' + fileName);
     Logger.log('📎 URL: ' + reportUrl);
