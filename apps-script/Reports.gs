@@ -436,8 +436,8 @@ function generateWeeklyPayrollSummaryReport(weekEnding) {
       'Gross Pay',
       'UIF',
       'Other Ded.',
-      'Loan Ded.',
       'Net Pay',
+      'Loan Ded.',
       'New Loan',
       'Paid to Account'
     ]]);
@@ -458,8 +458,8 @@ function generateWeeklyPayrollSummaryReport(weekEnding) {
         p['GROSSSALARY'] || 0,
         p['UIF'] || 0,
         p['OTHER DEDUCTIONS'] || 0,
-        p['LoanDeductionThisWeek'] || 0,
         p['NETTSALARY'] || 0,
+        p['LoanDeductionThisWeek'] || 0,
         p['NewLoanThisWeek'] || 0,
         p['PaidtoAccount'] || 0
       ]]);
@@ -475,8 +475,8 @@ function generateWeeklyPayrollSummaryReport(weekEnding) {
       totals.grossPay,
       totals.uif,
       totals.otherDeductions,
-      totals.loanDeductions,
       totals.netPay,
+      totals.loanDeductions,
       '',
       totals.paidToAccounts
     ]]);
