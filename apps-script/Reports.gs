@@ -541,6 +541,44 @@ function generateWeeklyPayrollSummaryReport(weekEnding) {
     // Auto-resize
     summarySheet.autoResizeColumns(1, 2);
 
+    // ===== TAB 3: Payslip Received Register =====
+    const receivedSheet = spreadsheet.insertSheet('Payslip Received Register');
+
+    // Header
+    receivedSheet.getRange('A1:E1').setValues([[
+      'Payslip Received Register - Week Ending: ' + formatDate(weekEnd),
+      '', '', '', ''
+    ]]);
+    receivedSheet.getRange('A1:E1').setFontWeight('bold').setFontSize(14);
+
+
+    // Column headers
+    receivedSheet.getRange('A3:E3').setValues([[
+      'Weekending',
+      'Employer',
+      'Employee Name',
+      'Record Number',
+      'Signature'
+    ]]);
+    receivedSheet.getRange('A3:E3').setFontWeight('bold').setBackground('#4CAF50').setFontColor('#FFFFFF');
+
+    // Data rows
+    let receivedRowNum = 4;
+    for (let i = 0; i < payslips.length; i++) {
+      const p = payslips[i];
+      receivedSheet.getRange(receivedRowNum, 1, 1, 5).setValues([[
+        formatDate(weekEnd),
+        p['EMPLOYER'],
+        p['EMPLOYEE NAME'],
+        p['RECORDNUMBER'],
+        '' // Blank for signature
+      ]]);
+      receivedRowNum++;
+    }
+
+    // Auto-resize
+    receivedSheet.autoResizeColumns(1, 5);
+
     // Move to reports folder and set sharing
     const reportUrl = moveToReportsFolder(spreadsheet);
 
