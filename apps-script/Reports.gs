@@ -354,6 +354,7 @@ function generateWeeklyPayrollSummaryReport(weekEnding) {
       uif: 0,
       otherDeductions: 0,
       loanDeductions: 0,
+      newLoans: 0,
       netPay: 0,
       paidToAccounts: 0
     };
@@ -385,6 +386,7 @@ function generateWeeklyPayrollSummaryReport(weekEnding) {
       totals.uif += p['UIF'] || 0;
       totals.otherDeductions += p['OTHER DEDUCTIONS'] || 0;
       totals.loanDeductions += p['LoanDeductionThisWeek'] || 0;
+      totals.newLoans += p['NewLoanThisWeek'] || 0;
       totals.netPay += p['NETTSALARY'] || 0;
 
       const paidToAccountValue = p['PaidtoAccount'] || 0;
@@ -420,12 +422,9 @@ function generateWeeklyPayrollSummaryReport(weekEnding) {
     const registerSheet = spreadsheet.getActiveSheet();
     registerSheet.setName('Payroll Register');
 
-    // Header
-    registerSheet.getRange('A1:K1').setValues([[
-      'WEEKLY PAYROLL REGISTER - Week Ending: ' + formatDate(weekEnd),
-      '', '', '', '', '', '', '', '', '', ''
-    ]]);
-    registerSheet.getRange('A1:K1').setFontWeight('bold').setFontSize(14);
+    // Header - set text first (merge will happen after setting widths)
+    registerSheet.getRange('A1').setValue('WEEKLY PAYROLL REGISTER - Week Ending: ' + formatDate(weekEnd));
+    registerSheet.setRowHeight(1, 30);
 
     // Column headers
     registerSheet.getRange('A3:K3').setValues([[
@@ -441,7 +440,8 @@ function generateWeeklyPayrollSummaryReport(weekEnding) {
       'New Loan',
       'Paid to Account'
     ]]);
-    registerSheet.getRange('A3:K3').setFontWeight('bold').setBackground('#4CAF50').setFontColor('#FFFFFF');
+    registerSheet.getRange('A3:K3').setFontWeight('bold').setBackground('#4CAF50').setFontColor('#FFFFFF').setHorizontalAlignment('center');
+    registerSheet.setRowHeight(3, 25);
 
     // Data rows
     let rowNum = 4;
@@ -477,7 +477,7 @@ function generateWeeklyPayrollSummaryReport(weekEnding) {
       totals.otherDeductions,
       totals.netPay,
       totals.loanDeductions,
-      '',
+      totals.newLoans,
       totals.paidToAccounts
     ]]);
     registerSheet.getRange(rowNum, 1, 1, 11).setFontWeight('bold').setBackground('#FFD700');
@@ -487,8 +487,27 @@ function generateWeeklyPayrollSummaryReport(weekEnding) {
     registerSheet.getRange(4, 4, payslips.length + 1, 1).setNumberFormat('0.00');  // OT Hours
     registerSheet.getRange(4, 5, payslips.length + 1, 7).setNumberFormat('"R"#,##0.00');  // Currency columns
 
-    // Auto-resize
-    registerSheet.autoResizeColumns(1, 11);
+    // Set hardcoded column widths for optimal layout
+    registerSheet.setColumnWidth(1, 220);  // Column A - Employee
+    registerSheet.setColumnWidth(2, 135);  // Column B - Employer
+    registerSheet.setColumnWidth(3, 80);   // Column C - Std Hours
+    registerSheet.setColumnWidth(4, 80);   // Column D - OT Hours
+    registerSheet.setColumnWidth(5, 90);   // Column E - Gross Pay
+    registerSheet.setColumnWidth(6, 80);   // Column F - UIF
+    registerSheet.setColumnWidth(7, 110);  // Column G - Other Ded.
+    registerSheet.setColumnWidth(8, 110);  // Column H - Net Pay
+    registerSheet.setColumnWidth(9, 110);  // Column I - Loan Ded.
+    registerSheet.setColumnWidth(10, 110); // Column J - New Loan
+    registerSheet.setColumnWidth(11, 110); // Column K - Paid to Account
+
+    // Merge header cells A1:K1 and apply formatting
+    registerSheet.getRange('A1:K1').merge();
+    registerSheet.getRange('A1').setFontWeight('bold').setFontSize(14).setHorizontalAlignment('center');
+
+    // Add borders to the entire table (from column headers through last data row)
+    const lastRegisterRow = rowNum;
+    const registerTableRange = registerSheet.getRange('A3:K' + lastRegisterRow);
+    registerTableRange.setBorder(true, true, true, true, true, true, 'black', SpreadsheetApp.BorderStyle.SOLID);
 
     // ===== TAB 2: Summary =====
     const summarySheet = spreadsheet.insertSheet('Summary');
