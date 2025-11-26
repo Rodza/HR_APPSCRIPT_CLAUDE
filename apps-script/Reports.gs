@@ -544,13 +544,11 @@ function generateWeeklyPayrollSummaryReport(weekEnding) {
     // ===== TAB 3: Payslip Received Register =====
     const receivedSheet = spreadsheet.insertSheet('Payslip Received Register');
 
-    // Header
-    receivedSheet.getRange('A1:E1').setValues([[
-      'Payslip Received Register - Week Ending: ' + formatDate(weekEnd),
-      '', '', '', ''
-    ]]);
-    receivedSheet.getRange('A1:E1').setFontWeight('bold').setFontSize(14);
-
+    // Header - merged across columns A to E
+    receivedSheet.getRange('A1:E1').merge();
+    receivedSheet.getRange('A1').setValue('Payslip Received Register - Week Ending: ' + formatDate(weekEnd));
+    receivedSheet.getRange('A1').setFontWeight('bold').setFontSize(14).setHorizontalAlignment('center');
+    receivedSheet.setRowHeight(1, 30); // Header row height
 
     // Column headers
     receivedSheet.getRange('A3:E3').setValues([[
@@ -560,7 +558,8 @@ function generateWeeklyPayrollSummaryReport(weekEnding) {
       'Record Number',
       'Signature'
     ]]);
-    receivedSheet.getRange('A3:E3').setFontWeight('bold').setBackground('#4CAF50').setFontColor('#FFFFFF');
+    receivedSheet.getRange('A3:E3').setFontWeight('bold').setBackground('#4CAF50').setFontColor('#FFFFFF').setHorizontalAlignment('center');
+    receivedSheet.setRowHeight(3, 25); // Column header row height
 
     // Data rows
     let receivedRowNum = 4;
@@ -573,11 +572,30 @@ function generateWeeklyPayrollSummaryReport(weekEnding) {
         p['RECORDNUMBER'],
         '' // Blank for signature
       ]]);
+      // Set row height to accommodate signatures
+      receivedSheet.setRowHeight(receivedRowNum, 40);
       receivedRowNum++;
     }
 
-    // Auto-resize
-    receivedSheet.autoResizeColumns(1, 5);
+    // Auto-resize columns A-D to fit max text content
+    receivedSheet.autoResizeColumns(1, 4);
+
+    // Set column E (Signature) width to fixed size for signatures
+    receivedSheet.setColumnWidth(5, 150);
+
+    // Page setup for A4 portrait printing
+    receivedSheet.setPageOrientation(SpreadsheetApp.PageOrientation.PORTRAIT);
+    receivedSheet.setPageSize(SpreadsheetApp.PageSize.A4);
+
+    // Set print margins (narrow margins in points: 0.25 inch = 18 points)
+    receivedSheet.getSheetMargins().setMargins(18, 18, 18, 18);
+
+    // Fit to one page wide
+    receivedSheet.setFitToWidth(1);
+
+    // Enable gridlines and center on page
+    receivedSheet.setPrintGridlines(true);
+    receivedSheet.setHorizontalAlignment(SpreadsheetApp.HorizontalAlignment.CENTER);
 
     // Move to reports folder and set sharing
     const reportUrl = moveToReportsFolder(spreadsheet);
