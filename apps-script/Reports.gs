@@ -354,6 +354,7 @@ function generateWeeklyPayrollSummaryReport(weekEnding) {
       uif: 0,
       otherDeductions: 0,
       loanDeductions: 0,
+      newLoans: 0,
       netPay: 0,
       paidToAccounts: 0
     };
@@ -385,6 +386,7 @@ function generateWeeklyPayrollSummaryReport(weekEnding) {
       totals.uif += p['UIF'] || 0;
       totals.otherDeductions += p['OTHER DEDUCTIONS'] || 0;
       totals.loanDeductions += p['LoanDeductionThisWeek'] || 0;
+      totals.newLoans += p['NewLoanThisWeek'] || 0;
       totals.netPay += p['NETTSALARY'] || 0;
 
       const paidToAccountValue = p['PaidtoAccount'] || 0;
@@ -420,12 +422,9 @@ function generateWeeklyPayrollSummaryReport(weekEnding) {
     const registerSheet = spreadsheet.getActiveSheet();
     registerSheet.setName('Payroll Register');
 
-    // Header
-    registerSheet.getRange('A1:K1').setValues([[
-      'WEEKLY PAYROLL REGISTER - Week Ending: ' + formatDate(weekEnd),
-      '', '', '', '', '', '', '', '', '', ''
-    ]]);
-    registerSheet.getRange('A1:K1').setFontWeight('bold').setFontSize(14);
+    // Header - set text first (merge will happen after setting widths)
+    registerSheet.getRange('A1').setValue('WEEKLY PAYROLL REGISTER - Week Ending: ' + formatDate(weekEnd));
+    registerSheet.setRowHeight(1, 30);
 
     // Column headers
     registerSheet.getRange('A3:K3').setValues([[
@@ -441,7 +440,8 @@ function generateWeeklyPayrollSummaryReport(weekEnding) {
       'New Loan',
       'Paid to Account'
     ]]);
-    registerSheet.getRange('A3:K3').setFontWeight('bold').setBackground('#4CAF50').setFontColor('#FFFFFF');
+    registerSheet.getRange('A3:K3').setFontWeight('bold').setBackground('#4CAF50').setFontColor('#FFFFFF').setHorizontalAlignment('center');
+    registerSheet.setRowHeight(3, 25);
 
     // Data rows
     let rowNum = 4;
@@ -477,7 +477,7 @@ function generateWeeklyPayrollSummaryReport(weekEnding) {
       totals.otherDeductions,
       totals.netPay,
       totals.loanDeductions,
-      '',
+      totals.newLoans,
       totals.paidToAccounts
     ]]);
     registerSheet.getRange(rowNum, 1, 1, 11).setFontWeight('bold').setBackground('#FFD700');
@@ -487,8 +487,27 @@ function generateWeeklyPayrollSummaryReport(weekEnding) {
     registerSheet.getRange(4, 4, payslips.length + 1, 1).setNumberFormat('0.00');  // OT Hours
     registerSheet.getRange(4, 5, payslips.length + 1, 7).setNumberFormat('"R"#,##0.00');  // Currency columns
 
-    // Auto-resize
-    registerSheet.autoResizeColumns(1, 11);
+    // Set hardcoded column widths for optimal layout
+    registerSheet.setColumnWidth(1, 220);  // Column A - Employee
+    registerSheet.setColumnWidth(2, 135);  // Column B - Employer
+    registerSheet.setColumnWidth(3, 80);   // Column C - Std Hours
+    registerSheet.setColumnWidth(4, 80);   // Column D - OT Hours
+    registerSheet.setColumnWidth(5, 90);   // Column E - Gross Pay
+    registerSheet.setColumnWidth(6, 80);   // Column F - UIF
+    registerSheet.setColumnWidth(7, 110);  // Column G - Other Ded.
+    registerSheet.setColumnWidth(8, 110);  // Column H - Net Pay
+    registerSheet.setColumnWidth(9, 110);  // Column I - Loan Ded.
+    registerSheet.setColumnWidth(10, 110); // Column J - New Loan
+    registerSheet.setColumnWidth(11, 110); // Column K - Paid to Account
+
+    // Merge header cells A1:K1 and apply formatting
+    registerSheet.getRange('A1:K1').merge();
+    registerSheet.getRange('A1').setFontWeight('bold').setFontSize(14).setHorizontalAlignment('center');
+
+    // Add borders to the entire table (from column headers through last data row)
+    const lastRegisterRow = rowNum;
+    const registerTableRange = registerSheet.getRange('A3:K' + lastRegisterRow);
+    registerTableRange.setBorder(true, true, true, true, true, true, 'black', SpreadsheetApp.BorderStyle.SOLID);
 
     // ===== TAB 2: Summary =====
     const summarySheet = spreadsheet.insertSheet('Summary');
@@ -544,10 +563,8 @@ function generateWeeklyPayrollSummaryReport(weekEnding) {
     // ===== TAB 3: Payslip Received Register =====
     const receivedSheet = spreadsheet.insertSheet('Payslip Received Register');
 
-    // Header - merged across columns A to E
-    receivedSheet.getRange('A1:E1').merge();
+    // Header - set text first (merge will happen after auto-resize)
     receivedSheet.getRange('A1').setValue('Payslip Received Register - Week Ending: ' + formatDate(weekEnd));
-    receivedSheet.getRange('A1').setFontWeight('bold').setFontSize(14).setHorizontalAlignment('center');
     receivedSheet.setRowHeight(1, 30); // Header row height
 
     // Column headers
@@ -572,30 +589,30 @@ function generateWeeklyPayrollSummaryReport(weekEnding) {
         p['RECORDNUMBER'],
         '' // Blank for signature
       ]]);
-      // Set row height to accommodate signatures
-      receivedSheet.setRowHeight(receivedRowNum, 40);
+      // Set row height to 50px to accommodate signatures
+      receivedSheet.setRowHeight(receivedRowNum, 50);
       receivedRowNum++;
     }
 
-    // Auto-resize columns A-D to fit max text content
-    receivedSheet.autoResizeColumns(1, 4);
+    // Set hardcoded column widths for optimal A4 portrait layout
+    receivedSheet.setColumnWidth(1, 85);   // Column A - Weekending
+    receivedSheet.setColumnWidth(2, 135);  // Column B - Employer
+    receivedSheet.setColumnWidth(3, 220);  // Column C - Employee Name
+    receivedSheet.setColumnWidth(4, 110);  // Column D - Record Number
+    receivedSheet.setColumnWidth(5, 220);  // Column E - Signature
 
-    // Set column E (Signature) width to fixed size for signatures
-    receivedSheet.setColumnWidth(5, 150);
+    // Merge header cells A1:E1 and apply formatting
+    receivedSheet.getRange('A1:E1').merge();
+    receivedSheet.getRange('A1').setFontWeight('bold').setFontSize(14).setHorizontalAlignment('center');
 
-    // Page setup for A4 portrait printing
-    receivedSheet.setPageOrientation(SpreadsheetApp.PageOrientation.PORTRAIT);
-    receivedSheet.setPageSize(SpreadsheetApp.PageSize.A4);
+    // Add borders to the entire table (from column headers through last data row)
+    const lastRow = receivedRowNum - 1;
+    const tableRange = receivedSheet.getRange('A3:E' + lastRow);
+    tableRange.setBorder(true, true, true, true, true, true, 'black', SpreadsheetApp.BorderStyle.SOLID);
 
-    // Set print margins (narrow margins in points: 0.25 inch = 18 points)
-    receivedSheet.getSheetMargins().setMargins(18, 18, 18, 18);
-
-    // Fit to one page wide
-    receivedSheet.setFitToWidth(1);
-
-    // Enable gridlines and center on page
-    receivedSheet.setPrintGridlines(true);
-    receivedSheet.setHorizontalAlignment(SpreadsheetApp.HorizontalAlignment.CENTER);
+    // NOTE: For optimal A4 portrait printing, manually configure in Google Sheets:
+    // File > Print > Set page orientation to Portrait, paper size to A4,
+    // margins to Narrow, and scale to "Fit to width" = 1 page
 
     // Move to reports folder and set sharing
     const reportUrl = moveToReportsFolder(spreadsheet);
