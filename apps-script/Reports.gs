@@ -570,22 +570,26 @@ function generateWeeklyPayrollSummaryReport(weekEnding) {
         p['RECORDNUMBER'],
         '' // Blank for signature
       ]]);
-      // Set row height to accommodate signatures
-      receivedSheet.setRowHeight(receivedRowNum, 40);
+      // Set row height to 50px to accommodate signatures
+      receivedSheet.setRowHeight(receivedRowNum, 50);
       receivedRowNum++;
     }
 
-    // IMPORTANT: Auto-resize columns A-D BEFORE merging header
-    // This ensures proper column width calculation based on actual content
-    receivedSheet.autoResizeColumns(1, 4);
+    // Set hardcoded column widths for optimal A4 portrait layout
+    receivedSheet.setColumnWidth(1, 85);   // Column A - Weekending
+    receivedSheet.setColumnWidth(2, 135);  // Column B - Employer
+    receivedSheet.setColumnWidth(3, 220);  // Column C - Employee Name
+    receivedSheet.setColumnWidth(4, 110);  // Column D - Record Number
+    receivedSheet.setColumnWidth(5, 220);  // Column E - Signature
 
-    // Set column E (Signature) width to fixed size for signatures
-    receivedSheet.setColumnWidth(5, 150);
-
-    // NOW merge header cells A1:E1 and apply formatting
-    // (done after auto-resize so it doesn't interfere with width calculation)
+    // Merge header cells A1:E1 and apply formatting
     receivedSheet.getRange('A1:E1').merge();
     receivedSheet.getRange('A1').setFontWeight('bold').setFontSize(14).setHorizontalAlignment('center');
+
+    // Add borders to the entire table (from column headers through last data row)
+    const lastRow = receivedRowNum - 1;
+    const tableRange = receivedSheet.getRange('A3:E' + lastRow);
+    tableRange.setBorder(true, true, true, true, true, true, 'black', SpreadsheetApp.BorderStyle.SOLID);
 
     // NOTE: For optimal A4 portrait printing, manually configure in Google Sheets:
     // File > Print > Set page orientation to Portrait, paper size to A4,
