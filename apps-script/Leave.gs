@@ -25,6 +25,106 @@ function getDayOfWeek(date) {
   return days[date.getDay()];
 }
 
+/**
+ * Get or create the Leave Documents folder in Google Drive
+ *
+ * @returns {Folder} Google Drive folder for leave documents
+ */
+function getLeaveDocumentsFolder() {
+  const folderName = 'Leave Documents';
+  const folders = DriveApp.getFoldersByName(folderName);
+
+  if (folders.hasNext()) {
+    return folders.next();
+  } else {
+    // Create folder if it doesn't exist
+    const folder = DriveApp.createFolder(folderName);
+    Logger.log('Created Leave Documents folder: ' + folder.getId());
+    return folder;
+  }
+}
+
+/**
+ * Upload a leave document to Google Drive
+ *
+ * @param {Object} fileData - File data object
+ * @param {string} fileData.fileName - Original file name
+ * @param {string} fileData.mimeType - File MIME type
+ * @param {string} fileData.content - Base64 encoded file content
+ * @param {string} fileData.employeeName - Employee name for file naming
+ * @param {string} fileData.startDate - Leave start date for file naming
+ *
+ * @returns {Object} Result with success flag and file URL/error
+ *
+ * @example
+ * const result = uploadLeaveDocument({
+ *   fileName: 'doctors_note.pdf',
+ *   mimeType: 'application/pdf',
+ *   content: 'base64string...',
+ *   employeeName: 'John Doe',
+ *   startDate: '2025-11-20'
+ * });
+ */
+function uploadLeaveDocument(fileData) {
+  try {
+    Logger.log('\n========== UPLOAD LEAVE DOCUMENT ==========');
+    Logger.log('File name: ' + fileData.fileName);
+    Logger.log('MIME type: ' + fileData.mimeType);
+    Logger.log('Employee: ' + fileData.employeeName);
+
+    // Validate input
+    if (!fileData.fileName || !fileData.mimeType || !fileData.content) {
+      throw new Error('File name, MIME type, and content are required');
+    }
+
+    // Get or create Leave Documents folder
+    const folder = getLeaveDocumentsFolder();
+
+    // Create a unique file name
+    const timestamp = new Date().getTime();
+    const sanitizedEmployeeName = fileData.employeeName.replace(/[^a-zA-Z0-9]/g, '_');
+    const sanitizedStartDate = fileData.startDate ? fileData.startDate.replace(/[^0-9-]/g, '') : 'unknown';
+    const fileExtension = fileData.fileName.split('.').pop();
+    const uniqueFileName = `Leave_${sanitizedEmployeeName}_${sanitizedStartDate}_${timestamp}.${fileExtension}`;
+
+    // Decode base64 content
+    const blob = Utilities.newBlob(
+      Utilities.base64Decode(fileData.content),
+      fileData.mimeType,
+      uniqueFileName
+    );
+
+    // Create file in Drive
+    const file = folder.createFile(blob);
+
+    // Make file accessible to anyone with the link (for easy access)
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+    const fileUrl = file.getUrl();
+    const fileId = file.getId();
+
+    Logger.log('✅ File uploaded successfully');
+    Logger.log('File ID: ' + fileId);
+    Logger.log('File URL: ' + fileUrl);
+    Logger.log('========== UPLOAD LEAVE DOCUMENT COMPLETE ==========\n');
+
+    return {
+      success: true,
+      data: {
+        fileUrl: fileUrl,
+        fileId: fileId,
+        fileName: uniqueFileName
+      }
+    };
+
+  } catch (error) {
+    Logger.log('❌ ERROR in uploadLeaveDocument: ' + error.message);
+    Logger.log('Stack: ' + error.stack);
+    Logger.log('========== UPLOAD LEAVE DOCUMENT FAILED ==========\n');
+    return { success: false, error: error.message };
+  }
+}
+
 // ==================== ADD LEAVE RECORD ====================
 
 /**
