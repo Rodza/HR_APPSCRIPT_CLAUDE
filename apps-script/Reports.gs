@@ -544,10 +544,8 @@ function generateWeeklyPayrollSummaryReport(weekEnding) {
     // ===== TAB 3: Payslip Received Register =====
     const receivedSheet = spreadsheet.insertSheet('Payslip Received Register');
 
-    // Header - merged across columns A to E
-    receivedSheet.getRange('A1:E1').merge();
+    // Header - set text first (merge will happen after auto-resize)
     receivedSheet.getRange('A1').setValue('Payslip Received Register - Week Ending: ' + formatDate(weekEnd));
-    receivedSheet.getRange('A1').setFontWeight('bold').setFontSize(14).setHorizontalAlignment('center');
     receivedSheet.setRowHeight(1, 30); // Header row height
 
     // Column headers
@@ -577,11 +575,17 @@ function generateWeeklyPayrollSummaryReport(weekEnding) {
       receivedRowNum++;
     }
 
-    // Auto-resize columns A-D to fit max text content
+    // IMPORTANT: Auto-resize columns A-D BEFORE merging header
+    // This ensures proper column width calculation based on actual content
     receivedSheet.autoResizeColumns(1, 4);
 
     // Set column E (Signature) width to fixed size for signatures
     receivedSheet.setColumnWidth(5, 150);
+
+    // NOW merge header cells A1:E1 and apply formatting
+    // (done after auto-resize so it doesn't interfere with width calculation)
+    receivedSheet.getRange('A1:E1').merge();
+    receivedSheet.getRange('A1').setFontWeight('bold').setFontSize(14).setHorizontalAlignment('center');
 
     // NOTE: For optimal A4 portrait printing, manually configure in Google Sheets:
     // File > Print > Set page orientation to Portrait, paper size to A4,
