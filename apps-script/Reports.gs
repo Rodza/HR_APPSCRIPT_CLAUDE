@@ -583,19 +583,9 @@ function generateWeeklyPayrollSummaryReport(weekEnding) {
     // Set column E (Signature) width to fixed size for signatures
     receivedSheet.setColumnWidth(5, 150);
 
-    // Page setup for A4 portrait printing
-    receivedSheet.setPageOrientation(SpreadsheetApp.PageOrientation.PORTRAIT);
-    receivedSheet.setPageSize(SpreadsheetApp.PageSize.A4);
-
-    // Set print margins (narrow margins in points: 0.25 inch = 18 points)
-    receivedSheet.getSheetMargins().setMargins(18, 18, 18, 18);
-
-    // Fit to one page wide
-    receivedSheet.setFitToWidth(1);
-
-    // Enable gridlines and center on page
-    receivedSheet.setPrintGridlines(true);
-    receivedSheet.setHorizontalAlignment(SpreadsheetApp.HorizontalAlignment.CENTER);
+    // NOTE: For optimal A4 portrait printing, manually configure in Google Sheets:
+    // File > Print > Set page orientation to Portrait, paper size to A4,
+    // margins to Narrow, and scale to "Fit to width" = 1 page
 
     // Move to reports folder and set sharing
     const reportUrl = moveToReportsFolder(spreadsheet);
