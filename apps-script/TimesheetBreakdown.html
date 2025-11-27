@@ -595,74 +595,118 @@
         }
 
         function exportPDF() {
-            // Create a new window with just the report content for clean PDF export
-            const printWindow = window.open('', '_blank');
-
-            // Get the current filter selection for the title
+            // Get currently filtered data to include in the PDF
             const weekFilter = document.getElementById('weekFilter');
-            const weekText = weekFilter.options[weekFilter.selectedIndex].text;
+            const weekText = weekFilter.options[weekFilter.selectedIndex].text || 'All Weeks';
+            const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
-            // Build the print content
-            const printContent = `
+            // Build comprehensive HTML document
+            let html = `
                 <!DOCTYPE html>
                 <html>
                 <head>
-                    <title>Timesheet Breakdown - ${weekText}</title>
+                    <meta charset="UTF-8">
+                    <title>Timesheet Breakdown Report - ${weekText}</title>
                     <style>
-                        * { box-sizing: border-box; }
                         body {
                             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                            margin: 0;
-                            padding: 20px;
+                            margin: 20px;
                             background: white;
                         }
-                        .header {
+                        h1 {
+                            color: #4f46e5;
+                            border-bottom: 3px solid #4f46e5;
+                            padding-bottom: 10px;
+                            margin-bottom: 10px;
+                        }
+                        .report-meta {
+                            color: #6b7280;
+                            margin-bottom: 20px;
+                            font-size: 14px;
+                        }
+                        .print-btn {
                             background: #4f46e5;
                             color: white;
-                            padding: 15px 20px;
-                            border-radius: 8px;
-                            margin-bottom: 15px;
+                            padding: 12px 24px;
+                            border: none;
+                            border-radius: 6px;
+                            cursor: pointer;
+                            margin: 20px 0;
+                            font-size: 16px;
+                            font-weight: 600;
                         }
-                        .header h1 { margin: 0 0 5px 0; font-size: 20px; }
-                        .header p { margin: 0; opacity: 0.9; font-size: 12px; }
+                        .print-btn:hover { background: #4338ca; }
                         .stats-grid {
                             display: grid;
                             grid-template-columns: repeat(4, 1fr);
-                            gap: 10px;
-                            margin-bottom: 15px;
+                            gap: 15px;
+                            margin-bottom: 20px;
                         }
                         .stat-card {
                             background: #f8fafc;
-                            padding: 10px;
-                            border-radius: 6px;
-                            border: 1px solid #e5e7eb;
-                        }
-                        .stat-card .label { font-size: 10px; color: #666; margin-bottom: 3px; }
-                        .stat-card .value { font-size: 18px; font-weight: bold; color: #333; }
-                        .employee-card {
-                            border: 1px solid #e5e7eb;
+                            padding: 15px;
                             border-radius: 8px;
-                            margin-bottom: 15px;
+                            border: 2px solid #e5e7eb;
+                        }
+                        .stat-card .label {
+                            font-size: 11px;
+                            color: #6b7280;
+                            margin-bottom: 5px;
+                            text-transform: uppercase;
+                            font-weight: 600;
+                        }
+                        .stat-card .value {
+                            font-size: 24px;
+                            font-weight: bold;
+                            color: #1f2937;
+                        }
+                        .stat-card.warning .value { color: #f59e0b; }
+                        .stat-card.error .value { color: #ef4444; }
+                        .stat-card.success .value { color: #10b981; }
+                        .employee-card {
+                            border: 2px solid #e5e7eb;
+                            border-radius: 10px;
+                            margin-bottom: 20px;
                             page-break-inside: avoid;
+                            overflow: hidden;
                         }
                         .employee-header {
                             background: #f8fafc;
-                            padding: 10px 15px;
-                            border-bottom: 1px solid #e5e7eb;
+                            padding: 15px 20px;
+                            border-bottom: 2px solid #e5e7eb;
                             display: flex;
                             justify-content: space-between;
                             align-items: center;
                         }
-                        .employee-name { font-size: 14px; font-weight: 600; color: #1f2937; }
-                        .employee-total { font-size: 12px; color: #6b7280; }
-                        .employee-total strong { color: #4f46e5; font-size: 14px; }
-                        .employee-body { padding: 10px 15px; }
+                        .employee-name {
+                            font-size: 16px;
+                            font-weight: 700;
+                            color: #1f2937;
+                        }
+                        .employee-meta {
+                            font-size: 11px;
+                            color: #6b7280;
+                            margin-top: 4px;
+                        }
+                        .employee-total {
+                            font-size: 13px;
+                            color: #6b7280;
+                            text-align: right;
+                        }
+                        .employee-total strong {
+                            color: #4f46e5;
+                            font-size: 18px;
+                            display: block;
+                        }
+                        .employee-body {
+                            padding: 15px 20px;
+                        }
                         .day-row {
                             background: #f9fafb;
-                            border-radius: 6px;
-                            padding: 10px;
-                            margin-bottom: 8px;
-                            border-left: 3px solid #4f46e5;
+                            border-radius: 8px;
+                            padding: 12px 15px;
+                            margin-bottom: 10px;
+                            border-left: 4px solid #4f46e5;
                             page-break-inside: avoid;
                         }
                         .day-row.friday { border-left-color: #8b5cf6; }
@@ -672,65 +716,112 @@
                             display: flex;
                             justify-content: space-between;
                             align-items: center;
-                            margin-bottom: 8px;
+                            margin-bottom: 10px;
+                            padding-bottom: 8px;
+                            border-bottom: 1px solid #e5e7eb;
                         }
-                        .day-date { font-weight: 600; color: #374151; font-size: 12px; }
-                        .day-paid { font-weight: 600; color: #4f46e5; font-size: 12px; }
+                        .day-date {
+                            font-weight: 700;
+                            color: #374151;
+                            font-size: 13px;
+                        }
+                        .day-paid {
+                            font-weight: 700;
+                            color: #4f46e5;
+                            font-size: 14px;
+                        }
                         .day-details {
                             display: grid;
                             grid-template-columns: repeat(4, 1fr);
-                            gap: 10px;
+                            gap: 15px;
                             font-size: 11px;
                         }
                         .detail-group h4 {
-                            margin: 0 0 5px 0;
+                            margin: 0 0 6px 0;
                             font-size: 9px;
                             color: #6b7280;
                             text-transform: uppercase;
+                            font-weight: 700;
+                            letter-spacing: 0.5px;
                         }
-                        .detail-item { color: #374151; margin-bottom: 2px; }
-                        .detail-item.adjusted { color: #4f46e5; }
+                        .detail-item {
+                            color: #374151;
+                            margin-bottom: 3px;
+                            line-height: 1.4;
+                        }
+                        .detail-item.adjusted {
+                            color: #4f46e5;
+                            font-weight: 600;
+                        }
                         .warning-item {
                             background: #fef3c7;
                             color: #92400e;
-                            padding: 4px 6px;
-                            border-radius: 3px;
+                            padding: 5px 8px;
+                            border-radius: 4px;
                             font-size: 10px;
-                            margin-top: 3px;
+                            margin-top: 4px;
+                            border-left: 3px solid #f59e0b;
                         }
                         .badge {
                             display: inline-block;
-                            padding: 2px 6px;
-                            border-radius: 10px;
+                            padding: 3px 8px;
+                            border-radius: 12px;
                             font-size: 9px;
-                            font-weight: 500;
+                            font-weight: 600;
+                            margin-left: 8px;
                         }
                         .badge-lunch { background: #dcfce7; color: #166534; }
                         .badge-no-lunch { background: #fee2e2; color: #991b1b; }
                         .badge-friday { background: #ede9fe; color: #5b21b6; }
                         @media print {
-                            body { padding: 10px; }
+                            .print-btn { display: none !important; }
+                            body { margin: 1cm; padding: 0; }
+                            .page-break { page-break-before: always; }
+                            h1 { font-size: 20px; }
+                            .employee-card { margin-bottom: 15px; }
+                            .day-row { margin-bottom: 8px; padding: 10px 12px; }
+                            .stat-card { padding: 10px; }
                         }
                     </style>
                 </head>
                 <body>
-                    <div class="header">
-                        <h1>Timesheet Breakdown Report</h1>
-                        <p>${weekText} - Generated ${new Date().toLocaleDateString()}</p>
+                    <button class="print-btn" onclick="window.print()">🖨️ Print / Save as PDF</button>
+
+                    <h1>Timesheet Breakdown Report</h1>
+                    <div class="report-meta">
+                        <strong>Week:</strong> ${weekText}<br>
+                        <strong>Generated:</strong> ${today}
                     </div>
-                    ${document.getElementById('statsGrid').innerHTML}
-                    ${document.getElementById('content').innerHTML}
+            `;
+
+            // Add stats section
+            html += `<div class="stats-grid">${document.getElementById('statsGrid').innerHTML}</div>`;
+
+            // Add all employee cards
+            html += `<div>${document.getElementById('content').innerHTML}</div>`;
+
+            html += `
+                    <script>
+                        // Auto-print instruction
+                        console.log('Report ready. Click the Print button or use Ctrl/Cmd+P to save as PDF');
+                    </script>
                 </body>
                 </html>
             `;
 
-            printWindow.document.write(printContent);
-            printWindow.document.close();
+            // Create and download the HTML file
+            const blob = new Blob([html], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const filename = `Timesheet_Breakdown_${weekText.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().split('T')[0]}.html`;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
 
-            // Wait for content to load then print
-            printWindow.onload = function() {
-                printWindow.print();
-            };
+            alert('Report downloaded as HTML!\n\nTo create PDF:\n1. Open the downloaded HTML file in your browser\n2. Click the Print button or press Ctrl/Cmd+P\n3. Select "Save as PDF" as the printer\n4. Click Save');
         }
     </script>
 </body>
