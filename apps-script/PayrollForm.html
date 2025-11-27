@@ -137,22 +137,30 @@
                         <div class="form-section">
                             <h6><i class="fas fa-plus-circle"></i> Additional Pay</h6>
                             <div class="row">
-                                <div class="col-md-4">
+                                <div class="col-md-6">
                                     <div class="mb-3">
                                         <label for="leavePay" class="form-label">Leave Pay (R)</label>
                                         <input type="number" class="form-control" id="leavePay" step="0.01" min="0" value="0" onchange="calculatePreview()">
                                     </div>
                                 </div>
-                                <div class="col-md-4">
+                                <div class="col-md-6">
                                     <div class="mb-3">
                                         <label for="bonusPay" class="form-label">Bonus Pay (R)</label>
                                         <input type="number" class="form-control" id="bonusPay" step="0.01" min="0" value="0" onchange="calculatePreview()">
                                     </div>
                                 </div>
-                                <div class="col-md-4">
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6">
                                     <div class="mb-3">
                                         <label for="otherIncome" class="form-label">Other Income (R)</label>
                                         <input type="number" class="form-control" id="otherIncome" step="0.01" min="0" value="0" onchange="calculatePreview()">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="otherIncomeText" class="form-label">Description</label>
+                                        <input type="text" class="form-control" id="otherIncomeText" placeholder="e.g., Commission">
                                     </div>
                                 </div>
                             </div>
@@ -597,6 +605,7 @@
                 leavePay: parseFloat(document.getElementById('leavePay').value) || 0,
                 bonusPay: parseFloat(document.getElementById('bonusPay').value) || 0,
                 otherIncome: parseFloat(document.getElementById('otherIncome').value) || 0,
+                otherIncomeText: document.getElementById('otherIncomeText').value || '',
                 otherDeductions: parseFloat(document.getElementById('otherDeductions').value) || 0,
                 otherDeductionsText: document.getElementById('otherDeductionsText').value || '',
                 loanDeductionThisWeek: parseFloat(document.getElementById('loanDeductionThisWeek').value) || 0,
@@ -707,6 +716,7 @@
                 document.getElementById('leavePay').value = payslip['LEAVE PAY'] || 0;
                 document.getElementById('bonusPay').value = payslip['BONUS PAY'] || 0;
                 document.getElementById('otherIncome').value = payslip.OTHERINCOME || 0;
+                document.getElementById('otherIncomeText').value = payslip['OTHER INCOME TEXT'] || '';
                 document.getElementById('otherDeductions').value = payslip['OTHER DEDUCTIONS'] || 0;
                 document.getElementById('otherDeductionsText').value = payslip['OTHER DEDUCTIONS TEXT'] || '';
                 document.getElementById('loanDeductionThisWeek').value = payslip.LoanDeductionThisWeek || 0;
