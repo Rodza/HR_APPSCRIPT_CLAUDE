@@ -297,37 +297,89 @@
         })();
 
         function loadBreakdownData() {
-            google.script.run
-                .withSuccessHandler(handleDataLoaded)
-                .withFailureHandler(handleError)
-                .getTimesheetBreakdownData();
+            console.log('🔄 Starting to load breakdown data...');
+            try {
+                google.script.run
+                    .withSuccessHandler(handleDataLoaded)
+                    .withFailureHandler(handleError)
+                    .getTimesheetBreakdownData();
+                console.log('✅ google.script.run call initiated');
+            } catch (error) {
+                console.error('❌ Error calling google.script.run:', error);
+                document.getElementById('content').innerHTML =
+                    '<div class="no-data"><h3>Error</h3><p>Failed to initiate data load: ' + error.message + '</p></div>';
+            }
         }
 
         function handleDataLoaded(data) {
-            console.log('handleDataLoaded called with:', data);
-            console.log('data type:', typeof data);
-            console.log('data is null:', data === null);
-            console.log('data is undefined:', data === undefined);
+            console.log('✅ handleDataLoaded called');
+            console.log('📦 Data received:', data);
+            console.log('📊 Data type:', typeof data);
+            console.log('🔍 Data is null:', data === null);
+            console.log('🔍 Data is undefined:', data === undefined);
 
-            if (!data || !data.success) {
-                console.error('Data loading failed:', data);
+            if (!data) {
+                console.error('❌ No data received');
                 document.getElementById('content').innerHTML =
-                    '<div class="no-data"><h3>No Data Available</h3><p>' +
-                    (data ? data.error : 'Failed to load data') + '</p></div>';
+                    '<div class="no-data"><h3>No Data Available</h3><p>The server returned no data. Please check the backend logs.</p></div>';
                 return;
             }
 
-            console.log('Data loaded successfully:', data.data.length, 'employees');
+            if (!data.success) {
+                console.error('❌ Data loading failed:', data);
+                document.getElementById('content').innerHTML =
+                    '<div class="no-data"><h3>Error Loading Data</h3><p>' +
+                    (data.error || 'Unknown error occurred') + '</p>' +
+                    '<p style="font-size: 12px; color: #666; margin-top: 10px;">Check Apps Script logs for more details.</p></div>';
+                return;
+            }
+
+            if (!data.data || !Array.isArray(data.data)) {
+                console.error('❌ Invalid data format:', data);
+                document.getElementById('content').innerHTML =
+                    '<div class="no-data"><h3>Invalid Data Format</h3><p>Expected an array of employee data.</p></div>';
+                return;
+            }
+
+            console.log('✅ Data loaded successfully:', data.data.length, 'employees');
             allData = data.data;
+
+            if (allData.length === 0) {
+                console.warn('⚠️ No employees found in data');
+                document.getElementById('content').innerHTML =
+                    '<div class="no-data"><h3>No Timesheets Found</h3><p>There are no timesheet records to display. Import clock data first.</p></div>';
+                return;
+            }
+
             populateWeekFilter(allData);
             updateStats(allData);
             renderEmployees(allData);
         }
 
         function handleError(error) {
-            console.error('handleError called:', error);
+            console.error('❌ handleError called');
+            console.error('❌ Error details:', error);
+            console.error('❌ Error message:', error.message);
+            console.error('❌ Error stack:', error.stack);
+
             document.getElementById('content').innerHTML =
-                '<div class="no-data"><h3>Error Loading Data</h3><p>' + error.message + '</p></div>';
+                '<div class="no-data">' +
+                '<h3>⚠️ Error Loading Data</h3>' +
+                '<p style="color: #ef4444; font-weight: 600;">' + (error.message || 'Unknown error') + '</p>' +
+                '<details style="margin-top: 15px; font-size: 12px;">' +
+                '<summary style="cursor: pointer; color: #4f46e5;">Technical Details</summary>' +
+                '<pre style="background: #f3f4f6; padding: 10px; border-radius: 4px; overflow-x: auto; margin-top: 10px;">' +
+                JSON.stringify(error, null, 2) +
+                '</pre>' +
+                '</details>' +
+                '<p style="font-size: 12px; color: #666; margin-top: 15px;">💡 Troubleshooting tips:</p>' +
+                '<ul style="font-size: 12px; color: #666; text-align: left; margin: 10px auto; max-width: 500px;">' +
+                '<li>Check that RAW_CLOCK_DATA sheet exists and has data</li>' +
+                '<li>Verify the sheet headers are correct</li>' +
+                '<li>Check Apps Script execution logs for errors</li>' +
+                '<li>Ensure you have imported clock data first</li>' +
+                '</ul>' +
+                '</div>';
         }
 
         function populateWeekFilter(data) {
