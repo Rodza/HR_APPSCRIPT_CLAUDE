@@ -898,6 +898,70 @@ function isFriday(date) {
 }
 
 /**
+ * Get first Friday of a month
+ *
+ * @param {Date|string} date - Any date in the month
+ * @returns {Date} First Friday of that month
+ */
+function getFirstFridayOfMonth(date) {
+  var d = parseDate(date);
+
+  // Set to first day of month
+  var firstDay = new Date(d.getFullYear(), d.getMonth(), 1);
+
+  // Get day of week for first day (0 = Sunday, 5 = Friday)
+  var dayOfWeek = firstDay.getDay();
+
+  // Calculate days until first Friday
+  var daysUntilFriday;
+  if (dayOfWeek <= 5) {
+    // Friday is in the same week
+    daysUntilFriday = 5 - dayOfWeek;
+  } else {
+    // Friday is in the next week (Saturday = 6, need to go to next Friday)
+    daysUntilFriday = 6; // From Saturday to Friday
+  }
+
+  // Add days to get to first Friday
+  var firstFriday = new Date(firstDay);
+  firstFriday.setDate(firstDay.getDate() + daysUntilFriday);
+
+  return firstFriday;
+}
+
+/**
+ * Get last Friday of a month
+ *
+ * @param {Date|string} date - Any date in the month
+ * @returns {Date} Last Friday of that month
+ */
+function getLastFridayOfMonth(date) {
+  var d = parseDate(date);
+
+  // Set to last day of month
+  var lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+
+  // Get day of week for last day (0 = Sunday, 5 = Friday)
+  var dayOfWeek = lastDay.getDay();
+
+  // Calculate days back to last Friday
+  var daysBackToFriday;
+  if (dayOfWeek >= 5) {
+    // Friday is in the same week
+    daysBackToFriday = dayOfWeek - 5;
+  } else {
+    // Friday is in the previous week
+    daysBackToFriday = dayOfWeek + 2; // e.g., if Thursday (4), go back 6 days
+  }
+
+  // Subtract days to get to last Friday
+  var lastFriday = new Date(lastDay);
+  lastFriday.setDate(lastDay.getDate() - daysBackToFriday);
+
+  return lastFriday;
+}
+
+/**
  * Get unique values from array
  *
  * @param {Array} array - Array to get unique values from
