@@ -647,6 +647,293 @@ function generateWeeklyPayrollSummaryReport(weekEnding) {
   }
 }
 
+// ==================== MONTHLY PAYROLL SUMMARY REPORT ====================
+
+/**
+ * Generates Monthly Payroll Summary Report for a specific month
+ * Date range: First Friday to Last Friday of the month
+ *
+ * @param {Date|string} monthDate - Any date in the month to report on
+ * @returns {Object} Result with success flag and report URL
+ *
+ * @example
+ * const result = generateMonthlyPayrollSummaryReport('2025-11-15');
+ * // Returns report for November 2025 (First Friday to Last Friday)
+ */
+function generateMonthlyPayrollSummaryReport(monthDate) {
+  try {
+    Logger.log('\n========== GENERATE MONTHLY PAYROLL SUMMARY REPORT ==========');
+
+    const inputDate = parseDate(monthDate);
+    Logger.log('Month: ' + (inputDate.getMonth() + 1) + '/' + inputDate.getFullYear());
+
+    // Calculate first and last Friday of the month
+    const firstFriday = getFirstFridayOfMonth(inputDate);
+    const lastFriday = getLastFridayOfMonth(inputDate);
+
+    Logger.log('Period: ' + formatDate(firstFriday) + ' to ' + formatDate(lastFriday));
+
+    // Get all payslips for this date range
+    const payslipsResult = listPayslips({
+      dateRange: {
+        start: firstFriday,
+        end: lastFriday
+      }
+    });
+
+    if (!payslipsResult.success) {
+      throw new Error('Failed to get payslips: ' + payslipsResult.error);
+    }
+
+    const payslips = payslipsResult.data;
+    Logger.log('📊 Processing ' + payslips.length + ' payslips');
+
+    if (payslips.length === 0) {
+      throw new Error('No payslips found for month ' + formatDate(inputDate));
+    }
+
+    // Group payslips by employee
+    const employeeData = {};
+
+    for (let i = 0; i < payslips.length; i++) {
+      const p = payslips[i];
+      const empName = p['EMPLOYEE NAME'];
+
+      if (!employeeData[empName]) {
+        employeeData[empName] = {
+          employeeName: empName,
+          employer: p['EMPLOYER'],
+          standardHours: 0,
+          overtimeHours: 0,
+          grossPay: 0,
+          uif: 0,
+          otherDeductions: 0,
+          netPay: 0,
+          weeksWorked: 0
+        };
+      }
+
+      const totalHours = (p['HOURS'] || 0) + ((p['MINUTES'] || 0) / 60);
+      const totalOvertimeHours = (p['OVERTIMEHOURS'] || 0) + ((p['OVERTIMEMINUTES'] || 0) / 60);
+
+      employeeData[empName].standardHours += totalHours;
+      employeeData[empName].overtimeHours += totalOvertimeHours;
+      employeeData[empName].grossPay += p['GROSSSALARY'] || 0;
+      employeeData[empName].uif += p['UIF'] || 0;
+      employeeData[empName].otherDeductions += p['OTHER DEDUCTIONS'] || 0;
+      employeeData[empName].netPay += p['NETTSALARY'] || 0;
+      employeeData[empName].weeksWorked++;
+    }
+
+    // Convert to array and sort by employee name
+    const employeeArray = Object.values(employeeData);
+    employeeArray.sort((a, b) => a.employeeName.localeCompare(b.employeeName));
+
+    Logger.log('👥 Unique employees: ' + employeeArray.length);
+
+    // Calculate totals
+    let totals = {
+      employees: employeeArray.length,
+      standardHours: 0,
+      overtimeHours: 0,
+      grossPay: 0,
+      uif: 0,
+      otherDeductions: 0,
+      netPay: 0
+    };
+
+    const byEmployer = {};
+
+    for (let i = 0; i < employeeArray.length; i++) {
+      const emp = employeeArray[i];
+
+      totals.standardHours += emp.standardHours;
+      totals.overtimeHours += emp.overtimeHours;
+      totals.grossPay += emp.grossPay;
+      totals.uif += emp.uif;
+      totals.otherDeductions += emp.otherDeductions;
+      totals.netPay += emp.netPay;
+
+      // Track by employer
+      const employer = emp.employer;
+      if (!byEmployer[employer]) {
+        byEmployer[employer] = {
+          count: 0,
+          grossPay: 0,
+          netPay: 0
+        };
+      }
+
+      byEmployer[employer].count++;
+      byEmployer[employer].grossPay += emp.grossPay;
+      byEmployer[employer].netPay += emp.netPay;
+    }
+
+    // Create Google Sheet
+    const monthName = ['January', 'February', 'March', 'April', 'May', 'June',
+                       'July', 'August', 'September', 'October', 'November', 'December'][inputDate.getMonth()];
+    const fileName = 'Monthly Payroll Summary - ' + monthName + ' ' + inputDate.getFullYear();
+    const spreadsheet = SpreadsheetApp.create(fileName);
+
+    // ===== TAB 1: Payroll Register =====
+    const registerSheet = spreadsheet.getActiveSheet();
+    registerSheet.setName('Payroll Register');
+
+    // Header
+    registerSheet.getRange('A1').setValue('MONTHLY PAYROLL REGISTER - ' + monthName + ' ' + inputDate.getFullYear());
+    registerSheet.setRowHeight(1, 30);
+
+    // Period row
+    registerSheet.getRange('A2').setValue('Period: ' + formatDate(firstFriday) + ' to ' + formatDate(lastFriday));
+    registerSheet.getRange('A2').setFontStyle('italic');
+
+    // Column headers
+    registerSheet.getRange('A4:H4').setValues([[
+      'Employee',
+      'Employer',
+      'Std Hours',
+      'OT Hours',
+      'Gross Pay',
+      'UIF',
+      'Other Ded.',
+      'Net Pay'
+    ]]);
+    registerSheet.getRange('A4:H4').setFontWeight('bold').setBackground('#4CAF50').setFontColor('#FFFFFF').setHorizontalAlignment('center');
+    registerSheet.setRowHeight(4, 25);
+
+    // Data rows
+    let rowNum = 5;
+    for (let i = 0; i < employeeArray.length; i++) {
+      const emp = employeeArray[i];
+
+      registerSheet.getRange(rowNum, 1, 1, 8).setValues([[
+        emp.employeeName,
+        emp.employer,
+        emp.standardHours,
+        emp.overtimeHours,
+        emp.grossPay,
+        emp.uif,
+        emp.otherDeductions,
+        emp.netPay
+      ]]);
+      rowNum++;
+    }
+
+    // Totals row
+    registerSheet.getRange(rowNum, 1, 1, 8).setValues([[
+      'TOTALS',
+      totals.employees + ' employees',
+      totals.standardHours,
+      totals.overtimeHours,
+      totals.grossPay,
+      totals.uif,
+      totals.otherDeductions,
+      totals.netPay
+    ]]);
+    registerSheet.getRange(rowNum, 1, 1, 8).setFontWeight('bold').setBackground('#FFD700');
+
+    // Format currency and number columns
+    registerSheet.getRange(5, 3, employeeArray.length + 1, 1).setNumberFormat('0.00');  // Std Hours
+    registerSheet.getRange(5, 4, employeeArray.length + 1, 1).setNumberFormat('0.00');  // OT Hours
+    registerSheet.getRange(5, 5, employeeArray.length + 1, 4).setNumberFormat('"R"#,##0.00');  // Currency columns
+
+    // Set hardcoded column widths for optimal layout
+    registerSheet.setColumnWidth(1, 220);  // Column A - Employee
+    registerSheet.setColumnWidth(2, 135);  // Column B - Employer
+    registerSheet.setColumnWidth(3, 80);   // Column C - Std Hours
+    registerSheet.setColumnWidth(4, 80);   // Column D - OT Hours
+    registerSheet.setColumnWidth(5, 90);   // Column E - Gross Pay
+    registerSheet.setColumnWidth(6, 80);   // Column F - UIF
+    registerSheet.setColumnWidth(7, 110);  // Column G - Other Ded.
+    registerSheet.setColumnWidth(8, 110);  // Column H - Net Pay
+
+    // Merge header cells A1:H1 and apply formatting
+    registerSheet.getRange('A1:H1').merge();
+    registerSheet.getRange('A1').setFontWeight('bold').setFontSize(14).setHorizontalAlignment('center');
+
+    // Add borders to the entire table (from column headers through last data row)
+    const lastRegisterRow = rowNum;
+    const registerTableRange = registerSheet.getRange('A4:H' + lastRegisterRow);
+    registerTableRange.setBorder(true, true, true, true, true, true, 'black', SpreadsheetApp.BorderStyle.SOLID);
+
+    // ===== TAB 2: Summary =====
+    const summarySheet = spreadsheet.insertSheet('Summary');
+
+    // Header
+    summarySheet.getRange('A1:B1').setValues([['MONTHLY PAYROLL SUMMARY', '']]);
+    summarySheet.getRange('A1:B1').setFontWeight('bold').setFontSize(14);
+
+    summarySheet.getRange('A2:B2').setValues([['Month:', monthName + ' ' + inputDate.getFullYear()]]);
+    summarySheet.getRange('A3:B3').setValues([['Period:', formatDate(firstFriday) + ' to ' + formatDate(lastFriday)]]);
+
+    // Overall summary
+    summarySheet.getRange('A5:B5').setValues([['OVERALL SUMMARY', '']]);
+    summarySheet.getRange('A5:B5').setFontWeight('bold').setBackground('#4CAF50').setFontColor('#FFFFFF');
+
+    summarySheet.getRange('A6:B11').setValues([
+      ['Total Employees:', totals.employees],
+      ['Total Standard Hours:', totals.standardHours],
+      ['Total Overtime Hours:', totals.overtimeHours],
+      ['Total Gross Pay:', totals.grossPay],
+      ['Total UIF:', totals.uif],
+      ['Total Deductions:', totals.otherDeductions]
+    ]);
+
+    summarySheet.getRange('A6:A11').setFontWeight('bold');
+    summarySheet.getRange('B7:B11').setNumberFormat('"R"#,##0.00');
+
+    // By employer
+    summarySheet.getRange('A13:B13').setValues([['BY EMPLOYER', '']]);
+    summarySheet.getRange('A13:B13').setFontWeight('bold').setBackground('#4CAF50').setFontColor('#FFFFFF');
+
+    let summaryRow = 14;
+    for (const employer in byEmployer) {
+      const data = byEmployer[employer];
+      summarySheet.getRange(summaryRow, 1, 1, 2).setValues([[employer, '']]);
+      summarySheet.getRange(summaryRow, 1).setFontWeight('bold');
+      summaryRow++;
+
+      summarySheet.getRange(summaryRow, 1, 3, 2).setValues([
+        ['  Employees:', data.count],
+        ['  Gross Pay:', data.grossPay],
+        ['  Net Pay:', data.netPay]
+      ]);
+
+      summarySheet.getRange(summaryRow, 2, 2, 1).setNumberFormat('"R"#,##0.00');
+      summaryRow += 4;
+    }
+
+    // Auto-resize
+    summarySheet.autoResizeColumns(1, 2);
+
+    // Move to reports folder and set sharing
+    const reportUrl = moveToReportsFolder(spreadsheet);
+
+    Logger.log('✅ Report generated: ' + fileName);
+    Logger.log('📎 URL: ' + reportUrl);
+    Logger.log('========== GENERATE MONTHLY PAYROLL SUMMARY REPORT COMPLETE ==========\n');
+
+    return {
+      success: true,
+      data: {
+        url: reportUrl,
+        fileName: fileName,
+        month: monthName + ' ' + inputDate.getFullYear(),
+        periodStart: formatDate(firstFriday),
+        periodEnd: formatDate(lastFriday),
+        totalEmployees: totals.employees,
+        totalNetPay: totals.netPay
+      }
+    };
+
+  } catch (error) {
+    Logger.log('❌ ERROR in generateMonthlyPayrollSummaryReport: ' + error.message);
+    Logger.log('Stack: ' + error.stack);
+    Logger.log('========== GENERATE MONTHLY PAYROLL SUMMARY REPORT FAILED ==========\n');
+    return { success: false, error: error.message };
+  }
+}
+
 // ==================== HELPER FUNCTIONS ====================
 
 /**
@@ -734,6 +1021,31 @@ function test_weeklyPayrollReport() {
     Logger.log('URL: ' + result.data.url);
     Logger.log('Total Employees: ' + result.data.totalEmployees);
     Logger.log('Total Paid: R' + result.data.totalPaidToAccounts.toFixed(2));
+  } else {
+    Logger.log('❌ TEST FAILED: ' + result.error);
+  }
+
+  Logger.log('========== TEST COMPLETE ==========\n');
+}
+
+/**
+ * Test function for Monthly Payroll Summary Report
+ */
+function test_monthlyPayrollReport() {
+  Logger.log('\n========== TEST: MONTHLY PAYROLL SUMMARY REPORT ==========');
+
+  // Use current month (or specify a month)
+  const monthDate = new Date('2025-11-15');
+
+  const result = generateMonthlyPayrollSummaryReport(monthDate);
+
+  if (result.success) {
+    Logger.log('✅ TEST PASSED');
+    Logger.log('URL: ' + result.data.url);
+    Logger.log('Month: ' + result.data.month);
+    Logger.log('Period: ' + result.data.periodStart + ' to ' + result.data.periodEnd);
+    Logger.log('Total Employees: ' + result.data.totalEmployees);
+    Logger.log('Total Net Pay: R' + result.data.totalNetPay.toFixed(2));
   } else {
     Logger.log('❌ TEST FAILED: ' + result.error);
   }
