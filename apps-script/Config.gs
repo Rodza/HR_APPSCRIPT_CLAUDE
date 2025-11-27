@@ -166,6 +166,7 @@ var PAYSLIP_FIELDS = [
   'LEAVE PAY',               // Manual entry
   'BONUS PAY',               // Manual entry
   'OTHERINCOME',             // Manual entry
+  'OTHER INCOME TEXT',       // Description
   'GROSSSALARY',             // Calculated
   'UIF',                     // Calculated
   'OTHER DEDUCTIONS',        // Manual entry
