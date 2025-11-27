@@ -342,7 +342,7 @@
                         showReportResult(
                             'Monthly Payroll Summary',
                             result.data.url,
-                            `Month: ${result.data.month} | Period: ${formatDate(result.data.periodStart)} to ${formatDate(result.data.periodEnd)} | Employees: ${result.data.totalEmployees} | Total Paid to Accounts: ${formatCurrency(result.data.totalPaidToAccounts)}`
+                            `Month: ${result.data.month} | Period: ${formatDate(result.data.periodStart)} to ${formatDate(result.data.periodEnd)} | Employees: ${result.data.totalEmployees} | Total Net Pay: ${formatCurrency(result.data.totalNetPay)}`
                         );
                     } else {
                         showError('Failed to generate report: ' + result.error);

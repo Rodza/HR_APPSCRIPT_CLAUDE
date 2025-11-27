@@ -708,10 +708,7 @@ function generateMonthlyPayrollSummaryReport(monthDate) {
           grossPay: 0,
           uif: 0,
           otherDeductions: 0,
-          loanDeductions: 0,
-          newLoans: 0,
           netPay: 0,
-          paidToAccount: 0,
           weeksWorked: 0
         };
       }
@@ -724,10 +721,7 @@ function generateMonthlyPayrollSummaryReport(monthDate) {
       employeeData[empName].grossPay += p['GROSSSALARY'] || 0;
       employeeData[empName].uif += p['UIF'] || 0;
       employeeData[empName].otherDeductions += p['OTHER DEDUCTIONS'] || 0;
-      employeeData[empName].loanDeductions += p['LoanDeductionThisWeek'] || 0;
-      employeeData[empName].newLoans += p['NewLoanThisWeek'] || 0;
       employeeData[empName].netPay += p['NETTSALARY'] || 0;
-      employeeData[empName].paidToAccount += p['PaidtoAccount'] || 0;
       employeeData[empName].weeksWorked++;
     }
 
@@ -745,10 +739,7 @@ function generateMonthlyPayrollSummaryReport(monthDate) {
       grossPay: 0,
       uif: 0,
       otherDeductions: 0,
-      loanDeductions: 0,
-      newLoans: 0,
-      netPay: 0,
-      paidToAccounts: 0
+      netPay: 0
     };
 
     const byEmployer = {};
@@ -761,10 +752,7 @@ function generateMonthlyPayrollSummaryReport(monthDate) {
       totals.grossPay += emp.grossPay;
       totals.uif += emp.uif;
       totals.otherDeductions += emp.otherDeductions;
-      totals.loanDeductions += emp.loanDeductions;
-      totals.newLoans += emp.newLoans;
       totals.netPay += emp.netPay;
-      totals.paidToAccounts += emp.paidToAccount;
 
       // Track by employer
       const employer = emp.employer;
@@ -772,15 +760,13 @@ function generateMonthlyPayrollSummaryReport(monthDate) {
         byEmployer[employer] = {
           count: 0,
           grossPay: 0,
-          netPay: 0,
-          paidToAccounts: 0
+          netPay: 0
         };
       }
 
       byEmployer[employer].count++;
       byEmployer[employer].grossPay += emp.grossPay;
       byEmployer[employer].netPay += emp.netPay;
-      byEmployer[employer].paidToAccounts += emp.paidToAccount;
     }
 
     // Create Google Sheet
@@ -802,7 +788,7 @@ function generateMonthlyPayrollSummaryReport(monthDate) {
     registerSheet.getRange('A2').setFontStyle('italic');
 
     // Column headers
-    registerSheet.getRange('A4:K4').setValues([[
+    registerSheet.getRange('A4:H4').setValues([[
       'Employee',
       'Employer',
       'Std Hours',
@@ -810,12 +796,9 @@ function generateMonthlyPayrollSummaryReport(monthDate) {
       'Gross Pay',
       'UIF',
       'Other Ded.',
-      'Net Pay',
-      'Loan Ded.',
-      'New Loan',
-      'Paid to Account'
+      'Net Pay'
     ]]);
-    registerSheet.getRange('A4:K4').setFontWeight('bold').setBackground('#4CAF50').setFontColor('#FFFFFF').setHorizontalAlignment('center');
+    registerSheet.getRange('A4:H4').setFontWeight('bold').setBackground('#4CAF50').setFontColor('#FFFFFF').setHorizontalAlignment('center');
     registerSheet.setRowHeight(4, 25);
 
     // Data rows
@@ -823,7 +806,7 @@ function generateMonthlyPayrollSummaryReport(monthDate) {
     for (let i = 0; i < employeeArray.length; i++) {
       const emp = employeeArray[i];
 
-      registerSheet.getRange(rowNum, 1, 1, 11).setValues([[
+      registerSheet.getRange(rowNum, 1, 1, 8).setValues([[
         emp.employeeName,
         emp.employer,
         emp.standardHours,
@@ -831,16 +814,13 @@ function generateMonthlyPayrollSummaryReport(monthDate) {
         emp.grossPay,
         emp.uif,
         emp.otherDeductions,
-        emp.netPay,
-        emp.loanDeductions,
-        emp.newLoans,
-        emp.paidToAccount
+        emp.netPay
       ]]);
       rowNum++;
     }
 
     // Totals row
-    registerSheet.getRange(rowNum, 1, 1, 11).setValues([[
+    registerSheet.getRange(rowNum, 1, 1, 8).setValues([[
       'TOTALS',
       totals.employees + ' employees',
       totals.standardHours,
@@ -848,17 +828,14 @@ function generateMonthlyPayrollSummaryReport(monthDate) {
       totals.grossPay,
       totals.uif,
       totals.otherDeductions,
-      totals.netPay,
-      totals.loanDeductions,
-      totals.newLoans,
-      totals.paidToAccounts
+      totals.netPay
     ]]);
-    registerSheet.getRange(rowNum, 1, 1, 11).setFontWeight('bold').setBackground('#FFD700');
+    registerSheet.getRange(rowNum, 1, 1, 8).setFontWeight('bold').setBackground('#FFD700');
 
     // Format currency and number columns
     registerSheet.getRange(5, 3, employeeArray.length + 1, 1).setNumberFormat('0.00');  // Std Hours
     registerSheet.getRange(5, 4, employeeArray.length + 1, 1).setNumberFormat('0.00');  // OT Hours
-    registerSheet.getRange(5, 5, employeeArray.length + 1, 7).setNumberFormat('"R"#,##0.00');  // Currency columns
+    registerSheet.getRange(5, 5, employeeArray.length + 1, 4).setNumberFormat('"R"#,##0.00');  // Currency columns
 
     // Set hardcoded column widths for optimal layout
     registerSheet.setColumnWidth(1, 220);  // Column A - Employee
@@ -869,17 +846,14 @@ function generateMonthlyPayrollSummaryReport(monthDate) {
     registerSheet.setColumnWidth(6, 80);   // Column F - UIF
     registerSheet.setColumnWidth(7, 110);  // Column G - Other Ded.
     registerSheet.setColumnWidth(8, 110);  // Column H - Net Pay
-    registerSheet.setColumnWidth(9, 110);  // Column I - Loan Ded.
-    registerSheet.setColumnWidth(10, 110); // Column J - New Loan
-    registerSheet.setColumnWidth(11, 110); // Column K - Paid to Account
 
-    // Merge header cells A1:K1 and apply formatting
-    registerSheet.getRange('A1:K1').merge();
+    // Merge header cells A1:H1 and apply formatting
+    registerSheet.getRange('A1:H1').merge();
     registerSheet.getRange('A1').setFontWeight('bold').setFontSize(14).setHorizontalAlignment('center');
 
     // Add borders to the entire table (from column headers through last data row)
     const lastRegisterRow = rowNum;
-    const registerTableRange = registerSheet.getRange('A4:K' + lastRegisterRow);
+    const registerTableRange = registerSheet.getRange('A4:H' + lastRegisterRow);
     registerTableRange.setBorder(true, true, true, true, true, true, 'black', SpreadsheetApp.BorderStyle.SOLID);
 
     // ===== TAB 2: Summary =====
@@ -896,39 +870,37 @@ function generateMonthlyPayrollSummaryReport(monthDate) {
     summarySheet.getRange('A5:B5').setValues([['OVERALL SUMMARY', '']]);
     summarySheet.getRange('A5:B5').setFontWeight('bold').setBackground('#4CAF50').setFontColor('#FFFFFF');
 
-    summarySheet.getRange('A6:B12').setValues([
+    summarySheet.getRange('A6:B11').setValues([
       ['Total Employees:', totals.employees],
       ['Total Standard Hours:', totals.standardHours],
       ['Total Overtime Hours:', totals.overtimeHours],
       ['Total Gross Pay:', totals.grossPay],
       ['Total UIF:', totals.uif],
-      ['Total Deductions:', totals.otherDeductions + totals.loanDeductions],
-      ['Total Paid to Accounts:', totals.paidToAccounts]
+      ['Total Deductions:', totals.otherDeductions]
     ]);
 
-    summarySheet.getRange('A6:A12').setFontWeight('bold');
-    summarySheet.getRange('B7:B12').setNumberFormat('"R"#,##0.00');
+    summarySheet.getRange('A6:A11').setFontWeight('bold');
+    summarySheet.getRange('B7:B11').setNumberFormat('"R"#,##0.00');
 
     // By employer
-    summarySheet.getRange('A14:B14').setValues([['BY EMPLOYER', '']]);
-    summarySheet.getRange('A14:B14').setFontWeight('bold').setBackground('#4CAF50').setFontColor('#FFFFFF');
+    summarySheet.getRange('A13:B13').setValues([['BY EMPLOYER', '']]);
+    summarySheet.getRange('A13:B13').setFontWeight('bold').setBackground('#4CAF50').setFontColor('#FFFFFF');
 
-    let summaryRow = 15;
+    let summaryRow = 14;
     for (const employer in byEmployer) {
       const data = byEmployer[employer];
       summarySheet.getRange(summaryRow, 1, 1, 2).setValues([[employer, '']]);
       summarySheet.getRange(summaryRow, 1).setFontWeight('bold');
       summaryRow++;
 
-      summarySheet.getRange(summaryRow, 1, 4, 2).setValues([
+      summarySheet.getRange(summaryRow, 1, 3, 2).setValues([
         ['  Employees:', data.count],
         ['  Gross Pay:', data.grossPay],
-        ['  Net Pay:', data.netPay],
-        ['  Paid to Accounts:', data.paidToAccounts]
+        ['  Net Pay:', data.netPay]
       ]);
 
-      summarySheet.getRange(summaryRow, 2, 3, 1).setNumberFormat('"R"#,##0.00');
-      summaryRow += 5;
+      summarySheet.getRange(summaryRow, 2, 2, 1).setNumberFormat('"R"#,##0.00');
+      summaryRow += 4;
     }
 
     // Auto-resize
@@ -950,7 +922,7 @@ function generateMonthlyPayrollSummaryReport(monthDate) {
         periodStart: formatDate(firstFriday),
         periodEnd: formatDate(lastFriday),
         totalEmployees: totals.employees,
-        totalPaidToAccounts: totals.paidToAccounts
+        totalNetPay: totals.netPay
       }
     };
 
@@ -1073,7 +1045,7 @@ function test_monthlyPayrollReport() {
     Logger.log('Month: ' + result.data.month);
     Logger.log('Period: ' + result.data.periodStart + ' to ' + result.data.periodEnd);
     Logger.log('Total Employees: ' + result.data.totalEmployees);
-    Logger.log('Total Paid: R' + result.data.totalPaidToAccounts.toFixed(2));
+    Logger.log('Total Net Pay: R' + result.data.totalNetPay.toFixed(2));
   } else {
     Logger.log('❌ TEST FAILED: ' + result.error);
   }
