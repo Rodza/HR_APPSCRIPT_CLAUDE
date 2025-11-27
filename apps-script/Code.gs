@@ -592,6 +592,7 @@ function onOpen() {
   menu.addSubMenu(ui.createMenu('Timesheets')
     .addItem('Import Clock Data', 'showTimesheetImport')
     .addItem('Pending Approval', 'showTimesheetApproval')
+    .addItem('📊 Timesheet Breakdown', 'showTimesheetBreakdown')
     .addSeparator()
     .addItem('Settings', 'showTimesheetSettings')
     .addSeparator()
