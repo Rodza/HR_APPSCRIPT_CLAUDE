@@ -145,6 +145,46 @@ function applyEndBuffer(clockOut, standardEnd, bufferMinutes) {
   };
 }
 
+/**
+ * Apply lunch return buffer to clock-in time after lunch (Clock 3)
+ * If employee clocks in early or within grace period, adjust to standard lunch return
+ *
+ * @param {Date} clockIn - Clock-in time after lunch
+ * @param {Date} standardLunchReturn - Standard lunch return time
+ * @param {number} bufferMinutes - Buffer in minutes
+ * @returns {Object} Adjusted time and applied flag
+ */
+function applyLunchReturnBuffer(clockIn, standardLunchReturn, bufferMinutes) {
+  var clockInMs = clockIn.getTime();
+  var standardMs = standardLunchReturn.getTime();
+  var bufferMs = bufferMinutes * 60 * 1000;
+
+  // Employee clocked in early → use standard lunch return
+  if (clockInMs < standardMs) {
+    return {
+      adjustedTime: new Date(standardMs),
+      bufferApplied: true,
+      reason: 'Early return from lunch adjusted to standard time'
+    };
+  }
+
+  // Employee clocked in within buffer period → use standard lunch return
+  if (clockInMs <= standardMs + bufferMs) {
+    return {
+      adjustedTime: new Date(standardMs),
+      bufferApplied: true,
+      reason: 'Within lunch return buffer, adjusted to standard time'
+    };
+  }
+
+  // Late return from lunch → use actual time
+  return {
+    adjustedTime: clockIn,
+    bufferApplied: false,
+    reason: 'Late return from lunch, no buffer applied'
+  };
+}
+
 // ==================== LUNCH CALCULATION ====================
 
 /**
@@ -999,36 +1039,115 @@ function processDayData(dayData, config) {
     };
   }
 
-  // Apply start buffer
-  var standardStart = parseTimeString(config.standardStartTime);
-  standardStart.setFullYear(date.getFullYear());
-  standardStart.setMonth(date.getMonth());
-  standardStart.setDate(date.getDate());
+  // Check if this is a normal Mon-Thu day with all 4 clocks
+  var clockIns = dayData.clockInPunches.filter(function(p) { return p.type === 'in'; });
+  var clockOuts = dayData.clockInPunches.filter(function(p) { return p.type === 'out'; });
+  var hasAllFourClocks = !isFriday && clockIns.length === 2 && clockOuts.length === 2;
 
-  var startResult = applyStartBuffer(firstIn, standardStart, config.graceMinutes);
-  var adjustedIn = startResult.adjustedTime;
-  if (startResult.bufferApplied) {
-    appliedRules.push('graceBufferApplied');
+  var adjustedIn, adjustedOut, workedMinutes;
+
+  if (hasAllFourClocks) {
+    // Mon-Thu with all 4 clocks: Clock1 (IN), Clock2 (OUT), Clock3 (IN), Clock4 (OUT)
+    Logger.log('\n  ⏰ DIAGNOSTIC: Applying individual clock buffers (Mon-Thu with 4 clocks)...');
+
+    // Get individual clocks
+    var clock1 = clockIns[0].time;   // Morning IN
+    var clock2 = clockOuts[0].time;  // Lunch OUT
+    var clock3 = clockIns[1].time;   // Lunch IN
+    var clock4 = clockOuts[1].time;  // Afternoon OUT
+
+    // Apply start buffer to Clock 1
+    var standardStart = parseTimeString(config.standardStartTime);
+    standardStart.setFullYear(date.getFullYear());
+    standardStart.setMonth(date.getMonth());
+    standardStart.setDate(date.getDate());
+
+    var clock1Result = applyStartBuffer(clock1, standardStart, config.graceMinutes);
+    var adjustedClock1 = clock1Result.adjustedTime;
+    if (clock1Result.bufferApplied) {
+      appliedRules.push('graceBufferApplied');
+    }
+
+    // Apply lunch return buffer to Clock 3
+    var standardLunchReturn = parseTimeString(config.standardLunchReturn || '13:00');
+    standardLunchReturn.setFullYear(date.getFullYear());
+    standardLunchReturn.setMonth(date.getMonth());
+    standardLunchReturn.setDate(date.getDate());
+
+    var clock3Result = applyLunchReturnBuffer(clock3, standardLunchReturn, config.lunchBufferMinutes);
+    var adjustedClock3 = clock3Result.adjustedTime;
+    if (clock3Result.bufferApplied) {
+      appliedRules.push('lunchReturnBufferApplied');
+    }
+
+    // Apply end buffer to Clock 4
+    var standardEnd = parseTimeString(config.standardEndTime);
+    standardEnd.setFullYear(date.getFullYear());
+    standardEnd.setMonth(date.getMonth());
+    standardEnd.setDate(date.getDate());
+
+    var clock4Result = applyEndBuffer(clock4, standardEnd, config.endBufferMinutes);
+    var adjustedClock4 = clock4Result.adjustedTime;
+    if (clock4Result.bufferApplied) {
+      appliedRules.push('endBufferApplied');
+    }
+
+    Logger.log('    Clock 1 (Morning IN): ' + formatTime(clock1) + ' → ' + formatTime(adjustedClock1));
+    Logger.log('    Clock 2 (Lunch OUT): ' + formatTime(clock2));
+    Logger.log('    Clock 3 (Lunch IN): ' + formatTime(clock3) + ' → ' + formatTime(adjustedClock3));
+    Logger.log('    Clock 4 (Afternoon OUT): ' + formatTime(clock4) + ' → ' + formatTime(adjustedClock4));
+
+    // Calculate worked time as Morning + Afternoon
+    var morningMs = clock2.getTime() - adjustedClock1.getTime();
+    var afternoonMs = adjustedClock4.getTime() - adjustedClock3.getTime();
+    workedMinutes = (morningMs + afternoonMs) / (60 * 1000);
+
+    Logger.log('    Morning time: ' + Math.round(morningMs / 60000) + ' min');
+    Logger.log('    Afternoon time: ' + Math.round(afternoonMs / 60000) + ' min');
+    Logger.log('    Total worked: ' + Math.round(workedMinutes) + ' min');
+
+    // For display purposes, use first and last times
+    adjustedIn = adjustedClock1;
+    adjustedOut = adjustedClock4;
+
+  } else {
+    // Friday or incomplete day - use existing logic (first IN to last OUT)
+    Logger.log('\n  ⏰ DIAGNOSTIC: Applying standard buffer logic...');
+
+    // Apply start buffer
+    var standardStart = parseTimeString(config.standardStartTime);
+    standardStart.setFullYear(date.getFullYear());
+    standardStart.setMonth(date.getMonth());
+    standardStart.setDate(date.getDate());
+
+    var startResult = applyStartBuffer(firstIn, standardStart, config.graceMinutes);
+    adjustedIn = startResult.adjustedTime;
+    if (startResult.bufferApplied) {
+      appliedRules.push('graceBufferApplied');
+    }
+
+    // Apply end buffer
+    var endTime = isFriday ? config.fridayEndTime : config.standardEndTime;
+    var standardEnd = parseTimeString(endTime);
+    standardEnd.setFullYear(date.getFullYear());
+    standardEnd.setMonth(date.getMonth());
+    standardEnd.setDate(date.getDate());
+
+    var endResult = applyEndBuffer(lastOut, standardEnd, config.endBufferMinutes);
+    adjustedOut = endResult.adjustedTime;
+    if (endResult.bufferApplied) {
+      appliedRules.push('endBufferApplied');
+    }
+
+    Logger.log('    Adjusted IN: ' + formatTime(adjustedIn));
+    Logger.log('    Adjusted OUT: ' + formatTime(adjustedOut));
+
+    // Calculate worked time
+    var workedMs = adjustedOut.getTime() - adjustedIn.getTime();
+    workedMinutes = workedMs / (60 * 1000);
   }
 
-  // Apply end buffer
-  var endTime = isFriday ? config.fridayEndTime : config.standardEndTime;
-  var standardEnd = parseTimeString(endTime);
-  standardEnd.setFullYear(date.getFullYear());
-  standardEnd.setMonth(date.getMonth());
-  standardEnd.setDate(date.getDate());
-
-  var endResult = applyEndBuffer(lastOut, standardEnd, config.endBufferMinutes);
-  var adjustedOut = endResult.adjustedTime;
-  if (endResult.bufferApplied) {
-    appliedRules.push('endBufferApplied');
-  }
-
-  Logger.log('\n  ⏰ DIAGNOSTIC: Time adjustments...');
-  Logger.log('    Adjusted IN: ' + formatTime(adjustedIn));
-  Logger.log('    Adjusted OUT: ' + formatTime(adjustedOut));
-
-  // Calculate lunch
+  // Calculate lunch (only deduct for non-4-clock scenarios)
   var lunchResult = calculateLunchBreak(dayData.clockInPunches, config, isFriday);
   if (lunchResult.lunchTaken) {
     appliedRules.push('lunchDeducted');
@@ -1040,24 +1159,25 @@ function processDayData(dayData, config) {
     warnings = warnings.concat(bathroomResult.warnings);
   }
 
-  // Calculate total minutes
-  var workedMs = adjustedOut.getTime() - adjustedIn.getTime();
-  var workedMinutes = workedMs / (60 * 1000);
-
-  Logger.log('\n  💰 DIAGNOSTIC: Final calculation...');
-  Logger.log('    Adjusted OUT - Adjusted IN = Worked minutes');
-  Logger.log('    ' + formatTime(adjustedOut) + ' - ' + formatTime(adjustedIn) + ' = ' +
-             Math.round(workedMinutes) + ' minutes (' + (Math.round(workedMinutes / 60 * 10) / 10) + ' hours)');
-
   // Handle invalid data: clock-out before clock-in (results in negative time)
   if (workedMinutes < 0) {
     warnings.push('Invalid data: Clock-out (' + formatTime(adjustedOut) + ') before clock-in (' + formatTime(adjustedIn) + ')');
     workedMinutes = 0;
   }
 
-  var totalMinutes = workedMinutes - lunchResult.lunchMinutes;
-
-  Logger.log('    Lunch deduction: -' + lunchResult.lunchMinutes + ' minutes');
+  // Calculate total minutes
+  var totalMinutes;
+  if (hasAllFourClocks) {
+    // For 4-clock days, we already calculated morning + afternoon separately
+    // No lunch deduction needed as gaps are already excluded
+    totalMinutes = workedMinutes;
+    Logger.log('    Total worked time (morning + afternoon): ' + Math.round(totalMinutes) + ' minutes');
+  } else {
+    // For other days, deduct lunch from total span
+    totalMinutes = workedMinutes - lunchResult.lunchMinutes;
+    Logger.log('    Worked time: ' + Math.round(workedMinutes) + ' minutes');
+    Logger.log('    Lunch deduction: -' + lunchResult.lunchMinutes + ' minutes');
+  }
 
   // Special handling for "Not Scanned in from Lunch" - only count morning time
   if (appliedRules.indexOf('notScannedInFromLunch') >= 0 && dayData.clockInPunches.length >= 2) {
