@@ -1,11 +1,16 @@
 /**
- * TIMESHEETPROCESSOR.GS - Time Processing Logic
+ * TIMESHEETPROCESSOR.GS - Time Processing Logic (Revised Rules)
  * HR Payroll System for SA Grinding Wheels & Scorpio Abrasives
  *
- * This module processes raw clock-in data and calculates worked time
- * with configurable rules for grace periods, lunch deductions, etc.
+ * This module processes raw clock-in data according to the revised clock rules specification.
  *
- * Ported from HTML Time Sheet Analyzer
+ * CLOCK IN/OUT RULES:
+ * - Monday-Thursday: 4 clocks (Morning IN, Lunch OUT, Lunch RETURN, Afternoon OUT)
+ * - Friday: 2 clocks (Morning IN, Afternoon OUT)
+ * - Grace periods apply to Clock 1 (5 min) and Clock 2 (2 min)
+ * - Lunch deducted ONLY when Clock 3 is present
+ * - Bathroom time counted only during work periods
+ * - Duplicate detection: 2 min for main clocks, 60 sec for bathroom
  */
 
 // ==================== PARSE TIME ====================
@@ -63,225 +68,19 @@ function pad(num) {
   return num < 10 ? '0' + num : '' + num;
 }
 
-// ==================== BUFFER APPLICATIONS ====================
-
-/**
- * Apply start buffer (grace period) to clock-in time
- * If employee clocks in early or within grace period, adjust to standard start
- *
- * @param {Date} clockIn - Clock-in time
- * @param {Date} standardStart - Standard start time
- * @param {number} graceMinutes - Grace period in minutes
- * @returns {Object} Adjusted time and applied flag
- */
-function applyStartBuffer(clockIn, standardStart, graceMinutes) {
-  var clockInMs = clockIn.getTime();
-  var standardMs = standardStart.getTime();
-  var graceMs = graceMinutes * 60 * 1000;
-
-  // Employee clocked in early → use standard start
-  if (clockInMs < standardMs) {
-    return {
-      adjustedTime: new Date(standardMs),
-      bufferApplied: true,
-      reason: 'Early clock-in adjusted to standard time'
-    };
-  }
-
-  // Employee clocked in within grace period → use standard start
-  if (clockInMs <= standardMs + graceMs) {
-    return {
-      adjustedTime: new Date(standardMs),
-      bufferApplied: true,
-      reason: 'Within grace period, adjusted to standard time'
-    };
-  }
-
-  // Late clock-in → use actual time
-  return {
-    adjustedTime: clockIn,
-    bufferApplied: false,
-    reason: null
-  };
-}
-
-/**
- * Apply end buffer to clock-out time
- * Allow small buffer for clocking out early
- *
- * @param {Date} clockOut - Clock-out time
- * @param {Date} standardEnd - Standard end time
- * @param {number} bufferMinutes - Buffer in minutes
- * @returns {Object} Adjusted time and applied flag
- */
-function applyEndBuffer(clockOut, standardEnd, bufferMinutes) {
-  var clockOutMs = clockOut.getTime();
-  var standardMs = standardEnd.getTime();
-  var bufferMs = bufferMinutes * 60 * 1000;
-
-  // Clocked out after standard → CAP at standard end time (16:30 or 13:00)
-  if (clockOutMs > standardMs) {
-    return {
-      adjustedTime: new Date(standardMs),
-      bufferApplied: true,
-      reason: 'Clocked out after standard end, capped at standard time'
-    };
-  }
-
-  // Clocked out within buffer → use standard end
-  if (clockOutMs >= standardMs - bufferMs) {
-    return {
-      adjustedTime: new Date(standardMs),
-      bufferApplied: true,
-      reason: 'Within end buffer, adjusted to standard time'
-    };
-  }
-
-  // Clocked out too early → use actual time (will show as short day)
-  return {
-    adjustedTime: clockOut,
-    bufferApplied: false,
-    reason: 'Early clock-out, no buffer applied'
-  };
-}
-
-// ==================== LUNCH CALCULATION ====================
-
-/**
- * Calculate lunch break from clock punches
- * Detects gaps between clock-out and clock-in that indicate lunch
- *
- * @param {Array} punches - Array of punch objects {time: Date, type: 'in'|'out'}
- * @param {Object} config - Time configuration
- * @param {boolean} isFriday - Is this a Friday
- * @returns {Object} Lunch details
- */
-function calculateLunchBreak(punches, config, isFriday) {
-  Logger.log('\n  🍽️  DIAGNOSTIC: Calculating lunch break...');
-  Logger.log('    isFriday: ' + isFriday + ', applyLunchOnFriday: ' + config.applyLunchOnFriday);
-
-  // Don't apply lunch on Friday if configured
-  if (isFriday && !config.applyLunchOnFriday) {
-    Logger.log('    ❌ No lunch on Friday (config)');
-    return {
-      lunchTaken: false,
-      lunchMinutes: 0,
-      lunchStart: null,
-      lunchEnd: null,
-      reason: 'No lunch on Friday (config)'
-    };
-  }
-
-  // Need at least 2 clock-ins and 2 clock-outs to detect lunch
-  var clockIns = punches.filter(function(p) { return p.type === 'in'; });
-  var clockOuts = punches.filter(function(p) { return p.type === 'out'; });
-
-  Logger.log('    Total punches: ' + punches.length);
-  Logger.log('    Clock-ins: ' + clockIns.length + ', Clock-outs: ' + clockOuts.length);
-  Logger.log('    Lunch detection requires: 2+ INs AND 2+ OUTs');
-
-  // Try to detect lunch from multiple punches
-  if (clockIns.length >= 2 && clockOuts.length >= 2) {
-    Logger.log('    ✓ Sufficient punches for lunch detection');
-    Logger.log('    Analyzing gaps between OUT/IN pairs...');
-
-    // Find the largest gap between consecutive out/in pairs
-    var largestGap = 0;
-    var gapStart = null;
-    var gapEnd = null;
-
-    for (var i = 0; i < clockOuts.length; i++) {
-      var out = clockOuts[i].time;
-
-      // Find next clock-in after this clock-out
-      for (var j = 0; j < clockIns.length; j++) {
-        var in_time = clockIns[j].time;
-
-        if (in_time.getTime() > out.getTime()) {
-          var gapMinutes = (in_time.getTime() - out.getTime()) / (60 * 1000);
-
-          Logger.log('      Gap #' + (i + 1) + ': ' + formatTime(out) + ' → ' + formatTime(in_time) +
-                     ' = ' + Math.round(gapMinutes) + ' minutes');
-
-          if (gapMinutes > largestGap) {
-            largestGap = gapMinutes;
-            gapStart = out;
-            gapEnd = in_time;
-          }
-          break;
-        }
-      }
-    }
-
-    Logger.log('    Largest gap: ' + Math.round(largestGap) + ' minutes');
-    Logger.log('    Valid lunch range: ' + config.minLunchMinutes + '-' + config.maxLunchMinutes + ' minutes');
-
-    // Check if gap is within lunch range
-    if (largestGap >= config.minLunchMinutes && largestGap <= config.maxLunchMinutes) {
-      Logger.log('    ✅ LUNCH DETECTED: ' + Math.round(largestGap) + ' min gap → deducting ' + config.standardLunchMinutes + ' min');
-      return {
-        lunchTaken: true,
-        lunchMinutes: config.standardLunchMinutes,
-        lunchStart: gapStart,
-        lunchEnd: gapEnd,
-        actualGapMinutes: Math.round(largestGap),
-        reason: 'Lunch detected (' + Math.round(largestGap) + ' min gap)'
-      };
-    } else {
-      Logger.log('    ❌ Gap outside valid range - no lunch deducted');
-    }
-  } else {
-    Logger.log('    ❌ INSUFFICIENT PUNCHES: Need 2+ INs AND 2+ OUTs, but got ' +
-               clockIns.length + ' INs and ' + clockOuts.length + ' OUTs');
-  }
-
-  // Check if employee clocked in late (after late morning threshold)
-  if (clockIns.length > 0) {
-    var firstClockIn = clockIns[0].time;
-    var lateThreshold = parseTimeString(config.lateMorningThreshold);
-    lateThreshold.setFullYear(firstClockIn.getFullYear());
-    lateThreshold.setMonth(firstClockIn.getMonth());
-    lateThreshold.setDate(firstClockIn.getDate());
-
-    Logger.log('    Checking late arrival rule...');
-    Logger.log('      First clock-in: ' + formatTime(firstClockIn));
-    Logger.log('      Late threshold: ' + config.lateMorningThreshold);
-
-    if (firstClockIn.getTime() >= lateThreshold.getTime()) {
-      Logger.log('    ✅ LATE ARRIVAL: Lunch assumed taken, deducting ' + config.standardLunchMinutes + ' min');
-      return {
-        lunchTaken: true,
-        lunchMinutes: config.standardLunchMinutes,
-        lunchStart: null,
-        lunchEnd: null,
-        reason: 'Late arrival - lunch assumed taken'
-      };
-    }
-  }
-
-  // No lunch detected
-  Logger.log('    ❌ NO LUNCH DETECTED - No deduction applied');
-  return {
-    lunchTaken: false,
-    lunchMinutes: 0,
-    lunchStart: null,
-    lunchEnd: null,
-    reason: 'No lunch detected'
-  };
-}
-
 /**
  * Parse time string (HH:MM) to Date object (today)
  *
  * @param {string} timeString - Time in HH:MM format
- * @returns {Date} Date object with today's date and specified time
+ * @param {Date} referenceDate - Reference date to use
+ * @returns {Date} Date object with reference date and specified time
  */
-function parseTimeString(timeString) {
+function parseTimeString(timeString, referenceDate) {
   var parts = timeString.split(':');
   var hours = parseInt(parts[0], 10);
   var minutes = parseInt(parts[1], 10);
 
-  var date = new Date();
+  var date = new Date(referenceDate || new Date());
   date.setHours(hours);
   date.setMinutes(minutes);
   date.setSeconds(0);
@@ -290,19 +89,410 @@ function parseTimeString(timeString) {
   return date;
 }
 
+/**
+ * Get time in minutes since midnight
+ *
+ * @param {Date} date - Date object
+ * @returns {number} Minutes since midnight
+ */
+function getMinutesSinceMidnight(date) {
+  return date.getHours() * 60 + date.getMinutes();
+}
+
+// ==================== CLOCK CLASSIFICATION ====================
+
+/**
+ * Classify clock punches into Clock 1, 2, 3, 4 based on time windows
+ *
+ * @param {Array} punches - Array of punch objects {time: Date, type: 'in'|'out', device: string}
+ * @param {Object} config - Time configuration
+ * @param {boolean} isFriday - Is this a Friday
+ * @returns {Object} Classified clocks {clock1, clock2, clock3, clock4}
+ */
+function classifyClockPunches(punches, config, isFriday) {
+  Logger.log('\n  🔍 CLASSIFYING CLOCK PUNCHES...');
+
+  var result = {
+    clock1: null,  // Morning IN
+    clock2: null,  // Lunch OUT
+    clock3: null,  // Lunch RETURN
+    clock4: null   // Afternoon OUT
+  };
+
+  if (punches.length === 0) {
+    return result;
+  }
+
+  // Parse time windows
+  var clock1MaxMin = timeToMinutes(config.clock1MaxTime);
+  var clock2StartMin = timeToMinutes(config.clock2WindowStart);
+  var clock2EndMin = timeToMinutes(config.clock2WindowEnd);
+  var clock3StartMin = timeToMinutes(config.clock3WindowStart);
+  var clock3EndMin = timeToMinutes(config.clock3WindowEnd);
+  var clock4MinMin = timeToMinutes(config.clock4MinTime);
+
+  // Separate IN and OUT punches
+  var inPunches = punches.filter(function(p) { return p.type === 'in'; });
+  var outPunches = punches.filter(function(p) { return p.type === 'out'; });
+
+  Logger.log('    IN punches: ' + inPunches.length + ', OUT punches: ' + outPunches.length);
+
+  if (isFriday) {
+    // Friday: Clock 1 = first IN, Clock 2 = last OUT
+    if (inPunches.length > 0) {
+      result.clock1 = inPunches[0];
+      Logger.log('    Clock 1 (Friday IN): ' + formatTime(result.clock1.time));
+    }
+    if (outPunches.length > 0) {
+      result.clock2 = outPunches[outPunches.length - 1];
+      Logger.log('    Clock 2 (Friday OUT): ' + formatTime(result.clock2.time));
+    }
+  } else {
+    // Monday-Thursday: Classify by time windows
+
+    // Clock 1: First IN before clock1MaxTime
+    for (var i = 0; i < inPunches.length; i++) {
+      var minutes = getMinutesSinceMidnight(inPunches[i].time);
+      if (minutes < clock1MaxMin) {
+        result.clock1 = inPunches[i];
+        Logger.log('    Clock 1 (Morning IN): ' + formatTime(result.clock1.time));
+        break;
+      }
+    }
+
+    // Clock 2: First OUT in window 12:00-12:10
+    for (var i = 0; i < outPunches.length; i++) {
+      var minutes = getMinutesSinceMidnight(outPunches[i].time);
+      if (minutes >= clock2StartMin && minutes <= clock2EndMin) {
+        result.clock2 = outPunches[i];
+        Logger.log('    Clock 2 (Lunch OUT): ' + formatTime(result.clock2.time));
+        break;
+      }
+    }
+
+    // Clock 3: First IN in window 12:10-13:00
+    for (var i = 0; i < inPunches.length; i++) {
+      var minutes = getMinutesSinceMidnight(inPunches[i].time);
+      if (minutes >= clock3StartMin && minutes <= clock3EndMin) {
+        result.clock3 = inPunches[i];
+        Logger.log('    Clock 3 (Lunch RETURN): ' + formatTime(result.clock3.time));
+        break;
+      }
+    }
+
+    // Clock 4: Last OUT after clock4MinTime
+    for (var i = outPunches.length - 1; i >= 0; i--) {
+      var minutes = getMinutesSinceMidnight(outPunches[i].time);
+      if (minutes >= clock4MinMin) {
+        result.clock4 = outPunches[i];
+        Logger.log('    Clock 4 (Afternoon OUT): ' + formatTime(result.clock4.time));
+        break;
+      }
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Convert time string to minutes since midnight
+ *
+ * @param {string} timeString - Time in HH:MM format
+ * @returns {number} Minutes since midnight
+ */
+function timeToMinutes(timeString) {
+  var parts = timeString.split(':');
+  var hours = parseInt(parts[0], 10);
+  var minutes = parseInt(parts[1], 10);
+  return hours * 60 + minutes;
+}
+
+// ==================== GRACE PERIOD ADJUSTMENTS ====================
+
+/**
+ * Apply grace period adjustments according to revised rules
+ *
+ * @param {Object} clocks - Classified clock punches
+ * @param {Object} config - Time configuration
+ * @param {Date} referenceDate - Reference date
+ * @param {boolean} isFriday - Is this a Friday
+ * @returns {Object} Adjusted clocks and flags
+ */
+function applyGracePeriods(clocks, config, referenceDate, isFriday) {
+  Logger.log('\n  ⏰ APPLYING GRACE PERIODS...');
+
+  var adjusted = {
+    clock1: clocks.clock1 ? clocks.clock1.time : null,
+    clock2: clocks.clock2 ? clocks.clock2.time : null,
+    clock3: clocks.clock3 ? clocks.clock3.time : null,
+    clock4: clocks.clock4 ? clocks.clock4.time : null
+  };
+
+  var flags = [];
+
+  // Clock 1: Grace period 07:30-07:35
+  if (clocks.clock1) {
+    var standardStart = parseTimeString(config.standardStartTime, referenceDate);
+    var lateAfter = parseTimeString(config.flagLateAfter, referenceDate);
+    var clock1Time = clocks.clock1.time;
+
+    if (clock1Time.getTime() < standardStart.getTime()) {
+      // Before 07:30: Cap at 07:30
+      adjusted.clock1 = standardStart;
+      Logger.log('    Clock 1: ' + formatTime(clock1Time) + ' → ' + formatTime(adjusted.clock1) + ' (capped at standard time)');
+    } else if (clock1Time.getTime() <= lateAfter.getTime()) {
+      // Between 07:30 and 07:35: Adjust to 07:30
+      adjusted.clock1 = standardStart;
+      Logger.log('    Clock 1: ' + formatTime(clock1Time) + ' → ' + formatTime(adjusted.clock1) + ' (grace period applied)');
+    } else {
+      // After 07:35: Use actual time and flag as late
+      adjusted.clock1 = clock1Time;
+      flags.push('Late Clock In (' + formatTime(clock1Time) + ')');
+      Logger.log('    Clock 1: ' + formatTime(clock1Time) + ' (LATE - no adjustment)');
+    }
+  }
+
+  // Clock 2: Grace period 12:00-12:02
+  if (clocks.clock2) {
+    var lunchStart = parseTimeString(config.lunchStart, referenceDate);
+    var lunchGraceEnd = new Date(lunchStart.getTime() + config.lunchOutGraceMinutes * 60 * 1000);
+    var clock2Time = clocks.clock2.time;
+
+    if (clock2Time.getTime() >= lunchStart.getTime() && clock2Time.getTime() <= lunchGraceEnd.getTime()) {
+      // Between 12:00 and 12:02: Adjust to 12:00
+      adjusted.clock2 = lunchStart;
+      Logger.log('    Clock 2: ' + formatTime(clock2Time) + ' → ' + formatTime(adjusted.clock2) + ' (grace period applied)');
+    } else {
+      adjusted.clock2 = clock2Time;
+      Logger.log('    Clock 2: ' + formatTime(clock2Time) + ' (no adjustment)');
+    }
+  }
+
+  // Clock 3: After 12:30 flag as late
+  if (clocks.clock3) {
+    var lunchEnd = parseTimeString(config.lunchEnd, referenceDate);
+    var clock3Time = clocks.clock3.time;
+
+    adjusted.clock3 = clock3Time;
+
+    if (clock3Time.getTime() > lunchEnd.getTime()) {
+      flags.push('Late lunch return - review required (' + formatTime(clock3Time) + ')');
+      Logger.log('    Clock 3: ' + formatTime(clock3Time) + ' (LATE RETURN)');
+    } else {
+      Logger.log('    Clock 3: ' + formatTime(clock3Time) + ' (no adjustment)');
+    }
+  }
+
+  // Clock 4: After 16:30 flag as overtime
+  if (clocks.clock4 && !isFriday) {
+    var standardEnd = parseTimeString(config.standardEndTime, referenceDate);
+    var clock4Time = clocks.clock4.time;
+
+    adjusted.clock4 = clock4Time;
+
+    if (clock4Time.getTime() > standardEnd.getTime()) {
+      flags.push('Overtime - manual review (' + formatTime(clock4Time) + ')');
+      Logger.log('    Clock 4: ' + formatTime(clock4Time) + ' (OVERTIME)');
+    } else {
+      Logger.log('    Clock 4: ' + formatTime(clock4Time) + ' (no adjustment)');
+    }
+  }
+
+  // Friday Clock 2: Before 13:00 use actual time
+  if (isFriday && clocks.clock2) {
+    var fridayEnd = parseTimeString(config.fridayEndTime, referenceDate);
+    adjusted.clock2 = clocks.clock2.time;
+    Logger.log('    Clock 2 (Friday): ' + formatTime(adjusted.clock2) + ' (actual time)');
+  }
+
+  return {
+    adjusted: adjusted,
+    flags: flags
+  };
+}
+
+// ==================== PAID TIME CALCULATION ====================
+
+/**
+ * Calculate paid time based on punch scenario (revised rules)
+ *
+ * @param {Object} clocks - Classified clock punches
+ * @param {Object} adjusted - Adjusted clock times
+ * @param {Object} config - Time configuration
+ * @param {boolean} isFriday - Is this a Friday
+ * @returns {Object} Paid time calculation results
+ */
+function calculatePaidTime(clocks, adjusted, config, isFriday) {
+  Logger.log('\n  💰 CALCULATING PAID TIME...');
+
+  var paidMinutes = 0;
+  var lunchMinutes = 0;
+  var scenario = '';
+  var flags = [];
+
+  // Determine which clocks are present
+  var hasC1 = clocks.clock1 !== null;
+  var hasC2 = clocks.clock2 !== null;
+  var hasC3 = clocks.clock3 !== null;
+  var hasC4 = clocks.clock4 !== null;
+
+  if (isFriday) {
+    // ========== FRIDAY SCENARIOS ==========
+    if (hasC1 && hasC2) {
+      // Scenario: 1, 2 → Clock 2 - Clock 1
+      paidMinutes = (adjusted.clock2.getTime() - adjusted.clock1.getTime()) / (60 * 1000);
+      scenario = 'Friday: Complete day (Clock 2 - Clock 1)';
+      Logger.log('    Scenario: Friday complete (1,2)');
+      Logger.log('    ' + formatTime(adjusted.clock2) + ' - ' + formatTime(adjusted.clock1) + ' = ' + Math.round(paidMinutes) + ' min');
+    } else if (hasC1 && !hasC2) {
+      // Scenario: 1 only → 0 paid time
+      paidMinutes = 0;
+      scenario = 'Friday: Only morning scan';
+      flags.push('Missing Friday out - manual adjustment required');
+      Logger.log('    Scenario: Missing Friday out (1 only)');
+    } else if (!hasC1 && hasC2) {
+      // Scenario: 2 only → 0 paid time
+      paidMinutes = 0;
+      scenario = 'Friday: Only afternoon scan';
+      flags.push('Missing Friday in - manual adjustment required');
+      Logger.log('    Scenario: Missing Friday in (2 only)');
+    } else {
+      // No punches
+      paidMinutes = 0;
+      scenario = 'Friday: No punches';
+      flags.push('No Friday punches recorded');
+      Logger.log('    Scenario: No Friday punches');
+    }
+  } else {
+    // ========== MONDAY-THURSDAY SCENARIOS ==========
+
+    if (hasC1 && hasC2 && hasC3 && hasC4) {
+      // Scenario: 1, 2, 3, 4 → (Clock 4 - Clock 1) - 30 min
+      var totalMinutes = (adjusted.clock4.getTime() - adjusted.clock1.getTime()) / (60 * 1000);
+      lunchMinutes = config.standardLunchMinutes;
+      paidMinutes = totalMinutes - lunchMinutes;
+      scenario = 'Complete day (1,2,3,4)';
+      Logger.log('    Scenario: Complete day (1,2,3,4)');
+      Logger.log('    (' + formatTime(adjusted.clock4) + ' - ' + formatTime(adjusted.clock1) + ') - ' + lunchMinutes + ' min = ' + Math.round(paidMinutes) + ' min');
+
+    } else if (hasC1 && hasC3 && hasC4 && !hasC2) {
+      // Scenario: 1, 3, 4 → (Clock 4 - Clock 1) - 30 min
+      var totalMinutes = (adjusted.clock4.getTime() - adjusted.clock1.getTime()) / (60 * 1000);
+      lunchMinutes = config.standardLunchMinutes;
+      paidMinutes = totalMinutes - lunchMinutes;
+      scenario = 'Missing lunch out (1,3,4)';
+      flags.push('Missing lunch out scan - lunch deducted');
+      Logger.log('    Scenario: Missing lunch out (1,3,4)');
+      Logger.log('    (' + formatTime(adjusted.clock4) + ' - ' + formatTime(adjusted.clock1) + ') - ' + lunchMinutes + ' min = ' + Math.round(paidMinutes) + ' min');
+
+    } else if (hasC1 && hasC4 && !hasC2 && !hasC3) {
+      // Scenario: 1, 4 only → 0 (no lunch recorded)
+      paidMinutes = 0;
+      lunchMinutes = 0;
+      scenario = 'No lunch recorded (1,4)';
+      flags.push('No lunch recorded - investigation required');
+      Logger.log('    Scenario: No lunch recorded (1,4 only) → 0 paid time');
+
+    } else if (hasC1 && hasC2 && hasC4 && !hasC3) {
+      // Scenario: 1, 2, 4 → 0 (missing lunch return)
+      paidMinutes = 0;
+      lunchMinutes = 0;
+      scenario = 'Missing lunch return (1,2,4)';
+      flags.push('Missing lunch return - manual adjustment required');
+      Logger.log('    Scenario: Missing lunch return (1,2,4) → 0 paid time');
+
+    } else if (hasC2 && hasC3 && hasC4 && !hasC1) {
+      // Scenario: 2, 3, 4 → 0 (no morning scan)
+      paidMinutes = 0;
+      lunchMinutes = 0;
+      scenario = 'No morning scan (2,3,4)';
+      flags.push('No morning scan - manual adjustment required');
+      Logger.log('    Scenario: No morning scan (2,3,4) → 0 paid time');
+
+    } else if (hasC1 && hasC2 && hasC3 && !hasC4) {
+      // Scenario: 1, 2, 3 → 0 (no afternoon out)
+      paidMinutes = 0;
+      lunchMinutes = 0;
+      scenario = 'No afternoon out (1,2,3)';
+      flags.push('No afternoon out - manual adjustment required');
+      Logger.log('    Scenario: No afternoon out (1,2,3) → 0 paid time');
+
+    } else if (hasC1 && !hasC2 && !hasC3 && !hasC4) {
+      // Scenario: 1 only → 0
+      paidMinutes = 0;
+      lunchMinutes = 0;
+      scenario = 'Only morning scan (1)';
+      flags.push('Only morning scan - manual adjustment required');
+      Logger.log('    Scenario: Only morning scan (1) → 0 paid time');
+
+    } else if (!hasC1 && !hasC2 && !hasC3 && hasC4) {
+      // Scenario: 4 only → 0
+      paidMinutes = 0;
+      lunchMinutes = 0;
+      scenario = 'Only afternoon scan (4)';
+      flags.push('Only afternoon scan - manual adjustment required');
+      Logger.log('    Scenario: Only afternoon scan (4) → 0 paid time');
+
+    } else if (!hasC1 && hasC2 && hasC3 && !hasC4) {
+      // Scenario: 2, 3 only → 0
+      paidMinutes = 0;
+      lunchMinutes = 0;
+      scenario = 'Only lunch scans (2,3)';
+      flags.push('Only lunch scans - manual adjustment required');
+      Logger.log('    Scenario: Only lunch scans (2,3) → 0 paid time');
+
+    } else if (!hasC1 && hasC2 && !hasC3 && !hasC4) {
+      // Scenario: 2 only → 0
+      paidMinutes = 0;
+      lunchMinutes = 0;
+      scenario = 'Only lunch out scan (2)';
+      flags.push('Only lunch out scan - manual adjustment required');
+      Logger.log('    Scenario: Only lunch out (2) → 0 paid time');
+
+    } else if (!hasC1 && !hasC2 && hasC3 && !hasC4) {
+      // Scenario: 3 only → 0
+      paidMinutes = 0;
+      lunchMinutes = 0;
+      scenario = 'Only lunch return scan (3)';
+      flags.push('Only lunch return scan - manual adjustment required');
+      Logger.log('    Scenario: Only lunch return (3) → 0 paid time');
+
+    } else {
+      // Any other combination → 0
+      paidMinutes = 0;
+      lunchMinutes = 0;
+      scenario = 'Irregular punch pattern';
+      flags.push('Irregular punch pattern - manual adjustment required');
+      Logger.log('    Scenario: Irregular pattern → 0 paid time');
+    }
+  }
+
+  // Ensure paid time doesn't go negative
+  if (paidMinutes < 0) {
+    paidMinutes = 0;
+  }
+
+  return {
+    paidMinutes: Math.round(paidMinutes),
+    lunchMinutes: lunchMinutes,
+    scenario: scenario,
+    flags: flags
+  };
+}
+
 // ==================== BATHROOM TIME CALCULATION ====================
 
 /**
- * Calculate bathroom time from bathroom entry/exit punches
- * Only counts breaks during work periods (not before clock-in, during lunch, or after clock-out)
+ * Calculate bathroom time from bathroom entry/exit punches (revised rules)
  *
  * @param {Array} bathroomPunches - Array of bathroom punch objects
  * @param {Object} config - Time configuration
- * @param {Array} clockPunches - Array of clock in/out punches for determining work periods
+ * @param {Object} clocks - Classified clock punches
+ * @param {Object} adjusted - Adjusted clock times
  * @param {boolean} isFriday - Whether this is a Friday
  * @returns {Object} Bathroom time details
  */
-function calculateBathroomTime(bathroomPunches, config, clockPunches, isFriday) {
+function calculateBathroomTime(bathroomPunches, config, clocks, adjusted, isFriday) {
   if (!bathroomPunches || bathroomPunches.length === 0) {
     return {
       totalMinutes: 0,
@@ -313,62 +503,50 @@ function calculateBathroomTime(bathroomPunches, config, clockPunches, isFriday) 
     };
   }
 
+  Logger.log('\n  🚻 CALCULATING BATHROOM TIME...');
+
   var breaks = [];
   var totalMinutes = 0;
   var warnings = [];
   var unpairedEntries = [];
   var unpairedExits = [];
 
-  // Determine work periods from clock punches
-  // Mon-Thu: Morning (Clock1-Clock2), Afternoon (Clock3-Clock4)
-  // Friday: Full day (Clock1-Clock2)
+  // Determine work periods
   var workPeriods = [];
 
-  if (clockPunches && clockPunches.length > 0) {
-    // Sort clock punches by time
-    var sortedClocks = clockPunches.slice().sort(function(a, b) {
-      return a.time.getTime() - b.time.getTime();
-    });
-
-    if (isFriday) {
-      // Friday: one work period from first to last punch
-      if (sortedClocks.length >= 2) {
-        workPeriods.push({
-          start: sortedClocks[0].time,
-          end: sortedClocks[sortedClocks.length - 1].time
-        });
-      } else if (sortedClocks.length === 1) {
-        // Only one punch - no valid work period
-        workPeriods = [];
-      }
-    } else {
-      // Mon-Thu: Morning and Afternoon periods
-      if (sortedClocks.length >= 2) {
-        // Morning: Clock 1 to Clock 2
-        workPeriods.push({
-          start: sortedClocks[0].time,
-          end: sortedClocks[1].time
-        });
-      }
-      if (sortedClocks.length >= 4) {
-        // Afternoon: Clock 3 to Clock 4
-        workPeriods.push({
-          start: sortedClocks[2].time,
-          end: sortedClocks[3].time
-        });
-      } else if (sortedClocks.length === 3) {
-        // Only 3 punches - afternoon period is Clock 3 to end of day (but we don't have Clock 4)
-        // Don't count afternoon bathroom breaks
-      }
+  if (isFriday) {
+    // Friday: Clock 1 to Clock 2
+    if (adjusted.clock1 && adjusted.clock2) {
+      workPeriods.push({
+        start: adjusted.clock1,
+        end: adjusted.clock2,
+        name: 'Friday full day'
+      });
+    }
+  } else {
+    // Mon-Thu: Morning (Clock 1 to Clock 2) and Afternoon (Clock 3 to Clock 4)
+    if (adjusted.clock1 && adjusted.clock2) {
+      workPeriods.push({
+        start: adjusted.clock1,
+        end: adjusted.clock2,
+        name: 'Morning'
+      });
+    }
+    if (adjusted.clock3 && adjusted.clock4) {
+      workPeriods.push({
+        start: adjusted.clock3,
+        end: adjusted.clock4,
+        name: 'Afternoon'
+      });
     }
   }
 
-  Logger.log('  🚻 Work periods for bathroom filtering: ' + workPeriods.length);
-  workPeriods.forEach(function(period, idx) {
-    Logger.log('    Period ' + (idx + 1) + ': ' + formatTime(period.start) + ' - ' + formatTime(period.end));
+  Logger.log('    Work periods: ' + workPeriods.length);
+  workPeriods.forEach(function(p, i) {
+    Logger.log('      ' + (i + 1) + '. ' + p.name + ': ' + formatTime(p.start) + ' - ' + formatTime(p.end));
   });
 
-  // Helper function to check if a time falls within work periods
+  // Helper function to check if time is within work periods
   function isWithinWorkPeriods(time) {
     for (var i = 0; i < workPeriods.length; i++) {
       var period = workPeriods[i];
@@ -379,12 +557,12 @@ function calculateBathroomTime(bathroomPunches, config, clockPunches, isFriday) 
     return false;
   }
 
-  // Sort punches by time
+  // Sort bathroom punches by time
   bathroomPunches.sort(function(a, b) {
     return a.time.getTime() - b.time.getTime();
   });
 
-  // Separate entries and exits based on device name
+  // Separate entries and exits
   var entries = [];
   var exits = [];
 
@@ -396,33 +574,23 @@ function calculateBathroomTime(bathroomPunches, config, clockPunches, isFriday) 
       entries.push(punch);
     } else if (deviceLower.indexOf('exit') >= 0) {
       exits.push(punch);
-    } else {
-      // Unknown bathroom device - treat as entry if even index, exit if odd
-      if (i % 2 === 0) {
-        entries.push(punch);
-      } else {
-        exits.push(punch);
-      }
     }
   }
 
-  // Filter duplicates within each category (within 60 seconds)
+  Logger.log('    Raw bathroom punches - Entries: ' + entries.length + ', Exits: ' + exits.length);
+
+  // Filter duplicates (60 seconds threshold for bathroom)
   function filterBathroomDuplicates(punches) {
     if (punches.length === 0) return [];
 
-    // Sort by time first
-    punches.sort(function(a, b) {
-      return a.time.getTime() - b.time.getTime();
-    });
-
     var filtered = [punches[0]];
-    var DUPLICATE_THRESHOLD_MS = 60 * 1000; // 60 seconds
+    var thresholdMs = config.bathroomDuplicateSeconds * 1000;
 
     for (var i = 1; i < punches.length; i++) {
       var lastTime = filtered[filtered.length - 1].time.getTime();
       var currentTime = punches[i].time.getTime();
 
-      if (currentTime - lastTime >= DUPLICATE_THRESHOLD_MS) {
+      if (currentTime - lastTime >= thresholdMs) {
         filtered.push(punches[i]);
       } else {
         Logger.log('    🚻 Duplicate bathroom scan at ' + formatTime(punches[i].time) + ' - skipped');
@@ -432,29 +600,44 @@ function calculateBathroomTime(bathroomPunches, config, clockPunches, isFriday) 
     return filtered;
   }
 
-  var originalEntries = entries.length;
-  var originalExits = exits.length;
-
   entries = filterBathroomDuplicates(entries);
   exits = filterBathroomDuplicates(exits);
 
-  Logger.log('  🚻 Bathroom punches - Entries: ' + entries.length + ' (was ' + originalEntries + '), Exits: ' + exits.length + ' (was ' + originalExits + ')');
+  Logger.log('    After duplicate filtering - Entries: ' + entries.length + ', Exits: ' + exits.length);
 
-  // Log all entries and exits after filtering
-  Logger.log('  📋 Filtered entries:');
-  for (var i = 0; i < entries.length; i++) {
-    Logger.log('    ' + (i + 1) + '. ' + formatTime(entries[i].time));
-  }
-  Logger.log('  📋 Filtered exits:');
-  for (var i = 0; i < exits.length; i++) {
-    Logger.log('    ' + (i + 1) + '. ' + formatTime(exits[i].time));
+  // Check for early bathroom (within 10 min of Clock 1 or Clock 3)
+  if (entries.length > 0) {
+    var earlyThresholdMs = config.earlyBathroomThreshold * 60 * 1000;
+
+    if (adjusted.clock1) {
+      var firstEntryAfterClock1 = null;
+      for (var i = 0; i < entries.length; i++) {
+        if (entries[i].time.getTime() > adjusted.clock1.getTime()) {
+          firstEntryAfterClock1 = entries[i];
+          break;
+        }
+      }
+      if (firstEntryAfterClock1 && (firstEntryAfterClock1.time.getTime() - adjusted.clock1.getTime()) <= earlyThresholdMs) {
+        warnings.push('Early bathroom after morning clock in (' + formatTime(firstEntryAfterClock1.time) + ')');
+      }
+    }
+
+    if (adjusted.clock3) {
+      var firstEntryAfterClock3 = null;
+      for (var i = 0; i < entries.length; i++) {
+        if (entries[i].time.getTime() > adjusted.clock3.getTime()) {
+          firstEntryAfterClock3 = entries[i];
+          break;
+        }
+      }
+      if (firstEntryAfterClock3 && (firstEntryAfterClock3.time.getTime() - adjusted.clock3.getTime()) <= earlyThresholdMs) {
+        warnings.push('Early bathroom after lunch return (' + formatTime(firstEntryAfterClock3.time) + ')');
+      }
+    }
   }
 
   // Match entries with exits
   var usedExits = [];
-  var outsideWorkPeriodBreaks = [];
-
-  Logger.log('  🔗 Matching entries to exits:');
 
   for (var i = 0; i < entries.length; i++) {
     var entry = entries[i];
@@ -462,14 +645,11 @@ function calculateBathroomTime(bathroomPunches, config, clockPunches, isFriday) 
 
     // Find the first exit that comes after this entry
     for (var j = 0; j < exits.length; j++) {
-      if (usedExits.indexOf(j) >= 0) continue; // Already used
+      if (usedExits.indexOf(j) >= 0) continue;
 
       var exit = exits[j];
       if (exit.time.getTime() > entry.time.getTime()) {
-        // Found a matching exit
         var duration = (exit.time.getTime() - entry.time.getTime()) / (60 * 1000);
-
-        Logger.log('    Entry ' + formatTime(entry.time) + ' → Exit ' + formatTime(exit.time) + ' (' + Math.round(duration) + 'm)');
 
         var breakInfo = {
           entry: formatTime(entry.time),
@@ -477,13 +657,12 @@ function calculateBathroomTime(bathroomPunches, config, clockPunches, isFriday) 
           minutes: Math.round(duration)
         };
 
-        // Check if break is within work periods
-        // Both entry AND exit must be within work periods to count
-        var entryInWorkPeriod = isWithinWorkPeriods(entry.time);
-        var exitInWorkPeriod = isWithinWorkPeriods(exit.time);
+        // Check if both entry and exit are within work periods
+        var entryInWork = isWithinWorkPeriods(entry.time);
+        var exitInWork = isWithinWorkPeriods(exit.time);
 
-        if (entryInWorkPeriod && exitInWorkPeriod) {
-          // Count this break - both entry and exit during work
+        if (entryInWork && exitInWork) {
+          // Count this break
           totalMinutes += duration;
 
           // Check for long bathroom break
@@ -493,20 +672,9 @@ function calculateBathroomTime(bathroomPunches, config, clockPunches, isFriday) 
           }
 
           breaks.push(breakInfo);
-          Logger.log('    ✓ Bathroom break ' + breakInfo.entry + '-' + breakInfo.exit + ' (' + breakInfo.minutes + 'm) - COUNTED');
+          Logger.log('    ✓ Break: ' + breakInfo.entry + '-' + breakInfo.exit + ' (' + breakInfo.minutes + 'm)');
         } else {
-          // Break is outside work periods - track but don't count
-          breakInfo.outsideWorkPeriod = true;
-          outsideWorkPeriodBreaks.push(breakInfo);
-          var reason = '';
-          if (!entryInWorkPeriod && !exitInWorkPeriod) {
-            reason = 'both entry and exit outside work';
-          } else if (!entryInWorkPeriod) {
-            reason = 'entry outside work (before clock-in or during lunch)';
-          } else {
-            reason = 'exit outside work (during lunch or after clock-out)';
-          }
-          Logger.log('    ✗ Bathroom break ' + breakInfo.entry + '-' + breakInfo.exit + ' (' + breakInfo.minutes + 'm) - NOT COUNTED: ' + reason);
+          Logger.log('    ✗ Break outside work: ' + breakInfo.entry + '-' + breakInfo.exit + ' (not counted)');
         }
 
         usedExits.push(j);
@@ -515,34 +683,26 @@ function calculateBathroomTime(bathroomPunches, config, clockPunches, isFriday) 
       }
     }
 
-    if (!matched) {
-      // Entry without exit - only report if during work hours
-      if (isWithinWorkPeriods(entry.time)) {
-        unpairedEntries.push(formatTime(entry.time));
-        warnings.push('Bathroom entry at ' + formatTime(entry.time) + ' without exit');
-      } else {
-        Logger.log('    🚻 Unpaired entry at ' + formatTime(entry.time) + ' outside work periods - ignored');
-      }
+    if (!matched && isWithinWorkPeriods(entry.time)) {
+      unpairedEntries.push(formatTime(entry.time));
+      warnings.push('Bathroom entry without matching exit (' + formatTime(entry.time) + ')');
     }
   }
 
   // Find exits without entries
   for (var j = 0; j < exits.length; j++) {
-    if (usedExits.indexOf(j) === -1) {
-      // Only report if during work hours
-      if (isWithinWorkPeriods(exits[j].time)) {
-        unpairedExits.push(formatTime(exits[j].time));
-        warnings.push('Bathroom exit at ' + formatTime(exits[j].time) + ' without entry');
-      } else {
-        Logger.log('    🚻 Unpaired exit at ' + formatTime(exits[j].time) + ' outside work periods - ignored');
-      }
+    if (usedExits.indexOf(j) === -1 && isWithinWorkPeriods(exits[j].time)) {
+      unpairedExits.push(formatTime(exits[j].time));
+      warnings.push('Bathroom exit without matching entry (' + formatTime(exits[j].time) + ')');
     }
   }
 
   // Check daily threshold
   if (totalMinutes > config.dailyBathroomThreshold) {
-    warnings.push('Daily bathroom time exceeds threshold (' + Math.round(totalMinutes) + ' min)');
+    warnings.push('Daily bathroom threshold exceeded: ' + Math.round(totalMinutes) + ' minutes');
   }
+
+  Logger.log('    Total bathroom time: ' + Math.round(totalMinutes) + ' min');
 
   return {
     totalMinutes: Math.round(totalMinutes),
@@ -553,10 +713,72 @@ function calculateBathroomTime(bathroomPunches, config, clockPunches, isFriday) 
   };
 }
 
+// ==================== DUPLICATE DETECTION ====================
+
+/**
+ * Filter duplicate main clock punches (2 minute threshold)
+ *
+ * @param {Array} punches - Array of punch objects
+ * @param {Object} config - Time configuration
+ * @returns {Array} Filtered punches
+ */
+function filterDuplicateMainPunches(punches, config) {
+  if (punches.length === 0) return [];
+
+  var filtered = [punches[0]];
+  var thresholdMs = config.mainClockDuplicateMinutes * 60 * 1000;
+  var duplicatesRemoved = 0;
+
+  for (var i = 1; i < punches.length; i++) {
+    var lastTime = filtered[filtered.length - 1].time.getTime();
+    var currentTime = punches[i].time.getTime();
+
+    if (currentTime - lastTime >= thresholdMs) {
+      filtered.push(punches[i]);
+    } else {
+      duplicatesRemoved++;
+      Logger.log('  ⚠️ DUPLICATE MAIN SCAN: ' + formatTime(punches[i].time) +
+                 ' (only ' + Math.round((currentTime - lastTime) / 1000) + 's after previous) - SKIPPED');
+    }
+  }
+
+  if (duplicatesRemoved > 0) {
+    Logger.log('  📋 Filtered ' + duplicatesRemoved + ' duplicate main clock scans');
+  }
+
+  return filtered;
+}
+
+// ==================== DEVICE RECOGNITION ====================
+
+/**
+ * Determine punch type (in/out) from device name
+ *
+ * @param {string} deviceName - Device name
+ * @param {number} punchIndex - Index in sequence (for alternating pattern)
+ * @returns {string} 'in' or 'out'
+ */
+function determinePunchType(deviceName, punchIndex) {
+  var deviceLower = (deviceName || '').toLowerCase().replace(/\s+/g, '');
+
+  // Explicit IN devices
+  if (deviceLower === 'clockin' || deviceLower === 'clock-in' || deviceLower === 'clock in') {
+    return 'in';
+  }
+
+  // Explicit OUT devices
+  if (deviceLower === 'clockout' || deviceLower === 'clock-out' || deviceLower === 'clock out') {
+    return 'out';
+  }
+
+  // Unknown device: Use alternating pattern (even index = in, odd = out)
+  return punchIndex % 2 === 0 ? 'in' : 'out';
+}
+
 // ==================== MAIN PROCESSING FUNCTION ====================
 
 /**
- * Process clock data for an employee for one week
+ * Process clock data for an employee for one week (revised rules)
  *
  * @param {Array} clockData - Array of clock punch records
  * @param {Object} config - Time configuration
@@ -564,17 +786,17 @@ function calculateBathroomTime(bathroomPunches, config, clockPunches, isFriday) 
  */
 function processClockData(clockData, config) {
   try {
-    Logger.log('\n========== PROCESS CLOCK DATA ==========');
+    Logger.log('\n========== PROCESS CLOCK DATA (REVISED RULES) ==========');
     Logger.log('Processing ' + clockData.length + ' clock records');
 
-    // Filter out records with empty or invalid PUNCH_TIME before processing
+    // Filter out records with empty or invalid PUNCH_TIME
     var validClockData = [];
     for (var i = 0; i < clockData.length; i++) {
       var record = clockData[i];
       if (record.PUNCH_TIME && record.PUNCH_TIME.toString().trim() !== '') {
         validClockData.push(record);
       } else {
-        Logger.log('  ⚠️ Skipping record with empty PUNCH_TIME: ' + JSON.stringify(record));
+        Logger.log('  ⚠️ Skipping record with empty PUNCH_TIME');
       }
     }
 
@@ -584,24 +806,19 @@ function processClockData(clockData, config) {
 
     clockData = validClockData;
 
-    // Group punches by date
-    var punchesByDate = {};
-
-    // CRITICAL: Sort clock data by date and time FIRST before assigning in/out types
-    // The alternating pattern only works if punches are processed in chronological order
+    // Sort by time
     clockData.sort(function(a, b) {
       try {
         var timeA = parseTime(a.PUNCH_TIME);
         var timeB = parseTime(b.PUNCH_TIME);
         return timeA.getTime() - timeB.getTime();
       } catch (e) {
-        Logger.log('  ❌ ERROR in sort comparing: ' + a.PUNCH_TIME + ' vs ' + b.PUNCH_TIME);
-        return 0; // Keep original order if parsing fails
+        Logger.log('  ❌ ERROR sorting: ' + e.message);
+        return 0;
       }
     });
 
-    // FIXED: Separate main and bathroom punches BEFORE duplicate detection
-    // This prevents bathroom punches from being filtered out when they're close to main punches
+    // Separate main and bathroom punches
     var mainPunches = [];
     var bathroomPunches = [];
 
@@ -616,140 +833,52 @@ function processClockData(clockData, config) {
       }
     }
 
-    Logger.log('\n📋 DIAGNOSTIC: Separated punches - Main: ' + mainPunches.length + ', Bathroom: ' + bathroomPunches.length);
+    Logger.log('\n📋 Separated punches - Main: ' + mainPunches.length + ', Bathroom: ' + bathroomPunches.length);
 
-    // Filter out duplicate scans within 2 minutes (keep only first scan)
-    // Apply separately to main and bathroom punches
-    var DUPLICATE_THRESHOLD_MS = 2 * 60 * 1000; // 2 minutes in milliseconds
+    // Group by date
+    var punchesByDate = {};
 
-    // Helper function to filter duplicates within a punch category
-    function filterDuplicates(punches, category) {
-      var filtered = [];
-      var lastPunchTime = null;
-      var duplicatesRemoved = 0;
-
-      for (var i = 0; i < punches.length; i++) {
-        var record = punches[i];
-
-        // Safely parse punch time with error handling
-        var punchTime;
-        try {
-          punchTime = parseTime(record.PUNCH_TIME);
-        } catch (e) {
-          Logger.log('  ❌ ERROR parsing PUNCH_TIME for ' + category + ': ' + record.PUNCH_TIME + ' - ' + e.message);
-          continue; // Skip this record
-        }
-
-        if (lastPunchTime === null) {
-          // First punch, always keep
-          filtered.push(record);
-          lastPunchTime = punchTime;
-        } else {
-          var timeDiff = punchTime.getTime() - lastPunchTime.getTime();
-
-          if (timeDiff >= DUPLICATE_THRESHOLD_MS) {
-            // More than 2 minutes apart, keep this punch
-            filtered.push(record);
-            lastPunchTime = punchTime;
-          } else {
-            // Within 2 minutes, skip as duplicate
-            duplicatesRemoved++;
-            Logger.log('  ⚠️ DUPLICATE ' + category + ' SCAN: ' + formatTime(punchTime) +
-                       ' (only ' + Math.round(timeDiff / 1000) + 's after previous) - SKIPPED');
-          }
-        }
-      }
-
-      if (duplicatesRemoved > 0) {
-        Logger.log('  📋 Filtered ' + duplicatesRemoved + ' duplicate ' + category + ' scans');
-      }
-
-      return filtered;
-    }
-
-    // Apply duplicate detection to main punches only
-    // Bathroom duplicates will be filtered later in calculateBathroomTime
-    // where entries and exits are separated (filtering them here causes
-    // exits to be incorrectly filtered when they're close to entries)
-    var filteredMainPunches = filterDuplicates(mainPunches, 'MAIN');
-
-    // Merge back together and sort by time
-    var filteredClockData = filteredMainPunches.concat(bathroomPunches);
-    filteredClockData.sort(function(a, b) {
-      try {
-        var timeA = parseTime(a.PUNCH_TIME);
-        var timeB = parseTime(b.PUNCH_TIME);
-        return timeA.getTime() - timeB.getTime();
-      } catch (e) {
-        return 0; // Keep original order if parsing fails
-      }
-    });
-
-    Logger.log('\n📋 DIAGNOSTIC: After duplicate filtering - Total: ' + filteredClockData.length +
-               ' (Main: ' + filteredMainPunches.length + ', Bathroom: ' + bathroomPunches.length + ')');
-
-    // Use filtered data for processing
-    clockData = filteredClockData;
-
-    Logger.log('\n🔍 DIAGNOSTIC: Grouping and classifying punches (sorted by time)...');
-    for (var i = 0; i < clockData.length; i++) {
-      var record = clockData[i];
+    for (var i = 0; i < mainPunches.length; i++) {
+      var record = mainPunches[i];
       var punchTime = parseTime(record.PUNCH_TIME);
       var dateKey = formatDate(punchTime);
 
       if (!punchesByDate[dateKey]) {
         punchesByDate[dateKey] = {
           date: dateKey,
-          clockInPunches: [],
+          mainPunches: [],
           bathroomPunches: []
         };
       }
 
-      var deviceName = record.DEVICE_NAME || '';
+      // Determine type using device recognition
+      var type = determinePunchType(record.DEVICE_NAME, punchesByDate[dateKey].mainPunches.length);
 
-      if (deviceName.toLowerCase().indexOf('bathroom') >= 0) {
-        punchesByDate[dateKey].bathroomPunches.push({
-          time: punchTime,
-          device: deviceName
-        });
-      } else {
-        // Determine if clock-in or clock-out
-        var type = 'unknown';
-        var currentCount = punchesByDate[dateKey].clockInPunches.length;
-        var deviceLower = deviceName.toLowerCase();
-
-        // Check for SPECIFIC device names that indicate in/out
-        // Must be exact matches like "Clock In" or "Clock Out", not substrings
-        if (deviceLower === 'clock in' || deviceLower === 'clock-in' || deviceLower === 'clockin') {
-          type = 'in';
-        } else if (deviceLower === 'clock out' || deviceLower === 'clock-out' || deviceLower === 'clockout') {
-          type = 'out';
-        } else {
-          // For any other device (like "Main Unit"), use alternating pattern
-          // 1st scan = in, 2nd = out, 3rd = in, 4th = out
-          type = currentCount % 2 === 0 ? 'in' : 'out';
-        }
-
-        Logger.log('  📌 ' + dateKey + ' @ ' + formatTime(punchTime) +
-                   ' | Device: "' + deviceName + '" | Count: ' + currentCount +
-                   ' | Type: ' + type.toUpperCase());
-
-        punchesByDate[dateKey].clockInPunches.push({
-          time: punchTime,
-          type: type,
-          device: deviceName
-        });
-      }
+      punchesByDate[dateKey].mainPunches.push({
+        time: punchTime,
+        type: type,
+        device: record.DEVICE_NAME
+      });
     }
 
-    // Log summary for each day
-    Logger.log('\n📊 DIAGNOSTIC: Daily punch summary:');
-    for (var dateKey in punchesByDate) {
-      var dayData = punchesByDate[dateKey];
-      var inCount = dayData.clockInPunches.filter(function(p) { return p.type === 'in'; }).length;
-      var outCount = dayData.clockInPunches.filter(function(p) { return p.type === 'out'; }).length;
-      Logger.log('  ' + dateKey + ': ' + inCount + ' INs, ' + outCount + ' OUTs, ' +
-                 dayData.bathroomPunches.length + ' bathroom punches');
+    // Add bathroom punches to dates
+    for (var i = 0; i < bathroomPunches.length; i++) {
+      var record = bathroomPunches[i];
+      var punchTime = parseTime(record.PUNCH_TIME);
+      var dateKey = formatDate(punchTime);
+
+      if (!punchesByDate[dateKey]) {
+        punchesByDate[dateKey] = {
+          date: dateKey,
+          mainPunches: [],
+          bathroomPunches: []
+        };
+      }
+
+      punchesByDate[dateKey].bathroomPunches.push({
+        time: punchTime,
+        device: record.DEVICE_NAME
+      });
     }
 
     // Process each day
@@ -757,25 +886,20 @@ function processClockData(clockData, config) {
     var totalMinutes = 0;
     var totalLunchDeduction = 0;
     var totalBathroomTime = 0;
-    var appliedRules = [];
     var allWarnings = [];
 
     for (var dateKey in punchesByDate) {
       var dayData = punchesByDate[dateKey];
+
+      // Filter duplicates from main punches
+      dayData.mainPunches = filterDuplicateMainPunches(dayData.mainPunches, config);
+
       var dayResult = processDayData(dayData, config);
 
       dailyBreakdown.push(dayResult);
       totalMinutes += dayResult.totalMinutes;
       totalLunchDeduction += dayResult.lunchMinutes;
       totalBathroomTime += dayResult.bathroomMinutes;
-
-      if (dayResult.appliedRules) {
-        dayResult.appliedRules.forEach(function(rule) {
-          if (appliedRules.indexOf(rule) === -1) {
-            appliedRules.push(rule);
-          }
-        });
-      }
 
       if (dayResult.warnings) {
         allWarnings = allWarnings.concat(dayResult.warnings);
@@ -786,18 +910,17 @@ function processClockData(clockData, config) {
     var totalHours = Math.floor(totalMinutes / 60);
     var remainingMinutes = totalMinutes % 60;
 
-    // Log weekly summary
-    Logger.log('\n📊 DIAGNOSTIC: WEEKLY SUMMARY');
+    // Log summary
+    Logger.log('\n📊 WEEKLY SUMMARY');
     Logger.log('============================================');
     dailyBreakdown.forEach(function(day) {
       var dayHours = Math.floor(day.totalMinutes / 60);
       var dayMins = day.totalMinutes % 60;
       Logger.log('  ' + day.date + ': ' + dayHours + 'h ' + dayMins + 'm' +
-                 (day.lunchMinutes > 0 ? ' (lunch: -' + day.lunchMinutes + 'm)' : ' (NO LUNCH)'));
+                 (day.lunchMinutes > 0 ? ' (lunch: -' + day.lunchMinutes + 'm)' : ''));
     });
     Logger.log('============================================');
     Logger.log('  TOTAL PAID TIME: ' + totalHours + 'h ' + remainingMinutes + 'm');
-    Logger.log('  Total lunch deducted: ' + totalLunchDeduction + ' minutes');
     Logger.log('============================================');
 
     var result = {
@@ -809,7 +932,6 @@ function processClockData(clockData, config) {
         lunchDeductionMinutes: totalLunchDeduction,
         bathroomTimeMinutes: totalBathroomTime,
         dailyBreakdown: dailyBreakdown,
-        appliedRules: appliedRules,
         warnings: allWarnings
       }
     };
@@ -831,7 +953,7 @@ function processClockData(clockData, config) {
 }
 
 /**
- * Process clock data for a single day
+ * Process clock data for a single day (revised rules)
  *
  * @param {Object} dayData - Day's punch data
  * @param {Object} config - Time configuration
@@ -841,284 +963,50 @@ function processDayData(dayData, config) {
   var date = new Date(dayData.date);
   var isFriday = date.getDay() === 5;
 
-  Logger.log('\n📅 DIAGNOSTIC: Processing day: ' + dayData.date + (isFriday ? ' (FRIDAY)' : ''));
+  Logger.log('\n📅 Processing: ' + dayData.date + (isFriday ? ' (FRIDAY)' : ''));
+  Logger.log('  Main punches: ' + dayData.mainPunches.length + ', Bathroom: ' + dayData.bathroomPunches.length);
 
   var warnings = [];
-  var appliedRules = [];
 
-  // Sort punches by time
-  dayData.clockInPunches.sort(function(a, b) {
-    return a.time.getTime() - b.time.getTime();
-  });
+  // Classify clocks into Clock 1, 2, 3, 4
+  var clocks = classifyClockPunches(dayData.mainPunches, config, isFriday);
 
-  Logger.log('  Sorted punches (' + dayData.clockInPunches.length + ' total):');
-  for (var i = 0; i < dayData.clockInPunches.length; i++) {
-    Logger.log('    ' + (i + 1) + '. ' + formatTime(dayData.clockInPunches[i].time) +
-               ' (' + dayData.clockInPunches[i].type.toUpperCase() + ')');
-  }
+  // Apply grace periods
+  var graceResult = applyGracePeriods(clocks, config, date, isFriday);
+  var adjusted = graceResult.adjusted;
+  warnings = warnings.concat(graceResult.flags);
 
-  // ========== VALIDATION CHECKS ==========
-  var punches = dayData.clockInPunches;
-  var punchCount = punches.length;
-  var expectedPunches = isFriday ? 2 : 4;
+  // Calculate paid time
+  var paidResult = calculatePaidTime(clocks, adjusted, config, isFriday);
+  warnings = warnings.concat(paidResult.flags);
 
-  // Helper: Get hour and minute from a punch
-  function getTimeMinutes(punchTime) {
-    return punchTime.getHours() * 60 + punchTime.getMinutes();
-  }
+  // Calculate bathroom time
+  var bathroomResult = calculateBathroomTime(dayData.bathroomPunches, config, clocks, adjusted, isFriday);
+  warnings = warnings.concat(bathroomResult.warnings);
 
-  // Time thresholds (in minutes from midnight)
-  var LATE_THRESHOLD = 7 * 60 + 35;  // 07:35
-  var LUNCH_OUT_START = 11 * 60 + 30;  // 11:30
-  var LUNCH_OUT_END = 12 * 60 + 30;    // 12:30
-  var LUNCH_RETURN_START = 12 * 60 + 15;  // 12:15
-  var LUNCH_RETURN_END = 13 * 60 + 0;     // 13:00
-  var AFTERNOON_OUT_START = 16 * 60 + 0;  // 16:00
-  var FRIDAY_OUT_START = 12 * 60 + 45;    // 12:45
-
-  if (punchCount > 0) {
-    var firstPunchTime = getTimeMinutes(punches[0].time);
-
-    // Check 4: Late Clock In (after 07:35)
-    if (firstPunchTime > LATE_THRESHOLD) {
-      var lateMinutes = firstPunchTime - (7 * 60 + 30);  // Minutes after 07:30
-      warnings.push('Late Clock In (' + formatTime(punches[0].time) + ' - ' + lateMinutes + ' min late)');
-    }
-
-    // Check 5: No morning clock in (first punch is around lunch time)
-    if (firstPunchTime >= LUNCH_OUT_START) {
-      warnings.push('No morning clock in - first scan at ' + formatTime(punches[0].time));
-      // Don't count morning time
-      appliedRules.push('noMorningClockIn');
-    }
-  }
-
-  // Checks for Mon-Thu (expected 4 punches)
-  if (!isFriday) {
-    // Check 2: Missing Clock 4 (no afternoon scan out)
-    if (punchCount < 4) {
-      warnings.push('Missing afternoon clock out (Clock 4)');
-    }
-
-    // Check 3: Not Scanned in from Lunch
-    // Pattern: Clock 1 morning, Clock 2 lunch out, Clock 3 is afternoon out (not lunch return)
-    if (punchCount === 3) {
-      var clock2Time = getTimeMinutes(punches[1].time);
-      var clock3Time = getTimeMinutes(punches[2].time);
-
-      // If Clock 2 is around lunch time (11:30-12:30) and Clock 3 is around end of day (16:00+)
-      if (clock2Time >= LUNCH_OUT_START && clock2Time <= LUNCH_OUT_END &&
-          clock3Time >= AFTERNOON_OUT_START) {
-        warnings.push('Not Scanned in from Lunch - no return scan after lunch');
-        // Time from Clock 2 to Clock 3 should not be counted as work
-        appliedRules.push('notScannedInFromLunch');
-      }
-    }
-
-    // Also check if 4 punches but Clock 3 is too late (should be around 12:30, not 16:00)
-    if (punchCount >= 3) {
-      var clock3Time = getTimeMinutes(punches[2].time);
-      // If Clock 3 is after 14:00, it's probably the afternoon out, not lunch return
-      if (clock3Time >= 14 * 60) {
-        if (punchCount === 3) {
-          // Already handled above
-        } else if (punchCount === 4) {
-          // Check if Clock 3 and Clock 4 are both in afternoon (missed lunch return)
-          var clock4Time = getTimeMinutes(punches[3].time);
-          if (clock3Time >= AFTERNOON_OUT_START - 60 && clock4Time >= AFTERNOON_OUT_START) {
-            warnings.push('Irregular scan pattern - possible missed lunch return');
-          }
-        }
-      }
-    }
-  }
-
-  // Friday checks (expected 2 punches)
-  if (isFriday && punchCount < 2) {
-    if (punchCount === 1) {
-      warnings.push('Missing Friday clock out (Clock 2)');
-    }
-  }
-
-  Logger.log('  Validation warnings: ' + (warnings.length > 0 ? warnings.join('; ') : 'None'));
-
-  // Get first clock-in and last clock-out
-  var firstIn = null;
-  var lastOut = null;
-
-  for (var i = 0; i < dayData.clockInPunches.length; i++) {
-    if (dayData.clockInPunches[i].type === 'in' && !firstIn) {
-      firstIn = dayData.clockInPunches[i].time;
-    }
-    if (dayData.clockInPunches[i].type === 'out') {
-      lastOut = dayData.clockInPunches[i].time;
-    }
-  }
-
-  Logger.log('  First IN: ' + (firstIn ? formatTime(firstIn) : 'NONE'));
-  Logger.log('  Last OUT: ' + (lastOut ? formatTime(lastOut) : 'NONE'));
-
-  // If incomplete day and projectIncompleteDays is enabled
-  if (config.projectIncompleteDays && (!firstIn || !lastOut)) {
-    warnings.push('Incomplete day - missing clock-in or clock-out');
-
-    // Use defaults
-    if (!firstIn) {
-      firstIn = parseTimeString(config.standardStartTime);
-      firstIn.setFullYear(date.getFullYear());
-      firstIn.setMonth(date.getMonth());
-      firstIn.setDate(date.getDate());
-      warnings.push('No clock-in found, using standard start time');
-    }
-
-    if (!lastOut) {
-      var endTime = isFriday ? config.fridayEndTime : config.standardEndTime;
-      lastOut = parseTimeString(endTime);
-      lastOut.setFullYear(date.getFullYear());
-      lastOut.setMonth(date.getMonth());
-      lastOut.setDate(date.getDate());
-      warnings.push('No clock-out found, using standard end time');
-    }
-
-    appliedRules.push('projectIncompleteDays');
-  }
-
-  if (!firstIn || !lastOut) {
-    return {
-      date: dayData.date,
-      clockIn: null,
-      clockOut: null,
-      adjustedIn: null,
-      adjustedOut: null,
-      lunchTaken: false,
-      lunchMinutes: 0,
-      bathroomMinutes: 0,
-      totalMinutes: 0,
-      warnings: warnings,
-      appliedRules: appliedRules
-    };
-  }
-
-  // Apply start buffer
-  var standardStart = parseTimeString(config.standardStartTime);
-  standardStart.setFullYear(date.getFullYear());
-  standardStart.setMonth(date.getMonth());
-  standardStart.setDate(date.getDate());
-
-  var startResult = applyStartBuffer(firstIn, standardStart, config.graceMinutes);
-  var adjustedIn = startResult.adjustedTime;
-  if (startResult.bufferApplied) {
-    appliedRules.push('graceBufferApplied');
-  }
-
-  // Apply end buffer
-  var endTime = isFriday ? config.fridayEndTime : config.standardEndTime;
-  var standardEnd = parseTimeString(endTime);
-  standardEnd.setFullYear(date.getFullYear());
-  standardEnd.setMonth(date.getMonth());
-  standardEnd.setDate(date.getDate());
-
-  var endResult = applyEndBuffer(lastOut, standardEnd, config.endBufferMinutes);
-  var adjustedOut = endResult.adjustedTime;
-  if (endResult.bufferApplied) {
-    appliedRules.push('endBufferApplied');
-  }
-
-  Logger.log('\n  ⏰ DIAGNOSTIC: Time adjustments...');
-  Logger.log('    Adjusted IN: ' + formatTime(adjustedIn));
-  Logger.log('    Adjusted OUT: ' + formatTime(adjustedOut));
-
-  // Calculate lunch
-  var lunchResult = calculateLunchBreak(dayData.clockInPunches, config, isFriday);
-  if (lunchResult.lunchTaken) {
-    appliedRules.push('lunchDeducted');
-  }
-
-  // Calculate bathroom time - pass clock punches to filter by work periods
-  var bathroomResult = calculateBathroomTime(dayData.bathroomPunches, config, dayData.clockInPunches, isFriday);
-  if (bathroomResult.warnings.length > 0) {
-    warnings = warnings.concat(bathroomResult.warnings);
-  }
-
-  // Calculate total minutes
-  var workedMs = adjustedOut.getTime() - adjustedIn.getTime();
-  var workedMinutes = workedMs / (60 * 1000);
-
-  Logger.log('\n  💰 DIAGNOSTIC: Final calculation...');
-  Logger.log('    Adjusted OUT - Adjusted IN = Worked minutes');
-  Logger.log('    ' + formatTime(adjustedOut) + ' - ' + formatTime(adjustedIn) + ' = ' +
-             Math.round(workedMinutes) + ' minutes (' + (Math.round(workedMinutes / 60 * 10) / 10) + ' hours)');
-
-  // Handle invalid data: clock-out before clock-in (results in negative time)
-  if (workedMinutes < 0) {
-    warnings.push('Invalid data: Clock-out (' + formatTime(adjustedOut) + ') before clock-in (' + formatTime(adjustedIn) + ')');
-    workedMinutes = 0;
-  }
-
-  var totalMinutes = workedMinutes - lunchResult.lunchMinutes;
-
-  Logger.log('    Lunch deduction: -' + lunchResult.lunchMinutes + ' minutes');
-
-  // Special handling for "Not Scanned in from Lunch" - only count morning time
-  if (appliedRules.indexOf('notScannedInFromLunch') >= 0 && dayData.clockInPunches.length >= 2) {
-    // Only count time from Clock 1 to Clock 2 (morning session)
-    var morningIn = dayData.clockInPunches[0].time;
-    var morningOut = dayData.clockInPunches[1].time;
-
-    // Apply buffer to morning in
-    var morningStandardStart = parseTimeString(config.standardStartTime);
-    morningStandardStart.setFullYear(date.getFullYear());
-    morningStandardStart.setMonth(date.getMonth());
-    morningStandardStart.setDate(date.getDate());
-    var morningStartResult = applyStartBuffer(morningIn, morningStandardStart, config.graceMinutes);
-
-    var morningMs = morningOut.getTime() - morningStartResult.adjustedTime.getTime();
-    totalMinutes = morningMs / (60 * 1000);
-
-    Logger.log('    ⚠️ NOT SCANNED IN FROM LUNCH - Only counting morning time:');
-    Logger.log('      Morning: ' + formatTime(morningStartResult.adjustedTime) + ' to ' + formatTime(morningOut));
-    Logger.log('      Morning minutes: ' + Math.round(totalMinutes));
-  }
-
-  // Special handling for "No morning clock in" - only count afternoon time
-  if (appliedRules.indexOf('noMorningClockIn') >= 0 && dayData.clockInPunches.length >= 2) {
-    // First punch is around lunch, so count from there
-    // This would be Clock 1 (which should be Clock 2 lunch out) to last out
-    // Actually set to 0 since we can't verify morning attendance
-    totalMinutes = 0;
-    Logger.log('    ⚠️ NO MORNING CLOCK IN - Time not counted');
-  }
-
-  Logger.log('    PAID TIME: ' + Math.round(totalMinutes) + ' minutes (' +
-             Math.floor(totalMinutes / 60) + 'h ' + Math.round(totalMinutes % 60) + 'm)');
-
-  // Ensure total doesn't go negative after lunch deduction
-  if (totalMinutes < 0) {
-    totalMinutes = 0;
-  }
-
-  // Collect all punch times for Clock 1, Clock 2, Clock 3, Clock 4 display
+  // Collect punch times for display
   var punchTimes = [];
-  for (var i = 0; i < dayData.clockInPunches.length; i++) {
-    punchTimes.push(formatTime(dayData.clockInPunches[i].time));
-  }
+  if (clocks.clock1) punchTimes.push(formatTime(clocks.clock1.time));
+  if (clocks.clock2) punchTimes.push(formatTime(clocks.clock2.time));
+  if (clocks.clock3) punchTimes.push(formatTime(clocks.clock3.time));
+  if (clocks.clock4) punchTimes.push(formatTime(clocks.clock4.time));
 
   return {
     date: dayData.date,
-    clockIn: formatTime(firstIn),
-    clockOut: formatTime(lastOut),
-    adjustedIn: formatTime(adjustedIn),
-    adjustedOut: formatTime(adjustedOut),
-    punchTimes: punchTimes,  // Array of all clock times [Clock1, Clock2, Clock3, Clock4]
-    lunchTaken: lunchResult.lunchTaken,
-    lunchMinutes: lunchResult.lunchMinutes,
+    scenario: paidResult.scenario,
+    clockIn: clocks.clock1 ? formatTime(clocks.clock1.time) : null,
+    clockOut: (isFriday ? (clocks.clock2 ? formatTime(clocks.clock2.time) : null) : (clocks.clock4 ? formatTime(clocks.clock4.time) : null)),
+    adjustedIn: adjusted.clock1 ? formatTime(adjusted.clock1) : null,
+    adjustedOut: (isFriday ? (adjusted.clock2 ? formatTime(adjusted.clock2) : null) : (adjusted.clock4 ? formatTime(adjusted.clock4) : null)),
+    punchTimes: punchTimes,
+    lunchTaken: paidResult.lunchMinutes > 0,
+    lunchMinutes: paidResult.lunchMinutes,
     bathroomMinutes: bathroomResult.totalMinutes,
     bathroomBreaks: bathroomResult.breaks,
     bathroomUnpairedEntries: bathroomResult.unpairedEntries,
     bathroomUnpairedExits: bathroomResult.unpairedExits,
-    totalMinutes: Math.round(totalMinutes),
-    warnings: warnings,
-    appliedRules: appliedRules
+    totalMinutes: paidResult.paidMinutes,
+    warnings: warnings
   };
 }
 
@@ -1245,112 +1133,4 @@ function test_timesheetProcessor() {
   }
 
   Logger.log('========== TEST COMPLETE ==========\n');
-}
-
-/**
- * Test function to debug bathroom matching for Eric Moses Sithole on 2025-11-20
- */
-function test_EricSitholeBathroom() {
-  Logger.log('\n========== TEST: ERIC SITHOLE BATHROOM DEBUG ==========');
-
-  var sheets = getSheets_v2();
-  var rawClockSheet = sheets.rawClockData;
-
-  if (!rawClockSheet) {
-    Logger.log('❌ RAW_CLOCK_DATA sheet not found');
-    return;
-  }
-
-  // Get raw clock data
-  var rawData = rawClockSheet.getDataRange().getValues();
-  var rawHeaders = rawData[0];
-
-  // Find column indices
-  var empNameCol = -1, empClockRefCol = -1, punchDateCol = -1, punchTimeCol = -1, deviceCol = -1;
-  for (var i = 0; i < rawHeaders.length; i++) {
-    var header = String(rawHeaders[i]).toUpperCase().trim();
-    if (header === 'EMPLOYEE_NAME') empNameCol = i;
-    if (header === 'EMPLOYEE_CLOCK_REF') empClockRefCol = i;
-    if (header === 'PUNCH_DATE') punchDateCol = i;
-    if (header === 'PUNCH_TIME') punchTimeCol = i;
-    if (header === 'DEVICE_NAME') deviceCol = i;
-  }
-
-  Logger.log('Column indices - Name: ' + empNameCol + ', ClockRef: ' + empClockRefCol +
-             ', PunchDate: ' + punchDateCol + ', PunchTime: ' + punchTimeCol + ', Device: ' + deviceCol);
-
-  // Filter for Eric Moses Sithole (clock ref 1008) on 2025-11-20
-  var targetClockRef = '1008';
-  var targetDate = '2025-11-20';
-  var clockData = [];
-
-  for (var j = 1; j < rawData.length; j++) {
-    var row = rawData[j];
-    var clockRef = String(row[empClockRefCol]).trim();
-    var punchTime = row[punchTimeCol];
-
-    if (clockRef === targetClockRef && punchTime) {
-      var punchDate;
-      if (punchTime instanceof Date) {
-        punchDate = Utilities.formatDate(punchTime, Session.getScriptTimeZone(), 'yyyy-MM-dd');
-      } else {
-        punchDate = String(row[punchDateCol]).substring(0, 10);
-      }
-
-      if (punchDate === targetDate) {
-        clockData.push({
-          EMPLOYEE_NAME: row[empNameCol],
-          PUNCH_DATE: row[punchDateCol],
-          PUNCH_TIME: punchTime,
-          DEVICE_NAME: row[deviceCol] || 'Main Unit'
-        });
-      }
-    }
-  }
-
-  Logger.log('\n📊 Found ' + clockData.length + ' punches for Eric Moses Sithole on 2025-11-20');
-
-  // Log all punches
-  Logger.log('\n📋 All punches (sorted by time):');
-  clockData.sort(function(a, b) {
-    var timeA = parseTime(a.PUNCH_TIME);
-    var timeB = parseTime(b.PUNCH_TIME);
-    return timeA.getTime() - timeB.getTime();
-  });
-
-  for (var i = 0; i < clockData.length; i++) {
-    var punch = clockData[i];
-    var time = parseTime(punch.PUNCH_TIME);
-    Logger.log('  ' + (i + 1) + '. ' + formatTime(time) + ' - ' + punch.DEVICE_NAME);
-  }
-
-  // Get config and process
-  var configResult = getTimeConfig();
-  var config = configResult.success ? configResult.data : DEFAULT_TIME_CONFIG;
-
-  Logger.log('\n🔄 Processing clock data...');
-  var result = processClockData(clockData, config);
-
-  if (result.success) {
-    Logger.log('\n✅ Processing complete');
-    Logger.log('Total paid time: ' + result.data.calculatedTotalHours + 'h ' + result.data.calculatedTotalMinutes + 'm');
-    Logger.log('Total bathroom time: ' + result.data.bathroomTimeMinutes + 'm');
-
-    // Show daily breakdown
-    if (result.data.dailyBreakdown && result.data.dailyBreakdown.length > 0) {
-      var day = result.data.dailyBreakdown[0];
-      Logger.log('\n📅 Day breakdown for ' + day.date + ':');
-      Logger.log('  Bathroom breaks counted: ' + (day.bathroomBreaks ? day.bathroomBreaks.length : 0));
-      if (day.bathroomBreaks) {
-        day.bathroomBreaks.forEach(function(brk, idx) {
-          Logger.log('    Break ' + (idx + 1) + ': ' + brk.entry + ' - ' + brk.exit + ' (' + brk.minutes + 'm)');
-        });
-      }
-      Logger.log('  Total bathroom minutes: ' + day.bathroomMinutes);
-    }
-  } else {
-    Logger.log('❌ Processing failed: ' + result.error);
-  }
-
-  Logger.log('\n========== TEST COMPLETE ==========');
 }

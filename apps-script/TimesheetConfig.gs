@@ -17,24 +17,40 @@ var DEFAULT_TIME_CONFIG = {
   standardStartTime: '07:30',
   standardEndTime: '16:30',
   fridayEndTime: '13:00',
+  lunchStart: '12:00',
+  lunchEnd: '12:30',
 
-  // Buffers & Grace periods
+  // Grace periods
   graceMinutes: 5,
-  endBufferMinutes: 5,
-  lunchBufferMinutes: 5,
+  lunchOutGraceMinutes: 2,
+
+  // Time windows for clock classification
+  clock1MaxTime: '11:50',
+  clock2WindowStart: '12:00',
+  clock2WindowEnd: '12:10',
+  clock3WindowStart: '12:10',
+  clock3WindowEnd: '13:00',
+  clock4MinTime: '13:05',
 
   // Lunch rules
-  minLunchMinutes: 20,
-  maxLunchMinutes: 35,
   standardLunchMinutes: 30,
   applyLunchOnFriday: false,
-  lateMorningThreshold: '11:00',
 
-  // Other rules
+  // Bathroom thresholds
   dailyBathroomThreshold: 30,
-  earlyChangeThreshold: 10,
   longBathroomThreshold: 15,
-  projectIncompleteDays: true
+  earlyBathroomThreshold: 10,
+  bathroomDuplicateSeconds: 60,
+
+  // Duplicate detection
+  mainClockDuplicateMinutes: 2,
+
+  // Flags
+  flagOvertimeAfter: '16:30',
+  flagLateAfter: '07:35',
+
+  // Legacy compatibility
+  projectIncompleteDays: false
 };
 
 // ==================== GET CONFIGURATION ====================
@@ -198,8 +214,44 @@ function validateTimeConfig(config) {
     errors.push('Invalid fridayEndTime format (use HH:MM)');
   }
 
-  if (config.lateMorningThreshold && !timePattern.test(config.lateMorningThreshold)) {
-    errors.push('Invalid lateMorningThreshold format (use HH:MM)');
+  if (config.lunchStart && !timePattern.test(config.lunchStart)) {
+    errors.push('Invalid lunchStart format (use HH:MM)');
+  }
+
+  if (config.lunchEnd && !timePattern.test(config.lunchEnd)) {
+    errors.push('Invalid lunchEnd format (use HH:MM)');
+  }
+
+  if (config.clock1MaxTime && !timePattern.test(config.clock1MaxTime)) {
+    errors.push('Invalid clock1MaxTime format (use HH:MM)');
+  }
+
+  if (config.clock2WindowStart && !timePattern.test(config.clock2WindowStart)) {
+    errors.push('Invalid clock2WindowStart format (use HH:MM)');
+  }
+
+  if (config.clock2WindowEnd && !timePattern.test(config.clock2WindowEnd)) {
+    errors.push('Invalid clock2WindowEnd format (use HH:MM)');
+  }
+
+  if (config.clock3WindowStart && !timePattern.test(config.clock3WindowStart)) {
+    errors.push('Invalid clock3WindowStart format (use HH:MM)');
+  }
+
+  if (config.clock3WindowEnd && !timePattern.test(config.clock3WindowEnd)) {
+    errors.push('Invalid clock3WindowEnd format (use HH:MM)');
+  }
+
+  if (config.clock4MinTime && !timePattern.test(config.clock4MinTime)) {
+    errors.push('Invalid clock4MinTime format (use HH:MM)');
+  }
+
+  if (config.flagOvertimeAfter && !timePattern.test(config.flagOvertimeAfter)) {
+    errors.push('Invalid flagOvertimeAfter format (use HH:MM)');
+  }
+
+  if (config.flagLateAfter && !timePattern.test(config.flagLateAfter)) {
+    errors.push('Invalid flagLateAfter format (use HH:MM)');
   }
 
   // Validate numeric values
@@ -217,10 +269,10 @@ function validateTimeConfig(config) {
     }
   }
 
-  if (config.lunchBufferMinutes !== undefined) {
-    var lunchBuffer = parseFloat(config.lunchBufferMinutes);
-    if (isNaN(lunchBuffer) || lunchBuffer < 0 || lunchBuffer > 60) {
-      errors.push('lunchBufferMinutes must be between 0 and 60');
+  if (config.lunchOutGraceMinutes !== undefined) {
+    var lunchGrace = parseFloat(config.lunchOutGraceMinutes);
+    if (isNaN(lunchGrace) || lunchGrace < 0 || lunchGrace > 60) {
+      errors.push('lunchOutGraceMinutes must be between 0 and 60');
     }
   }
 
@@ -252,10 +304,24 @@ function validateTimeConfig(config) {
     }
   }
 
-  if (config.earlyChangeThreshold !== undefined) {
-    var earlyThreshold = parseFloat(config.earlyChangeThreshold);
+  if (config.earlyBathroomThreshold !== undefined) {
+    var earlyThreshold = parseFloat(config.earlyBathroomThreshold);
     if (isNaN(earlyThreshold) || earlyThreshold < 0 || earlyThreshold > 60) {
-      errors.push('earlyChangeThreshold must be between 0 and 60');
+      errors.push('earlyBathroomThreshold must be between 0 and 60');
+    }
+  }
+
+  if (config.bathroomDuplicateSeconds !== undefined) {
+    var bathDup = parseFloat(config.bathroomDuplicateSeconds);
+    if (isNaN(bathDup) || bathDup < 0 || bathDup > 300) {
+      errors.push('bathroomDuplicateSeconds must be between 0 and 300');
+    }
+  }
+
+  if (config.mainClockDuplicateMinutes !== undefined) {
+    var mainDup = parseFloat(config.mainClockDuplicateMinutes);
+    if (isNaN(mainDup) || mainDup < 0 || mainDup > 60) {
+      errors.push('mainClockDuplicateMinutes must be between 0 and 60');
     }
   }
 
@@ -276,9 +342,9 @@ function validateTimeConfig(config) {
   }
 
   // Validate logical relationships
-  if (config.minLunchMinutes && config.maxLunchMinutes) {
-    if (parseFloat(config.minLunchMinutes) > parseFloat(config.maxLunchMinutes)) {
-      errors.push('minLunchMinutes cannot be greater than maxLunchMinutes');
+  if (config.lunchStart && config.lunchEnd) {
+    if (timeToMinutes(config.lunchStart) >= timeToMinutes(config.lunchEnd)) {
+      errors.push('lunchStart must be before lunchEnd');
     }
   }
 
