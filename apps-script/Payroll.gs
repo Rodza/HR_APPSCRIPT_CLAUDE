@@ -122,6 +122,29 @@ function createPayslip(data) {
 
     Logger.log('✅ Payslip created: #' + data.RECORDNUMBER);
     Logger.log('✅ Paid to Account: ' + formatCurrency(data.PaidtoAccount));
+
+    // CRITICAL: Manually sync loan to EmployeeLoans
+    // onChange trigger doesn't fire for appendRow(), only for edits
+    const loanDeduction = parseFloat(data.LoanDeductionThisWeek) || 0;
+    const newLoan = parseFloat(data.NewLoanThisWeek) || 0;
+
+    if (loanDeduction > 0 || newLoan > 0) {
+      Logger.log('🔄 Syncing loan transaction to EmployeeLoans...');
+      try {
+        const syncResult = syncLoanForPayslip(data.RECORDNUMBER);
+        if (syncResult.success) {
+          Logger.log('✅ Loan transaction synced to EmployeeLoans');
+        } else {
+          Logger.log('⚠️ Failed to sync loan: ' + (syncResult.error || 'Unknown error'));
+        }
+      } catch (syncError) {
+        Logger.log('❌ ERROR syncing loan: ' + syncError.message);
+        // Don't fail the whole payslip creation if loan sync fails
+      }
+    } else {
+      Logger.log('ℹ️ No loan activity - skipping loan sync');
+    }
+
     Logger.log('========== CREATE PAYSLIP COMPLETE ==========\n');
 
     // Sanitize for web - convert Date objects to strings
@@ -397,6 +420,29 @@ function updatePayslip(recordNumber, data) {
     SpreadsheetApp.flush();
 
     Logger.log('✅ Payslip updated: #' + recordNumber);
+
+    // CRITICAL: Manually sync loan to EmployeeLoans
+    // onChange trigger doesn't fire for setValues(), only for manual edits
+    const loanDeduction = parseFloat(updatedPayslip.LoanDeductionThisWeek) || 0;
+    const newLoan = parseFloat(updatedPayslip.NewLoanThisWeek) || 0;
+
+    if (loanDeduction > 0 || newLoan > 0) {
+      Logger.log('🔄 Syncing loan transaction to EmployeeLoans...');
+      try {
+        const syncResult = syncLoanForPayslip(recordNumber);
+        if (syncResult.success) {
+          Logger.log('✅ Loan transaction synced to EmployeeLoans');
+        } else {
+          Logger.log('⚠️ Failed to sync loan: ' + (syncResult.error || 'Unknown error'));
+        }
+      } catch (syncError) {
+        Logger.log('❌ ERROR syncing loan: ' + syncError.message);
+        // Don't fail the whole payslip update if loan sync fails
+      }
+    } else {
+      Logger.log('ℹ️ No loan activity - skipping loan sync');
+    }
+
     Logger.log('========== UPDATE PAYSLIP COMPLETE ==========\n');
 
     // Sanitize for web - convert Date objects to strings
