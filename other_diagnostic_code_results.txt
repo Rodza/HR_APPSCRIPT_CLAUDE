@@ -1,0 +1,32 @@
+apps-script/Code.gs:// TEST FUNCTIONS
+apps-script/DiagnosticPaidToAccount.gs:function test_PaidtoAccount_Diagnostic() {
+apps-script/Employees.gs:// TEST FUNCTION - Simple response test
+apps-script/Employees.gs:// TEST FUNCTION
+apps-script/Leave.gs:// ==================== TEST FUNCTIONS ====================
+apps-script/Leave.gs:function test_addLeave() {
+apps-script/Leave.gs:function test_listLeave() {
+apps-script/Leave.gs:function test_editLeave() {
+apps-script/Leave.gs:function test_deleteLeave() {
+apps-script/Loans.gs:// ==================== TEST FUNCTIONS ====================
+apps-script/Loans.gs:function test_loanOperations() {
+apps-script/Payroll.gs:// ========== TEST FUNCTIONS ==========
+apps-script/Payroll.gs:function test_calculatePayslip_StandardTime() {
+apps-script/Payroll.gs:function test_calculatePayslip_NewLoanWithSalary() {
+apps-script/Payroll.gs:function test_calculatePayslip_UIF() {
+apps-script/Payroll.gs:function test_calculatePayslip_Overtime() {
+apps-script/Payroll.gs: * TEST FUNCTION - Run this directly from Apps Script editor
+apps-script/Payroll.gs:function test_VerifyLoanSyncImplementation() {
+apps-script/Reports.gs:// ==================== TEST FUNCTIONS ====================
+apps-script/Reports.gs:function test_outstandingLoansReport() {
+apps-script/Reports.gs:function test_weeklyPayrollReport() {
+apps-script/Reports.gs:function test_monthlyPayrollReport() {
+apps-script/TimesheetConfig.gs:// ==================== TEST FUNCTIONS ====================
+apps-script/TimesheetConfig.gs:function test_timeConfig() {
+apps-script/TimesheetDebug.gs:// ==================== INDIVIDUAL TEST FUNCTIONS ====================
+apps-script/TimesheetProcessor.gs:// ==================== TEST FUNCTIONS ====================
+apps-script/TimesheetProcessor.gs:function test_timesheetProcessor() {
+apps-script/TimesheetProcessor.gs:function test_EricSitholeBathroom() {
+apps-script/Timesheets.gs: * DIAGNOSTIC FUNCTION - Run this directly from Apps Script editor
+apps-script/Timesheets.gs:// ==================== TEST FUNCTIONS ====================
+apps-script/Timesheets.gs:function test_timesheetWorkflow() {
+apps-script/Triggers.gs:function test_onChangeTrigger() {
