@@ -291,9 +291,22 @@
             google.script.run
                 .withSuccessHandler(function(result) {
                     if (result.success) {
+                        // Handle both old and new paginated format
+                        var employees = [];
+                        if (result.data && result.data.employees && Array.isArray(result.data.employees)) {
+                            // New paginated format
+                            employees = result.data.employees;
+                        } else if (Array.isArray(result.data)) {
+                            // Old array format
+                            employees = result.data;
+                        } else {
+                            showError('Unexpected response format');
+                            return;
+                        }
+
                         const select = document.getElementById('employeeName');
                         select.innerHTML = '<option value="">Select Employee</option>' +
-                            result.data
+                            employees
                                 .filter(emp => !emp['TERMINATION DATE']) // Only active employees
                                 .map(emp => `<option value="${emp.REFNAME}">${emp.REFNAME}</option>`)
                                 .join('');
