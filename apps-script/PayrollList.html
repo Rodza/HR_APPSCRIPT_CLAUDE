@@ -183,16 +183,42 @@
             return parseFloat(strValue) || 0;
         }
 
-        // Get the loan payment amount based on payment type
+        // Get the loan payment amount based on which field has a value
         function getLoanPaymentAmount(payslip) {
-            const paymentType = payslip.LoanDisbursementType || 'Separate';
-            if (paymentType === 'Repayment') {
-                // For repayments, show LoanDeductionThisWeek
-                return parseFloat(payslip.LoanDeductionThisWeek) || 0;
-            } else {
-                // For With Salary or Separate, show NewLoanThisWeek
-                return parseFloat(payslip.NewLoanThisWeek) || 0;
+            // Priority: Show whichever field has a value
+            // LoanDeductionThisWeek = repayment (deduction from salary)
+            // NewLoanThisWeek = disbursement (new loan given)
+            const loanDeduction = parseFloat(payslip.LoanDeductionThisWeek) || 0;
+            const newLoan = parseFloat(payslip.NewLoanThisWeek) || 0;
+
+            // Debug logging for first payslip
+            if (payslip.RECORDNUMBER === window.debugRecordNumber) {
+                console.log('=== LOAN DEBUG ===');
+                console.log('Record #' + payslip.RECORDNUMBER);
+                console.log('LoanDeductionThisWeek raw:', payslip.LoanDeductionThisWeek);
+                console.log('LoanDeductionThisWeek parsed:', loanDeduction);
+                console.log('NewLoanThisWeek raw:', payslip.NewLoanThisWeek);
+                console.log('NewLoanThisWeek parsed:', newLoan);
+                console.log('Returning:', loanDeduction > 0 ? loanDeduction : newLoan);
+                console.log('All payslip keys:', Object.keys(payslip));
             }
+
+            // Show loan deduction if present, otherwise show new loan
+            return loanDeduction > 0 ? loanDeduction : newLoan;
+        }
+
+        // Get the correct payment type based on which field has a value
+        function getActualPaymentType(payslip) {
+            const loanDeduction = parseFloat(payslip.LoanDeductionThisWeek) || 0;
+            const newLoan = parseFloat(payslip.NewLoanThisWeek) || 0;
+
+            // If there's a loan deduction, it's a repayment
+            if (loanDeduction > 0) {
+                return 'Repayment';
+            }
+
+            // Otherwise, use the stored LoanDisbursementType or default to 'Separate'
+            return payslip.LoanDisbursementType || 'Separate';
         }
 
         function formatDate(date) {
@@ -281,6 +307,18 @@
                         }
                         if (result.success) {
                             window.payrollListData.allPayslips = result.data;
+
+                            // Debug: Check first payslip for loan fields
+                            if (result.data && result.data.length > 0) {
+                                const firstPayslip = result.data[0];
+                                console.log('=== PAYSLIP DATA DEBUG ===');
+                                console.log('First payslip RECORDNUMBER:', firstPayslip.RECORDNUMBER);
+                                console.log('First payslip LoanDeductionThisWeek:', firstPayslip.LoanDeductionThisWeek);
+                                console.log('First payslip NewLoanThisWeek:', firstPayslip.NewLoanThisWeek);
+                                console.log('First payslip LoanDisbursementType:', firstPayslip.LoanDisbursementType);
+                                window.debugRecordNumber = firstPayslip.RECORDNUMBER;
+                            }
+
                             filterPayslips();
                         } else {
                             showError('Failed to load payslips: ' + (result.error || 'Unknown error'));
@@ -343,9 +381,9 @@
                                     data-record="${p.RECORDNUMBER}"
                                     onchange="updatePaymentType(${p.RECORDNUMBER}, this)"
                                     ${!isEditable ? 'disabled' : ''}>
-                                <option value="With Salary" ${(p.LoanDisbursementType === 'With Salary') ? 'selected' : ''}>With Salary</option>
-                                <option value="Separate" ${(p.LoanDisbursementType === 'Separate' || !p.LoanDisbursementType) ? 'selected' : ''}>Separate</option>
-                                <option value="Repayment" ${(p.LoanDisbursementType === 'Repayment') ? 'selected' : ''}>Repayment</option>
+                                <option value="With Salary" ${(getActualPaymentType(p) === 'With Salary') ? 'selected' : ''}>With Salary</option>
+                                <option value="Separate" ${(getActualPaymentType(p) === 'Separate') ? 'selected' : ''}>Separate</option>
+                                <option value="Repayment" ${(getActualPaymentType(p) === 'Repayment') ? 'selected' : ''}>Repayment</option>
                             </select>
                         </td>
                         <td class="amount-cell">${formatCurrency(p.PaidtoAccount || 0)}</td>
