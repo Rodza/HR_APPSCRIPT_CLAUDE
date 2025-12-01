@@ -923,11 +923,15 @@ function deletePayslip(recordNumber) {
 
     const recordNumCol = findColumnIndex(headers, 'RECORDNUMBER');
     const weekEndingCol = findColumnIndex(headers, 'WEEKENDING');
+    const employeeIdCol = findColumnIndex(headers, 'id');
     const rowIndex = rows.findIndex(r => String(r[recordNumCol]) === String(recordNumber));
 
     if (rowIndex === -1) {
       throw new Error('Payslip not found: ' + recordNumber);
     }
+
+    // Get employee ID before deleting (for loan balance recalculation)
+    const employeeId = rows[rowIndex][employeeIdCol];
 
     // Check if payslip is still editable
     const weekEnding = rows[rowIndex][weekEndingCol];
@@ -935,7 +939,33 @@ function deletePayslip(recordNumber) {
       throw new Error('Cannot delete payslip: The editing period has ended (past Friday midnight of the payslip week)');
     }
 
-    // Delete the row (add 2 to account for header and 0-index)
+    // CRITICAL: Delete associated loan record BEFORE deleting payslip
+    Logger.log('🔍 Checking for associated loan record...');
+    const loanRecord = findLoanRecordBySalaryLink(recordNumber);
+
+    if (loanRecord.success && loanRecord.data) {
+      Logger.log('🗑️ Found loan record with LoanID: ' + loanRecord.data.LoanID);
+      Logger.log('🗑️ Deleting loan record...');
+
+      const loansSheet = sheets.loans;
+      if (loansSheet && loanRecord.data._rowIndex) {
+        // Delete the loan record row
+        loansSheet.deleteRow(loanRecord.data._rowIndex + 1); // +1 for 1-based index
+        SpreadsheetApp.flush();
+        Logger.log('✅ Loan record deleted');
+
+        // Recalculate loan balances for this employee
+        if (employeeId) {
+          Logger.log('🔄 Recalculating loan balances for employee: ' + employeeId);
+          recalculateLoanBalances(employeeId);
+          Logger.log('✅ Loan balances recalculated');
+        }
+      }
+    } else {
+      Logger.log('ℹ️ No associated loan record found');
+    }
+
+    // Delete the payslip row (add 2 to account for header and 0-index)
     const sheetRowIndex = rowIndex + 2;
     salarySheet.deleteRow(sheetRowIndex);
     SpreadsheetApp.flush();
