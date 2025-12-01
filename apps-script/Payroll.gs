@@ -23,9 +23,6 @@
  */
 function createPayslip(data) {
   try {
-    Logger.log('\n========== CREATE PAYSLIP ==========');
-    Logger.log('ℹ️ Input: ' + JSON.stringify(data));
-
     // Map UI field names to internal field names (if needed)
     if (data.hours !== undefined) data.HOURS = data.hours;
     if (data.minutes !== undefined) data.MINUTES = data.minutes;
@@ -43,10 +40,8 @@ function createPayslip(data) {
     if (data.weekEnding !== undefined) data.WEEKENDING = data.weekEnding;
     if (data.notes !== undefined) data.NOTES = data.notes;
 
-    // Get employee details to lookup values
     const empResult = getEmployeeByName(data.employeeName);
 
-    // Defensive null check
     if (!empResult) {
       throw new Error('getEmployeeByName returned null for employee: ' + data.employeeName);
     }
@@ -57,44 +52,35 @@ function createPayslip(data) {
 
     const employee = empResult.data;
 
-    // Defensive null check for employee data
     if (!employee) {
       throw new Error('Employee data is null for: ' + data.employeeName);
     }
 
-    // Enrich data with lookups
-    data.id = employee.id;                                    // Link to employee record
+    data.id = employee.id;
     data['EMPLOYEE NAME'] = data.employeeName;
     data.EMPLOYER = employee.EMPLOYER;
     data['EMPLOYMENT STATUS'] = employee['EMPLOYMENT STATUS'];
     data.HOURLYRATE = employee['HOURLY RATE'];
 
-    // Get current loan balance (handle null safely)
     const loanBalanceResult = getCurrentLoanBalance(employee.id);
     data.CurrentLoanBalance = (loanBalanceResult && loanBalanceResult.success && loanBalanceResult.data !== undefined)
       ? loanBalanceResult.data
       : 0;
 
-    // Calculate all payslip values
     const calculations = calculatePayslip(data);
 
-    // Defensive null check for calculations
     if (!calculations) {
       throw new Error('calculatePayslip returned null');
     }
 
-    // Merge calculations into data
     Object.assign(data, calculations);
 
-    // Validate
     validatePayslip(data);
 
-    // Get sheets
     const sheets = getSheets();
     const salarySheet = sheets.salary;
     if (!salarySheet) throw new Error('Salary sheet not found');
 
-    // Generate record number (max + 1)
     const allData = salarySheet.getDataRange().getValues();
     const headers = allData[0];
     const rows = allData.slice(1);
@@ -110,53 +96,31 @@ function createPayslip(data) {
 
     data.RECORDNUMBER = maxRecord + 1;
 
-    // Add audit fields
     addAuditFields(data, true);
 
-    // Convert to row
     const row = objectToRow(data, headers);
 
-    // Append
     salarySheet.appendRow(row);
     SpreadsheetApp.flush();
 
-    Logger.log('✅ Payslip created: #' + data.RECORDNUMBER);
-    Logger.log('✅ Paid to Account: ' + formatCurrency(data.PaidtoAccount));
-
-    // CRITICAL: Manually sync loan to EmployeeLoans
-    // onChange trigger doesn't fire for appendRow(), only for edits
+    // Manually sync loan to EmployeeLoans
     const loanDeduction = parseFloat(data.LoanDeductionThisWeek) || 0;
     const newLoan = parseFloat(data.NewLoanThisWeek) || 0;
 
     if (loanDeduction > 0 || newLoan > 0) {
-      Logger.log('🔄 Syncing loan transaction to EmployeeLoans...');
       try {
-        const syncResult = syncLoanForPayslip(data.RECORDNUMBER);
-        if (syncResult.success) {
-          Logger.log('✅ Loan transaction synced to EmployeeLoans');
-        } else {
-          Logger.log('⚠️ Failed to sync loan: ' + (syncResult.error || 'Unknown error'));
-        }
+        syncLoanForPayslip(data.RECORDNUMBER);
       } catch (syncError) {
-        Logger.log('❌ ERROR syncing loan: ' + syncError.message);
         // Don't fail the whole payslip creation if loan sync fails
       }
-    } else {
-      Logger.log('ℹ️ No loan activity - skipping loan sync');
     }
 
-    Logger.log('========== CREATE PAYSLIP COMPLETE ==========\n');
-
-    // Sanitize for web - convert Date objects to strings
     const sanitizedData = sanitizeForWeb(data);
 
     return { success: true, data: sanitizedData };
 
   } catch (error) {
-    Logger.log('❌ ERROR in createPayslip: ' + error.message);
-    Logger.log('Stack: ' + error.stack);
-    Logger.log('========== CREATE PAYSLIP FAILED ==========\n');
-
+    logError('Failed to create payslip', error);
     return { success: false, error: error.message };
   }
 }
@@ -170,22 +134,17 @@ function createPayslip(data) {
  */
 function calculatePayslipPreview(data) {
   try {
-    // Get employee details to populate missing fields
     if (data.employeeName) {
       const empResult = getEmployeeByName(data.employeeName);
 
-      // Defensive null check
       if (empResult && empResult.success && empResult.data) {
         const employee = empResult.data;
         data.EMPLOYER = employee.EMPLOYER;
         data['EMPLOYMENT STATUS'] = employee['EMPLOYMENT STATUS'];
         data.HOURLYRATE = employee['HOURLY RATE'];
-      } else {
-        Logger.log('⚠️ Warning: Could not get employee details for preview: ' + data.employeeName);
       }
     }
 
-    // Map UI field names to internal field names
     data.HOURS = data.hours || 0;
     data.MINUTES = data.minutes || 0;
     data.OVERTIMEHOURS = data.overtimeHours || 0;
@@ -199,7 +158,6 @@ function calculatePayslipPreview(data) {
 
     const calculations = calculatePayslip(data);
 
-    // Defensive null check for calculations
     if (!calculations) {
       throw new Error('calculatePayslip returned null in preview');
     }
@@ -218,7 +176,7 @@ function calculatePayslipPreview(data) {
       error: null
     };
   } catch (error) {
-    Logger.log('❌ ERROR in calculatePayslipPreview: ' + error.message);
+    logError('Failed to calculate payslip preview', error);
     return {
       success: false,
       data: null,
@@ -235,8 +193,6 @@ function calculatePayslipPreview(data) {
  * @returns {Object} Calculated values
  */
 function calculatePayslip(data) {
-  Logger.log('🔢 Calculating payslip...');
-
   // Parse input values
   const hours = parseFloat(data.HOURS) || 0;
   const minutes = parseFloat(data.MINUTES) || 0;
@@ -254,41 +210,31 @@ function calculatePayslip(data) {
 
   // 1. STANDARD TIME
   const standardTime = (hours * hourlyRate) + ((hourlyRate / 60) * minutes);
-  Logger.log('  Standard Time: ' + formatCurrency(standardTime));
 
   // 2. OVERTIME (1.5x multiplier)
-  const overtime = (overtimeHours * hourlyRate * OVERTIME_MULTIPLIER) + 
+  const overtime = (overtimeHours * hourlyRate * OVERTIME_MULTIPLIER) +
                    ((hourlyRate / 60) * overtimeMinutes * OVERTIME_MULTIPLIER);
-  Logger.log('  Overtime: ' + formatCurrency(overtime));
 
   // 3. GROSS SALARY
   const grossSalary = standardTime + overtime + leavePay + bonusPay + otherIncome;
-  Logger.log('  Gross Salary: ' + formatCurrency(grossSalary));
 
   // 4. UIF (1% for permanent employees ONLY)
   const uif = (employmentStatus === 'Permanent') ? (grossSalary * UIF_RATE) : 0;
-  Logger.log('  UIF: ' + formatCurrency(uif) + ' (Status: ' + employmentStatus + ')');
 
   // 5. TOTAL DEDUCTIONS (NOTE: Loan deduction NOT included here - it comes from net)
   const totalDeductions = uif + otherDeductions;
-  Logger.log('  Total Deductions: ' + formatCurrency(totalDeductions));
 
   // 6. NET SALARY
   const netSalary = grossSalary - totalDeductions;
-  Logger.log('  Net Salary: ' + formatCurrency(netSalary));
 
   // 7. PAID TO ACCOUNT (CRITICAL - actual bank transfer amount)
   // Net - Loan Repayment + (New Loan if "With Salary")
   const newLoanToAdd = (loanDisbursementType === 'With Salary') ? newLoan : 0;
   const paidToAccount = netSalary - loanDeduction + newLoanToAdd;
-  Logger.log('  Loan Deduction: ' + formatCurrency(loanDeduction));
-  Logger.log('  New Loan (if with salary): ' + formatCurrency(newLoanToAdd));
-  Logger.log('  ** PAID TO ACCOUNT: ' + formatCurrency(paidToAccount) + ' **');
 
   // 8. UPDATED LOAN BALANCE
   const currentBalance = parseFloat(data.CurrentLoanBalance) || 0;
   const updatedBalance = currentBalance - loanDeduction + newLoan;
-  Logger.log('  Updated Loan Balance: ' + formatCurrency(updatedBalance));
 
   // Return all calculated values (rounded to 2 decimals)
   return {
@@ -324,14 +270,12 @@ function getPayslip(recordNumber) {
     }
 
     const payslip = buildObjectFromRow(row, headers);
-
-    // Sanitize for web - convert Date objects to strings
     const sanitizedPayslip = sanitizeForWeb(payslip);
 
     return { success: true, data: sanitizedPayslip };
 
   } catch (error) {
-    Logger.log('❌ ERROR in getPayslip: ' + error.message);
+    logError('Failed to get payslip', error);
     return { success: false, error: error.message };
   }
 }
@@ -459,16 +403,17 @@ function updatePayslip(recordNumber, data) {
 }
 
 /**
- * List payslips with optional filtering
+ * List payslips with optional filtering and pagination
  */
 function listPayslips(filters) {
   try {
-    // Ensure filters is an object (handle undefined/null)
     if (!filters) {
       filters = {};
     }
 
-    Logger.log('📋 listPayslips called with filters:', JSON.stringify(filters));
+    // Default pagination settings
+    var page = filters.page ? parseInt(filters.page) : 1;
+    var pageSize = filters.pageSize ? parseInt(filters.pageSize) : 50;
 
     const sheets = getSheets();
     const salarySheet = sheets.salary;
@@ -478,12 +423,7 @@ function listPayslips(filters) {
     const headers = allData[0];
     let rows = allData.slice(1);
 
-    Logger.log('📋 Found ' + rows.length + ' payslip rows');
-
-    // Convert to objects
     let payslips = rows.map(row => buildObjectFromRow(row, headers));
-
-    Logger.log('📋 Converted to ' + payslips.length + ' payslip objects');
 
     // Apply filters
     if (filters.employeeName) {
@@ -519,26 +459,35 @@ function listPayslips(filters) {
       });
     }
 
-    Logger.log('📋 Returning ' + payslips.length + ' payslips (after filters)');
+    // Calculate pagination
+    var totalPayslips = payslips.length;
+    var totalPages = Math.ceil(totalPayslips / pageSize);
+    var startIndex = (page - 1) * pageSize;
+    var endIndex = Math.min(startIndex + pageSize, totalPayslips);
 
-    // Sanitize data for web - convert Date objects to strings
-    const sanitizedPayslips = payslips.map(function(payslip) {
+    // Get page slice
+    var pagePayslips = payslips.slice(startIndex, endIndex);
+
+    const sanitizedPayslips = pagePayslips.map(function(payslip) {
       return sanitizeForWeb(payslip);
     });
 
-    Logger.log('📋 Sanitized ' + sanitizedPayslips.length + ' payslips for web');
-
-    const result = { success: true, data: sanitizedPayslips };
-    Logger.log('📋 listPayslips result type:', typeof result);
-    Logger.log('📋 listPayslips result.success:', result.success);
-    return result;
+    return {
+      success: true,
+      data: {
+        payslips: sanitizedPayslips,
+        pagination: {
+          page: page,
+          pageSize: pageSize,
+          total: totalPayslips,
+          totalPages: totalPages
+        }
+      }
+    };
 
   } catch (error) {
-    Logger.log('❌ ERROR in listPayslips: ' + error.message);
-    Logger.log('❌ Error stack:', error.stack);
-    const errorResult = { success: false, error: error.message };
-    Logger.log('❌ Returning error result:', JSON.stringify(errorResult));
-    return errorResult;
+    logError('Failed to list payslips', error);
+    return { success: false, error: error.message };
   }
 }
 

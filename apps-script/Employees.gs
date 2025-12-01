@@ -125,145 +125,98 @@ function sanitizeEmployeeForWeb(emp) {
 }
 
 /**
- * List all employees with optional filters
- * @param {Object} filters - Optional filters {employer, status, search, activeOnly}
- * @returns {Object} Response with employee list
+ * List all employees with optional filters and pagination
+ * @param {Object} filters - Optional filters {employer, status, search, activeOnly, page, pageSize}
+ * @returns {Object} Response with employee list and pagination info
  */
 function listEmployees(filters) {
   try {
-    console.log('=== listEmployees() START (from web app) ===');
-    console.log('Filters received:', filters);
+    // Default pagination settings
+    var page = (filters && filters.page) ? parseInt(filters.page) : 1;
+    var pageSize = (filters && filters.pageSize) ? parseInt(filters.pageSize) : 50;
 
-    // Step 1: Get sheets
-    console.log('Step 1: Getting sheets...');
     var sheets = getSheets();
-    console.log('✓ Sheets retrieved');
-
-    // Step 2: Get employee sheet
-    console.log('Step 2: Getting employee sheet...');
     var empSheet = sheets.empdetails;
 
     if (!empSheet) {
-      console.error('✗ Employee Details sheet not found!');
-      console.error('Available sheets:', Object.keys(sheets));
       throw new Error('Employee Details sheet not found');
     }
-    console.log('✓ Employee sheet found:', empSheet.getName());
 
-    // Step 3: Get data range
-    console.log('Step 3: Getting data range...');
     var data = empSheet.getDataRange().getValues();
-    console.log('✓ Data retrieved:', data.length, 'rows total');
 
     if (data.length === 0) {
-      console.warn('Sheet is empty!');
-      return formatResponse(true, [], null);
+      return formatResponse(true, {employees: [], pagination: {page: 1, pageSize: pageSize, total: 0, totalPages: 0}}, null);
     }
 
-    // Step 4: Extract headers
-    console.log('Step 4: Extracting headers...');
     var headers = data[0];
-    console.log('✓ Headers:', headers.join(', '));
-
-    // Step 5: Build employee objects
-    console.log('Step 5: Building employee objects...');
     var employees = [];
-    var skippedRows = 0;
 
     for (var i = 1; i < data.length; i++) {
-      if (data[i][0]) { // Skip empty rows
+      if (data[i][0]) {
         try {
           var employee = buildObjectFromRow(data[i], headers);
           employees.push(employee);
         } catch (rowError) {
-          console.error('Error building row ' + (i + 1) + ':', rowError);
-          skippedRows++;
+          // Skip invalid rows silently
         }
-      } else {
-        skippedRows++;
       }
     }
 
-    console.log('✓ Built', employees.length, 'employee objects');
-    if (skippedRows > 0) {
-      console.log('  Skipped', skippedRows, 'empty/invalid rows');
-    }
-
-    // Step 6: Apply filters
-    var originalCount = employees.length;
-
+    // Apply filters
     if (filters) {
-      console.log('Step 6: Applying filters...');
-
-      // Filter by employer
       if (filters.employer && filters.employer !== '') {
-        console.log('  Filtering by employer:', filters.employer);
         employees = filterByField(employees, 'EMPLOYER', filters.employer);
-        console.log('  After employer filter:', employees.length, 'employees');
       }
 
-      // Filter by search (name)
       if (filters.search && filters.search !== '') {
-        console.log('  Filtering by search term:', filters.search);
         employees = filterBySearch(employees, 'REFNAME', filters.search);
-        console.log('  After search filter:', employees.length, 'employees');
       }
 
-      // Filter by status
       if (filters.status && filters.status !== '') {
-        console.log('  Filtering by status:', filters.status);
         employees = filterByField(employees, 'EMPLOYMENT STATUS', filters.status);
-        console.log('  After status filter:', employees.length, 'employees');
       }
 
-      // Filter active only
       if (filters.activeOnly) {
-        console.log('  Filtering active only');
         employees = employees.filter(function(emp) {
           return emp['EMPLOYMENT STATUS'] !== 'Terminated' &&
                  emp['EMPLOYMENT STATUS'] !== 'Resigned';
         });
-        console.log('  After active filter:', employees.length, 'employees');
       }
-    } else {
-      console.log('Step 6: No filters provided, returning all employees');
     }
 
-    console.log('✓ Final count:', employees.length, '/', originalCount, 'employees');
+    // Calculate pagination
+    var totalEmployees = employees.length;
+    var totalPages = Math.ceil(totalEmployees / pageSize);
+    var startIndex = (page - 1) * pageSize;
+    var endIndex = Math.min(startIndex + pageSize, totalEmployees);
 
-    // CRITICAL FIX: Sanitize employee data for web serialization
-    console.log('Step 7: Sanitizing employee data for web...');
+    // Get page slice
+    var pageEmployees = employees.slice(startIndex, endIndex);
+
+    // Sanitize employee data for web serialization
     var sanitizedEmployees = [];
-    for (var i = 0; i < employees.length; i++) {
+    for (var i = 0; i < pageEmployees.length; i++) {
       try {
-        var sanitized = sanitizeEmployeeForWeb(employees[i]);
+        var sanitized = sanitizeEmployeeForWeb(pageEmployees[i]);
         sanitizedEmployees.push(sanitized);
       } catch (sanitizeError) {
-        console.error('Error sanitizing employee ' + (i + 1) + ':', sanitizeError);
+        // Skip errors silently
       }
     }
-    console.log('✓ Sanitized', sanitizedEmployees.length, 'employees');
 
-    console.log('=== listEmployees() END - SUCCESS ===');
-    console.log('Preparing response...');
-
-    var response = formatResponse(true, sanitizedEmployees, null);
-    console.log('Response created:', response ? 'OK' : 'NULL');
-    console.log('Response.success:', response.success);
-    console.log('Response.data length:', response.data ? response.data.length : 'NULL');
-
-    return response;
+    return formatResponse(true, {
+      employees: sanitizedEmployees,
+      pagination: {
+        page: page,
+        pageSize: pageSize,
+        total: totalEmployees,
+        totalPages: totalPages
+      }
+    }, null);
 
   } catch (error) {
-    console.error('=== listEmployees() ERROR ===');
-    console.error('Error type:', error.name);
-    console.error('Error message:', error.message);
-    console.error('Full error:', error.toString());
-    console.error('Stack trace:', error.stack);
-
-    var errorResponse = formatResponse(false, [], error.toString());
-    console.log('Error response created:', errorResponse ? 'OK' : 'NULL');
-    return errorResponse;
+    logError('Failed to list employees', error);
+    return formatResponse(false, [], error.toString());
   }
 }
 
@@ -413,69 +366,36 @@ function listEmployeesFull(filters) {
  */
 function getEmployeeById(id) {
   try {
-    console.log('=== getEmployeeById() START ===');
-    console.log('Looking for employee ID:', id);
-    logFunctionStart('getEmployeeById', {id: id});
-
     if (!id) {
       throw new Error('Employee ID is required');
     }
 
-    // Step 1: Get sheets
-    console.log('Step 1: Getting sheets...');
     var sheets = getSheets();
     var empSheet = sheets.empdetails;
 
     if (!empSheet) {
       throw new Error('Employee Details sheet not found');
     }
-    console.log('✓ Employee sheet found:', empSheet.getName());
 
-    // Step 2: Get data
-    console.log('Step 2: Getting data...');
     var data = empSheet.getDataRange().getValues();
     var headers = data[0];
-    console.log('✓ Data retrieved:', data.length, 'rows');
-
-    // Step 3: Find ID column
-    console.log('Step 3: Finding ID column...');
     var idCol = indexOf(headers, 'id');
 
     if (idCol === -1) {
       throw new Error('ID column not found in sheet');
     }
-    console.log('✓ ID column index:', idCol);
 
-    // Step 4: Search for employee
-    console.log('Step 4: Searching for employee...');
     for (var i = 1; i < data.length; i++) {
       if (data[i][idCol] === id) {
         var employee = buildObjectFromRow(data[i], headers);
-        console.log('✓ Employee found at row', (i + 1) + ':', employee.REFNAME);
-
-        // Step 5: Sanitize employee data for web serialization
-        console.log('Step 5: Sanitizing employee data for web...');
         var sanitizedEmployee = sanitizeEmployeeForWeb(employee);
-        console.log('✓ Employee data sanitized');
-
-        logSuccess('Found employee: ' + employee.REFNAME);
-        logFunctionEnd('getEmployeeById', {found: true});
-
-        console.log('=== getEmployeeById() END - SUCCESS ===');
         return formatResponse(true, sanitizedEmployee, null);
       }
     }
 
-    console.log('✗ Employee not found with ID:', id);
-    logWarning('Employee not found: ' + id);
-    logFunctionEnd('getEmployeeById', {found: false});
-
-    console.log('=== getEmployeeById() END - NOT FOUND ===');
     return formatResponse(false, null, 'Employee not found');
 
   } catch (error) {
-    console.error('=== getEmployeeById() ERROR ===');
-    console.error('Full error:', error.toString());
     logError('Failed to get employee', error);
     return formatResponse(false, null, error.toString());
   }
@@ -492,69 +412,36 @@ function getEmployeeById(id) {
  */
 function getEmployeeByName(name) {
   try {
-    console.log('=== getEmployeeByName() START ===');
-    console.log('Looking for employee name:', name);
-    logFunctionStart('getEmployeeByName', {name: name});
-
     if (!name) {
       throw new Error('Employee name is required');
     }
 
-    // Step 1: Get sheets
-    console.log('Step 1: Getting sheets...');
     var sheets = getSheets();
     var empSheet = sheets.empdetails;
 
     if (!empSheet) {
       throw new Error('Employee Details sheet not found');
     }
-    console.log('✓ Employee sheet found:', empSheet.getName());
 
-    // Step 2: Get data
-    console.log('Step 2: Getting data...');
     var data = empSheet.getDataRange().getValues();
     var headers = data[0];
-    console.log('✓ Data retrieved:', data.length, 'rows');
-
-    // Step 3: Find REFNAME column
-    console.log('Step 3: Finding REFNAME column...');
     var refNameCol = indexOf(headers, 'REFNAME');
 
     if (refNameCol === -1) {
       throw new Error('REFNAME column not found in sheet');
     }
-    console.log('✓ REFNAME column index:', refNameCol);
 
-    // Step 4: Search for employee by name
-    console.log('Step 4: Searching for employee...');
     for (var i = 1; i < data.length; i++) {
       if (data[i][refNameCol] === name) {
         var employee = buildObjectFromRow(data[i], headers);
-        console.log('✓ Employee found at row', (i + 1) + ':', employee.REFNAME);
-
-        // Step 5: Sanitize employee data for web serialization
-        console.log('Step 5: Sanitizing employee data for web...');
         var sanitizedEmployee = sanitizeEmployeeForWeb(employee);
-        console.log('✓ Employee data sanitized');
-
-        logSuccess('Found employee: ' + employee.REFNAME);
-        logFunctionEnd('getEmployeeByName', {found: true});
-
-        console.log('=== getEmployeeByName() END - SUCCESS ===');
         return formatResponse(true, sanitizedEmployee, null);
       }
     }
 
-    console.log('✗ Employee not found with name:', name);
-    logWarning('Employee not found: ' + name);
-    logFunctionEnd('getEmployeeByName', {found: false});
-
-    console.log('=== getEmployeeByName() END - NOT FOUND ===');
     return formatResponse(false, null, 'Employee not found');
 
   } catch (error) {
-    console.error('=== getEmployeeByName() ERROR ===');
-    console.error('Full error:', error.toString());
     logError('Failed to get employee by name', error);
     return formatResponse(false, null, error.toString());
   }
@@ -616,17 +503,8 @@ function transformEmployeeFieldNames(data) {
  */
 function createEmployee(employeeData) {
   try {
-    console.log('=== createEmployee() START ===');
-    console.log('Employee data received:', JSON.stringify(employeeData));
-    logFunctionStart('createEmployee', employeeData);
-
-    // Step 0: Transform camelCase fields to uppercase sheet column names
-    console.log('Step 0: Transforming field names...');
     employeeData = transformEmployeeFieldNames(employeeData);
-    console.log('Transformed data:', JSON.stringify(employeeData));
 
-    // Step 1: Validate required fields
-    console.log('Step 1: Validating required fields...');
     var requiredFields = getConfig('EMPLOYEE_REQUIRED_FIELDS');
     var missingFields = [];
 
@@ -640,20 +518,14 @@ function createEmployee(employeeData) {
     if (missingFields.length > 0) {
       throw new Error('Missing required fields: ' + missingFields.join(', '));
     }
-    console.log('✓ All required fields present');
 
-    // Step 2: Get sheets
-    console.log('Step 2: Getting sheets...');
     var sheets = getSheets();
     var empSheet = sheets.empdetails;
 
     if (!empSheet) {
       throw new Error('Employee Details sheet not found');
     }
-    console.log('✓ Employee sheet found');
 
-    // Step 3: Check for duplicates
-    console.log('Step 3: Checking for duplicates...');
     var data = empSheet.getDataRange().getValues();
     var headers = data[0];
     var idNumCol = indexOf(headers, 'ID NUMBER');
@@ -667,39 +539,23 @@ function createEmployee(employeeData) {
         throw new Error('Clock Number already exists: ' + employeeData['ClockInRef']);
       }
     }
-    console.log('✓ No duplicates found');
 
-    // Step 4: Generate ID and REFNAME
-    console.log('Step 4: Generating ID and REFNAME...');
     employeeData.id = generateId();
     employeeData.REFNAME = employeeData['EMPLOYEE NAME'] + ' ' + employeeData['SURNAME'];
     employeeData.USER = getCurrentUser();
     employeeData.TIMESTAMP = getCurrentTimestamp();
-    console.log('✓ Generated ID:', employeeData.id);
-    console.log('✓ Generated REFNAME:', employeeData.REFNAME);
 
-    // Step 5: Build row data
-    console.log('Step 5: Building row data...');
     var newRow = [];
     for (var i = 0; i < headers.length; i++) {
       var header = headers[i];
       newRow.push(employeeData[header] || '');
     }
 
-    // Step 6: Append to sheet
-    console.log('Step 6: Appending to sheet...');
     empSheet.appendRow(newRow);
-    console.log('✓ Employee added to sheet');
 
-    logSuccess('Employee created: ' + employeeData.REFNAME);
-    logFunctionEnd('createEmployee', {id: employeeData.id});
-
-    console.log('=== createEmployee() END - SUCCESS ===');
     return formatResponse(true, employeeData, null);
 
   } catch (error) {
-    console.error('=== createEmployee() ERROR ===');
-    console.error('Full error:', error.toString());
     logError('Failed to create employee', error);
     return formatResponse(false, null, error.toString());
   }
@@ -717,21 +573,12 @@ function createEmployee(employeeData) {
  */
 function updateEmployee(id, employeeData) {
   try {
-    console.log('=== updateEmployee() START ===');
-    console.log('Updating employee ID:', id);
-    console.log('Update data:', JSON.stringify(employeeData));
-    logFunctionStart('updateEmployee', {id: id, data: employeeData});
-
     if (!id) {
       throw new Error('Employee ID is required');
     }
 
-    // Transform camelCase fields to uppercase sheet column names
-    console.log('Step 0: Transforming field names...');
     employeeData = transformEmployeeFieldNames(employeeData);
-    console.log('Transformed data:', JSON.stringify(employeeData));
 
-    // Get sheets
     var sheets = getSheets();
     var empSheet = sheets.empdetails;
 
@@ -739,7 +586,6 @@ function updateEmployee(id, employeeData) {
       throw new Error('Employee Details sheet not found');
     }
 
-    // Find employee row
     var data = empSheet.getDataRange().getValues();
     var headers = data[0];
     var idCol = indexOf(headers, 'id');
@@ -756,20 +602,15 @@ function updateEmployee(id, employeeData) {
       throw new Error('Employee not found: ' + id);
     }
 
-    console.log('✓ Found employee at row', (rowIndex + 1));
-
-    // Update audit fields
     employeeData.MODIFIED_BY = getCurrentUser();
     employeeData.LAST_MODIFIED = getCurrentTimestamp();
 
-    // Update REFNAME if name changed
     if (employeeData['EMPLOYEE NAME'] || employeeData['SURNAME']) {
       var firstName = employeeData['EMPLOYEE NAME'] || data[rowIndex][indexOf(headers, 'EMPLOYEE NAME')];
       var surname = employeeData['SURNAME'] || data[rowIndex][indexOf(headers, 'SURNAME')];
       employeeData.REFNAME = firstName + ' ' + surname;
     }
 
-    // Build updated row
     var updatedRow = data[rowIndex];
     for (var i = 0; i < headers.length; i++) {
       var header = headers[i];
@@ -778,20 +619,12 @@ function updateEmployee(id, employeeData) {
       }
     }
 
-    // Write back to sheet
     var range = empSheet.getRange(rowIndex + 1, 1, 1, headers.length);
     range.setValues([updatedRow]);
 
-    console.log('✓ Employee updated');
-    logSuccess('Employee updated: ' + employeeData.REFNAME);
-    logFunctionEnd('updateEmployee', {id: id});
-
-    console.log('=== updateEmployee() END - SUCCESS ===');
     return formatResponse(true, buildObjectFromRow(updatedRow, headers), null);
 
   } catch (error) {
-    console.error('=== updateEmployee() ERROR ===');
-    console.error('Full error:', error.toString());
     logError('Failed to update employee', error);
     return formatResponse(false, null, error.toString());
   }
@@ -809,27 +642,14 @@ function updateEmployee(id, employeeData) {
  */
 function terminateEmployee(id, terminationDate) {
   try {
-    console.log('=== terminateEmployee() START ===');
-    console.log('Terminating employee ID:', id);
-    logFunctionStart('terminateEmployee', {id: id, date: terminationDate});
-
     var updateData = {
       'EMPLOYMENT STATUS': 'Terminated',
       'TERMINATION DATE': terminationDate || new Date()
     };
 
-    var result = updateEmployee(id, updateData);
-
-    if (result.success) {
-      logSuccess('Employee terminated: ' + id);
-      console.log('=== terminateEmployee() END - SUCCESS ===');
-    }
-
-    return result;
+    return updateEmployee(id, updateData);
 
   } catch (error) {
-    console.error('=== terminateEmployee() ERROR ===');
-    console.error('Full error:', error.toString());
     logError('Failed to terminate employee', error);
     return formatResponse(false, null, error.toString());
   }
