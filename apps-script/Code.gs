@@ -175,13 +175,93 @@ function diagnoseAuthorization() {
  */
 function doGet() {
   try {
+    // CHECK AUTHORIZATION FIRST
+    var currentUser = getCurrentUser();
+
+    if (!isAuthorizedUser()) {
+      // User is not authorized - show access denied page
+      var deniedHtml =
+        '<!DOCTYPE html>' +
+        '<html>' +
+        '<head>' +
+        '  <meta charset="utf-8">' +
+        '  <meta name="viewport" content="width=device-width, initial-scale=1">' +
+        '  <title>Access Denied - SA HR Payroll System</title>' +
+        '  <style>' +
+        '    body {' +
+        '      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;' +
+        '      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);' +
+        '      display: flex;' +
+        '      align-items: center;' +
+        '      justify-content: center;' +
+        '      min-height: 100vh;' +
+        '      margin: 0;' +
+        '      padding: 20px;' +
+        '    }' +
+        '    .container {' +
+        '      background: white;' +
+        '      border-radius: 12px;' +
+        '      box-shadow: 0 20px 60px rgba(0,0,0,0.3);' +
+        '      padding: 40px;' +
+        '      max-width: 500px;' +
+        '      text-align: center;' +
+        '    }' +
+        '    .icon {' +
+        '      font-size: 64px;' +
+        '      margin-bottom: 20px;' +
+        '    }' +
+        '    h1 {' +
+        '      color: #dc3545;' +
+        '      margin: 0 0 20px 0;' +
+        '      font-size: 28px;' +
+        '    }' +
+        '    p {' +
+        '      color: #666;' +
+        '      line-height: 1.6;' +
+        '      margin: 10px 0;' +
+        '    }' +
+        '    .user-info {' +
+        '      background: #f8f9fa;' +
+        '      border-radius: 6px;' +
+        '      padding: 15px;' +
+        '      margin: 20px 0;' +
+        '      font-family: monospace;' +
+        '      color: #495057;' +
+        '    }' +
+        '    .help-text {' +
+        '      font-size: 14px;' +
+        '      color: #6c757d;' +
+        '      margin-top: 30px;' +
+        '    }' +
+        '  </style>' +
+        '</head>' +
+        '<body>' +
+        '  <div class="container">' +
+        '    <div class="icon">🔒</div>' +
+        '    <h1>Access Denied</h1>' +
+        '    <p>You are not authorized to access this application.</p>' +
+        '    <div class="user-info">Your email: ' + currentUser + '</div>' +
+        '    <p class="help-text">' +
+        '      If you believe you should have access, please contact your administrator ' +
+        '      and provide them with your email address shown above.' +
+        '    </p>' +
+        '  </div>' +
+        '</body>' +
+        '</html>';
+
+      return HtmlService.createHtmlOutput(deniedHtml)
+        .setTitle('Access Denied');
+    }
+
+    // User is authorized - serve the dashboard
     return HtmlService.createHtmlOutputFromFile('Dashboard')
       .setTitle('SA HR Payroll System')
       .setSandboxMode(HtmlService.SandboxMode.IFRAME)
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
       .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+
   } catch (error) {
-    // If Dashboard.html doesn't exist, return error page
+    // If Dashboard.html doesn't exist or other error, return error page
     return HtmlService.createHtmlOutput(
       '<h1>Error</h1><p>Failed to load dashboard: ' + error.toString() + '</p>'
     ).setTitle('Error');
@@ -231,19 +311,37 @@ function getCurrentUser() {
 
 /**
  * Check if user has admin access
- * 
+ *
  * @returns {boolean} True if user is admin
  */
 function isAdmin() {
   var userEmail = getCurrentUser();
-  
+
   // Define admin emails (customize as needed)
   var adminEmails = [
     'admin@sagrindingwheels.co.za',
     'owner@sagrindingwheels.co.za'
   ];
-  
+
   return adminEmails.indexOf(userEmail) >= 0;
+}
+
+/**
+ * Check if user is authorized to access the system
+ * Checks against the UserConfig sheet for whitelisted users
+ *
+ * @returns {boolean} True if user is authorized
+ */
+function isAuthorizedUser() {
+  var userEmail = getCurrentUser();
+
+  // Unknown users are not authorized
+  if (userEmail === 'Unknown User') {
+    return false;
+  }
+
+  // Check against UserConfig sheet
+  return isUserAuthorized(userEmail);
 }
 
 /**
@@ -288,8 +386,9 @@ function getClientConfig() {
   return {
     user: getCurrentUser(),
     isAdmin: isAdmin(),
-    version: '1.3.0-timesheet-integration', // Version identifier to track deployment
-    lastUpdate: '2025-11-17T00:00:00Z',
+    isAuthorized: isAuthorizedUser(),
+    version: '1.4.0-user-whitelist', // Version identifier to track deployment
+    lastUpdate: '2025-12-01T00:00:00Z',
     features: {
       employees: true,
       leave: true,
@@ -297,7 +396,8 @@ function getClientConfig() {
       timesheets: true,
       timesheetIntegration: true,  // NEW - Clock-in integration
       payroll: true,  // ENABLED - Fixed module loading
-      reports: true
+      reports: true,
+      userWhitelist: true  // NEW - User whitelist access control
     }
   };
 }
@@ -579,6 +679,83 @@ function runCheckPendingTimesheetsHeaders() {
 }
 
 /**
+ * Menu handler for setting up UserConfig sheet
+ */
+function runSetupUserConfigSheet() {
+  try {
+    var ui = SpreadsheetApp.getUi();
+
+    // Confirm with user
+    var response = ui.alert(
+      'Setup UserConfig Sheet',
+      'This will create the UserConfig sheet for managing authorized users.\n\n' +
+      'The sheet will have two columns:\n' +
+      '• Name - User\'s full name\n' +
+      '• Email - User\'s email address (must match their Google account)\n\n' +
+      'Continue?',
+      ui.ButtonSet.YES_NO
+    );
+
+    if (response !== ui.Button.YES) {
+      return;
+    }
+
+    // Run setup
+    var result = setupUserConfigSheet();
+
+    if (result.success) {
+      ui.alert(
+        'Success',
+        result.message + '\n\n' +
+        'Sheet: ' + result.sheetName + '\n\n' +
+        'Next steps:\n' +
+        '1. Add authorized users to the UserConfig sheet\n' +
+        '2. Enter their Name and Email (must match their Google account)\n' +
+        '3. Redeploy the web app for changes to take effect',
+        ui.ButtonSet.OK
+      );
+    } else {
+      ui.alert('Error', 'Setup failed: ' + result.error, ui.ButtonSet.OK);
+    }
+
+  } catch (error) {
+    SpreadsheetApp.getUi().alert('Error: ' + error.toString());
+  }
+}
+
+/**
+ * Menu handler for viewing authorized users
+ */
+function runViewAuthorizedUsers() {
+  try {
+    var ui = SpreadsheetApp.getUi();
+
+    // Get authorized users
+    var authorizedUsers = getAuthorizedUsers();
+
+    var message;
+    if (authorizedUsers.length === 0) {
+      message = 'No authorized users found.\n\n' +
+                'The UserConfig sheet may not exist or may be empty.\n\n' +
+                'Use "Setup UserConfig Sheet" to create it.';
+    } else {
+      message = 'Authorized Users (' + authorizedUsers.length + '):\n\n';
+      for (var i = 0; i < authorizedUsers.length; i++) {
+        message += (i + 1) + '. ' + authorizedUsers[i] + '\n';
+      }
+      message += '\n' +
+                 'Current user: ' + getCurrentUser() + '\n' +
+                 'Is authorized: ' + (isAuthorizedUser() ? 'YES ✓' : 'NO ✗');
+    }
+
+    ui.alert('Authorized Users', message, ui.ButtonSet.OK);
+
+  } catch (error) {
+    SpreadsheetApp.getUi().alert('Error: ' + error.toString());
+  }
+}
+
+/**
  * Create custom menu on spreadsheet open
  * Adds HR System menu with all modules
  */
@@ -605,6 +782,11 @@ function onOpen() {
     .addSeparator()
     .addItem('📋 Check PendingTimesheets Headers', 'runCheckPendingTimesheetsHeaders'));
 
+  // Add User Access submenu
+  menu.addSubMenu(ui.createMenu('User Access')
+    .addItem('⚙️ Setup UserConfig Sheet', 'runSetupUserConfigSheet')
+    .addItem('👥 View Authorized Users', 'runViewAuthorizedUsers'));
+
   // Add other submenus (if you want to add more later)
   // menu.addSubMenu(ui.createMenu('Reports')...);
 
@@ -618,18 +800,20 @@ function onOpen() {
  */
 function getVersion() {
   return {
-    version: '1.3.0-timesheet-integration',
-    lastUpdate: '2025-11-17T00:00:00Z',
+    version: '1.4.0-user-whitelist',
+    lastUpdate: '2025-12-01T00:00:00Z',
     hasFixedSheetMapping: true,
     hasLoggingFunctions: true,
     hasFormatResponse: true,
     hasPayrollModule: true,
     hasTimesheetIntegration: true,
+    hasUserWhitelist: true,
     payrollFeatures: {
       createPayslip: true,
       calculatePayslipPreview: true,
       fieldMapping: true,
-      moduleLoading: true
+      moduleLoading: true,
+      authorizationCheck: true
     },
     timesheetFeatures: {
       clockInImport: true,
@@ -639,7 +823,13 @@ function getVersion() {
       employeeValidation: true,
       settingsInterface: true
     },
-    deploymentStatus: 'Payroll + Timesheet Integration fully enabled'
+    securityFeatures: {
+      userWhitelist: true,
+      userConfigSheet: true,
+      entryPointProtection: true,
+      criticalOperationProtection: true
+    },
+    deploymentStatus: 'Payroll + Timesheet Integration + User Whitelist fully enabled'
   };
 }
 

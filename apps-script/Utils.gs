@@ -299,6 +299,9 @@ function getSheets_v2() {
           sheets.pending = sheet;
         }
       }
+      else if (sheetName.indexOf('userconfig') >= 0 || sheetName.indexOf('authorizedusers') >= 0) {
+        sheets.userConfig = sheet;
+      }
     }
 
     return sheets;
@@ -979,6 +982,138 @@ function parseCSV(csvString, hasHeaders) {
   }
 
   return result;
+}
+
+// ============================================================================
+// USER AUTHORIZATION UTILITIES
+// ============================================================================
+
+/**
+ * Get list of authorized user emails from UserConfig sheet
+ * Returns empty array if sheet doesn't exist or has no data
+ *
+ * @returns {Array<string>} Array of authorized email addresses
+ */
+function getAuthorizedUsers() {
+  try {
+    var sheets = getSheets();
+
+    // Check if UserConfig sheet exists
+    if (!sheets.userConfig) {
+      logWarning('UserConfig sheet not found - no users authorized');
+      return [];
+    }
+
+    var sheet = sheets.userConfig;
+    var data = sheet.getDataRange().getValues();
+
+    // Check if sheet has data
+    if (data.length <= 1) {
+      logWarning('UserConfig sheet is empty - no users authorized');
+      return [];
+    }
+
+    // Get headers
+    var headers = data[0];
+    var emailIndex = indexOf(headers, 'Email');
+
+    if (emailIndex === -1) {
+      logError('UserConfig sheet missing "Email" column');
+      return [];
+    }
+
+    // Extract emails (skip header row)
+    var authorizedEmails = [];
+    for (var i = 1; i < data.length; i++) {
+      var email = data[i][emailIndex];
+
+      // Skip empty rows
+      if (email && typeof email === 'string' && email.trim() !== '') {
+        authorizedEmails.push(email.trim().toLowerCase());
+      }
+    }
+
+    logInfo('Loaded ' + authorizedEmails.length + ' authorized users from UserConfig');
+    return authorizedEmails;
+
+  } catch (error) {
+    logError('Failed to get authorized users', error);
+    return [];
+  }
+}
+
+/**
+ * Check if a user email is in the authorized users list
+ *
+ * @param {string} userEmail - Email address to check
+ * @returns {boolean} True if user is authorized
+ */
+function isUserAuthorized(userEmail) {
+  if (!userEmail || typeof userEmail !== 'string') {
+    return false;
+  }
+
+  var authorizedUsers = getAuthorizedUsers();
+  var normalizedEmail = userEmail.trim().toLowerCase();
+
+  return authorizedUsers.indexOf(normalizedEmail) >= 0;
+}
+
+/**
+ * Create UserConfig sheet with headers if it doesn't exist
+ * This is a helper function for initial setup
+ *
+ * @returns {Object} Result object with success status
+ */
+function setupUserConfigSheet() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheets = getSheets();
+
+    // Check if sheet already exists
+    if (sheets.userConfig) {
+      return {
+        success: true,
+        message: 'UserConfig sheet already exists',
+        sheetName: sheets.userConfig.getName()
+      };
+    }
+
+    // Create new sheet
+    var sheet = ss.insertSheet('UserConfig');
+
+    // Add headers
+    var headers = USER_CONFIG_COLUMNS;
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+
+    // Format header row
+    sheet.getRange(1, 1, 1, headers.length)
+      .setFontWeight('bold')
+      .setBackground('#4285f4')
+      .setFontColor('#ffffff');
+
+    // Set column widths
+    sheet.setColumnWidth(1, 200); // Name
+    sheet.setColumnWidth(2, 300); // Email
+
+    // Freeze header row
+    sheet.setFrozenRows(1);
+
+    logSuccess('UserConfig sheet created successfully');
+
+    return {
+      success: true,
+      message: 'UserConfig sheet created successfully',
+      sheetName: 'UserConfig'
+    };
+
+  } catch (error) {
+    logError('Failed to create UserConfig sheet', error);
+    return {
+      success: false,
+      error: 'Failed to create UserConfig sheet: ' + error.toString()
+    };
+  }
 }
 
 // ============================================================================

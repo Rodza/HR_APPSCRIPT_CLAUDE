@@ -503,6 +503,11 @@ function transformEmployeeFieldNames(data) {
  */
 function createEmployee(employeeData) {
   try {
+    // Check authorization
+    if (!isAuthorizedUser()) {
+      throw new Error('Unauthorized: You do not have permission to create employees');
+    }
+
     employeeData = transformEmployeeFieldNames(employeeData);
 
     var requiredFields = getConfig('EMPLOYEE_REQUIRED_FIELDS');
@@ -573,6 +578,11 @@ function createEmployee(employeeData) {
  */
 function updateEmployee(id, employeeData) {
   try {
+    // Check authorization
+    if (!isAuthorizedUser()) {
+      throw new Error('Unauthorized: You do not have permission to update employees');
+    }
+
     if (!id) {
       throw new Error('Employee ID is required');
     }

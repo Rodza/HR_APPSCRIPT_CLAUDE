@@ -273,7 +273,8 @@ var EXPECTED_SHEET_NAMES = {
   leave: ['LEAVE', 'leaverecords'],
   pending: ['PendingTimesheets', 'pendingtimesheets', 'timeapproval'],
   rawClockData: ['RAW_CLOCK_DATA', 'rawclockdata', 'clockdata'],
-  clockImports: ['CLOCK_IN_IMPORTS', 'clockinimports', 'clockimports']
+  clockImports: ['CLOCK_IN_IMPORTS', 'clockinimports', 'clockimports'],
+  userConfig: ['UserConfig', 'userconfig', 'authorizedusers']
 };
 
 // ==================== DATABASE TABLE STRUCTURES ====================
@@ -350,6 +351,15 @@ var PENDING_TIMESHEETS_COLUMNS = [
   'PAYSLIP_ID',                     // Links to MASTERSALARY.RECORDNUMBER
   'IS_LOCKED',                      // True once payslip generated
   'LOCKED_DATE'                     // When record was locked
+];
+
+/**
+ * UserConfig table columns
+ * Stores authorized users who can access the system
+ */
+var USER_CONFIG_COLUMNS = [
+  'Name',                          // User's full name
+  'Email'                          // User's email address (must match Google account)
 ];
 
 // ==================== ERROR MESSAGES ====================
