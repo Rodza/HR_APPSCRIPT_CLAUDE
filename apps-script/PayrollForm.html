@@ -205,13 +205,13 @@
                                 <div class="col-md-6">
                                     <div class="mb-3">
                                         <label for="loanDeductionThisWeek" class="form-label">Loan Repayment This Week (R)</label>
-                                        <input type="number" class="form-control" id="loanDeductionThisWeek" step="0.01" min="0" value="0" onchange="calculatePreview()">
+                                        <input type="number" class="form-control" id="loanDeductionThisWeek" step="0.01" min="0" value="0" oninput="calculatePreview(); handleLoanLogic();">
                                     </div>
                                 </div>
                                 <div class="col-md-6">
                                     <div class="mb-3">
                                         <label for="newLoanThisWeek" class="form-label">New Loan This Week (R)</label>
-                                        <input type="number" class="form-control" id="newLoanThisWeek" step="0.01" min="0" value="0" onchange="calculatePreview()">
+                                        <input type="number" class="form-control" id="newLoanThisWeek" step="0.01" min="0" value="0" oninput="calculatePreview(); handleLoanLogic();">
                                     </div>
                                 </div>
                             </div>
@@ -221,6 +221,7 @@
                                 <select class="form-select" id="loanDisbursementType" onchange="calculatePreview()">
                                     <option value="Separate">Separate (Not with Salary)</option>
                                     <option value="With Salary">With Salary</option>
+                                    <option value="Repayment">Repayment</option>
                                 </select>
                                 <div class="form-text">
                                     "With Salary" adds new loan to Paid to Account. "Separate" means loan paid separately.
@@ -397,6 +398,48 @@
                 toastElement.addEventListener('hidden.bs.toast', function() {
                     toastElement.remove();
                 });
+            }
+        }
+
+        function handleLoanLogic() {
+            const loanRepaymentInput = document.getElementById('loanDeductionThisWeek');
+            const newLoanInput = document.getElementById('newLoanThisWeek');
+            const disbursementTypeSelect = document.getElementById('loanDisbursementType');
+            const repaymentOption = disbursementTypeSelect.querySelector('option[value="Repayment"]');
+
+            const loanRepaymentValue = parseFloat(loanRepaymentInput.value) || 0;
+            const newLoanValue = parseFloat(newLoanInput.value) || 0;
+
+            // First, reset fields to their default enabled state
+            loanRepaymentInput.disabled = false;
+            newLoanInput.disabled = false;
+            disbursementTypeSelect.disabled = false;
+            if (repaymentOption) {
+                repaymentOption.disabled = false;
+            }
+
+            if (loanRepaymentValue > 0) {
+                // A repayment is entered: lock new loan field and set type to Repayment
+                newLoanInput.disabled = true;
+                disbursementTypeSelect.value = 'Repayment';
+                disbursementTypeSelect.disabled = true; // Lock the dropdown
+            } else if (newLoanValue > 0) {
+                // A new loan is entered: lock repayment field and disable Repayment option
+                loanRepaymentInput.disabled = true;
+                if (repaymentOption) {
+                    repaymentOption.disabled = true;
+                }
+                // If the current selection was Repayment, switch it to a valid option
+                if (disbursementTypeSelect.value === 'Repayment') {
+                    disbursementTypeSelect.value = 'Separate';
+                }
+            } else {
+                // Both fields are empty/zero: ensure everything is usable
+                // The reset at the top handles enabling fields.
+                // We just need to make sure 'Repayment' isn't selected by default.
+                if (disbursementTypeSelect.value === 'Repayment') {
+                    disbursementTypeSelect.value = 'Separate';
+                }
             }
         }
 
