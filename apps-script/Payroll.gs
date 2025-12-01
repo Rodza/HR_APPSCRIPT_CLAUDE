@@ -995,8 +995,8 @@ function deletePayslip(recordNumber) {
 
       const loansSheet = sheets.loans;
       if (loansSheet && loanRecord.data._rowIndex) {
-        // Delete the loan record row
-        loansSheet.deleteRow(loanRecord.data._rowIndex + 1); // +1 for 1-based index
+        // Delete the loan record row (_rowIndex already 1-based from findLoanRecordBySalaryLink)
+        loansSheet.deleteRow(loanRecord.data._rowIndex);
         SpreadsheetApp.flush();
         Logger.log('✅ Loan record deleted');
 
