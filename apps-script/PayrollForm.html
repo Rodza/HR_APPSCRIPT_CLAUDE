@@ -486,8 +486,13 @@
                             return;
                         }
 
-                        const activeEmployees = employees.filter(emp => !emp['TERMINATION DATE']);
-                        console.log('Active employees:', activeEmployees.length);
+                        // Filter for active employees only (Permanent, Casual, Temporary - no termination date)
+                        const activeEmployees = employees.filter(emp => {
+                            var status = emp['EMPLOYMENT STATUS'] || '';
+                            var hasTerminationDate = emp['TERMINATION DATE'] && emp['TERMINATION DATE'] !== '';
+                            return !hasTerminationDate && (status === 'Permanent' || status === 'Casual' || status === 'Temporary');
+                        });
+                        console.log('Active employees:', activeEmployees.length, '(filtered by status: Permanent, Casual, Temporary)');
 
                         select.innerHTML = '<option value="">Select Employee</option>' +
                             activeEmployees

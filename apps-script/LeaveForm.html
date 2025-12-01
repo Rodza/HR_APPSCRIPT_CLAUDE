@@ -305,9 +305,16 @@
                         }
 
                         const select = document.getElementById('employeeName');
+
+                        // Filter for active employees only (Permanent, Casual, Temporary - no termination date)
+                        var activeEmployees = employees.filter(function(emp) {
+                            var status = emp['EMPLOYMENT STATUS'] || '';
+                            var hasTerminationDate = emp['TERMINATION DATE'] && emp['TERMINATION DATE'] !== '';
+                            return !hasTerminationDate && (status === 'Permanent' || status === 'Casual' || status === 'Temporary');
+                        });
+
                         select.innerHTML = '<option value="">Select Employee</option>' +
-                            employees
-                                .filter(emp => !emp['TERMINATION DATE']) // Only active employees
+                            activeEmployees
                                 .map(emp => `<option value="${emp.REFNAME}">${emp.REFNAME}</option>`)
                                 .join('');
 
