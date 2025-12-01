@@ -101,13 +101,25 @@
     google.script.run
       .withSuccessHandler(function(result) {
         console.log('Server response:', result);
-        
+
         // Handle different response formats
         var employees = [];
-        
-        if (result && result.success && Array.isArray(result.data)) {
-          // Proper format: {success: true, data: [...]}
-          employees = result.data;
+        var pagination = null;
+
+        if (result && result.success && result.data) {
+          // Check if data has pagination format
+          if (result.data.employees && Array.isArray(result.data.employees)) {
+            // New paginated format: {success: true, data: {employees: [...], pagination: {...}}}
+            employees = result.data.employees;
+            pagination = result.data.pagination;
+          } else if (Array.isArray(result.data)) {
+            // Old array format: {success: true, data: [...]}
+            employees = result.data;
+          } else {
+            console.error('Unexpected data format:', result.data);
+            displayError('Unexpected response format');
+            return;
+          }
         } else if (Array.isArray(result)) {
           // Direct array format
           employees = result;
@@ -121,8 +133,8 @@
           displayError('Unexpected response format');
           return;
         }
-        
-        displayEmployees(employees);
+
+        displayEmployees(employees, pagination);
       })
       .withFailureHandler(function(error) {
         console.error('Failed to load employees:', error);
@@ -134,44 +146,44 @@
   /**
    * Display employees in table
    */
-  function displayEmployees(employees) {
+  function displayEmployees(employees, pagination) {
     console.log('Displaying', employees.length, 'employees');
     allEmployees = employees;
-    
+
     var tbody = document.getElementById('employeeTableBody');
     if (!tbody) {
       console.error('Table body element not found');
       return;
     }
-    
+
     tbody.innerHTML = '';
-    
+
     if (!employees || employees.length === 0) {
       tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No employees found</td></tr>';
-      updateEmployeeCount(0);
+      updateEmployeeCount(0, pagination);
       return;
     }
-    
+
     for (var i = 0; i < employees.length; i++) {
       var emp = employees[i];
       var row = document.createElement('tr');
-      
+
       // Name
       var nameCell = document.createElement('td');
       nameCell.innerHTML = '<strong>' + escapeHtml(emp.REFNAME || emp.refname || '') + '</strong>';
       row.appendChild(nameCell);
-      
+
       // Employer
       var employerCell = document.createElement('td');
       employerCell.textContent = emp.EMPLOYER || emp.employer || '';
       row.appendChild(employerCell);
-      
+
       // Hourly Rate
       var rateCell = document.createElement('td');
       var rate = emp['HOURLY RATE'] || emp.hourlyRate || 0;
       rateCell.textContent = 'R' + parseFloat(rate).toFixed(2);
       row.appendChild(rateCell);
-      
+
       // Status
       var statusCell = document.createElement('td');
       var statusBadge = document.createElement('span');
@@ -180,24 +192,24 @@
       statusBadge.textContent = status;
       statusCell.appendChild(statusBadge);
       row.appendChild(statusCell);
-      
+
       // Clock Number
       var clockCell = document.createElement('td');
       clockCell.textContent = emp.ClockInRef || emp.clockInRef || '';
       row.appendChild(clockCell);
-      
+
       // Actions
       var actionsCell = document.createElement('td');
       var empId = emp.id || emp.ID || '';
-      actionsCell.innerHTML = 
+      actionsCell.innerHTML =
         '<button class="btn btn-sm btn-info me-1" onclick="viewEmployee(\'' + empId + '\')">View</button>' +
         '<button class="btn btn-sm btn-warning" onclick="editEmployee(\'' + empId + '\')">Edit</button>';
       row.appendChild(actionsCell);
-      
+
       tbody.appendChild(row);
     }
-    
-    updateEmployeeCount(employees.length);
+
+    updateEmployeeCount(employees.length, pagination);
   }
 
   /**
@@ -214,11 +226,16 @@
   /**
    * Update employee count display
    */
-  function updateEmployeeCount(count) {
+  function updateEmployeeCount(count, pagination) {
     var countElement = document.getElementById('employeeCount');
     if (countElement) {
       if (count === 0) {
         countElement.textContent = 'No employees';
+      } else if (pagination && pagination.total) {
+        // Show pagination info
+        var start = ((pagination.page - 1) * pagination.pageSize) + 1;
+        var end = Math.min(start + count - 1, pagination.total);
+        countElement.textContent = 'Showing ' + start + '-' + end + ' of ' + pagination.total + ' employees';
       } else if (count === 1) {
         countElement.textContent = 'Showing 1 employee';
       } else {

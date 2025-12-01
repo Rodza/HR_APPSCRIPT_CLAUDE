@@ -127,8 +127,20 @@
                     let employees = [];
 
                     if (result && result.success && result.data) {
-                        console.log('✓ Using result.data format');
-                        employees = result.data;
+                        // Check if data has pagination format
+                        if (result.data.employees && Array.isArray(result.data.employees)) {
+                            console.log('✓ Using new paginated format');
+                            employees = result.data.employees;
+                        } else if (Array.isArray(result.data)) {
+                            console.log('✓ Using old array format');
+                            employees = result.data;
+                        } else {
+                            console.error('❌ Unexpected data format:', result.data);
+                            if (typeof showError === 'function') {
+                                showError('Failed to load employees: Unexpected format');
+                            }
+                            return;
+                        }
                     } else if (result && Array.isArray(result)) {
                         console.log('✓ Using direct array format');
                         employees = result;
@@ -143,12 +155,18 @@
                     allEmployees = employees;
                     const select = document.getElementById('employeeName');
                     if (select) {
+                        // Filter for active employees only (Permanent, Casual, Temporary - no termination date)
+                        const activeEmployees = employees.filter(emp => {
+                            var status = emp['EMPLOYMENT STATUS'] || '';
+                            var hasTerminationDate = emp['TERMINATION DATE'] && emp['TERMINATION DATE'] !== '';
+                            return !hasTerminationDate && (status === 'Permanent' || status === 'Casual' || status === 'Temporary');
+                        });
+
                         select.innerHTML = '<option value="">Select Employee</option>' +
-                            employees
-                                .filter(emp => !emp['TERMINATION DATE']) // Only active employees
+                            activeEmployees
                                 .map(emp => `<option value="${emp.id}">${emp.REFNAME}</option>`)
                                 .join('');
-                        console.log('✓ Employee dropdown populated with', employees.length, 'employees');
+                        console.log('✓ Employee dropdown populated with', activeEmployees.length, 'active employees (Permanent, Casual, Temporary)');
                     } else {
                         console.error('❌ employeeName dropdown not found');
                     }

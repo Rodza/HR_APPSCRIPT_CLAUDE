@@ -463,7 +463,21 @@
                         return;
                     }
                     if (result.success) {
-                        allEmployees = result.data;
+                        // Handle both old and new paginated format
+                        var employees = [];
+                        if (result.data && result.data.employees && Array.isArray(result.data.employees)) {
+                            // New paginated format
+                            employees = result.data.employees;
+                        } else if (Array.isArray(result.data)) {
+                            // Old array format
+                            employees = result.data;
+                        } else {
+                            console.error('Unexpected data format:', result.data);
+                            showError('Unexpected response format');
+                            return;
+                        }
+
+                        allEmployees = employees;
                         console.log('Employees loaded:', allEmployees.length);
 
                         const select = document.getElementById('employeeName');
@@ -472,8 +486,13 @@
                             return;
                         }
 
-                        const activeEmployees = result.data.filter(emp => !emp['TERMINATION DATE']);
-                        console.log('Active employees:', activeEmployees.length);
+                        // Filter for active employees only (Permanent, Casual, Temporary - no termination date)
+                        const activeEmployees = employees.filter(emp => {
+                            var status = emp['EMPLOYMENT STATUS'] || '';
+                            var hasTerminationDate = emp['TERMINATION DATE'] && emp['TERMINATION DATE'] !== '';
+                            return !hasTerminationDate && (status === 'Permanent' || status === 'Casual' || status === 'Temporary');
+                        });
+                        console.log('Active employees:', activeEmployees.length, '(filtered by status: Permanent, Casual, Temporary)');
 
                         select.innerHTML = '<option value="">Select Employee</option>' +
                             activeEmployees

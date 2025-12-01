@@ -291,10 +291,30 @@
             google.script.run
                 .withSuccessHandler(function(result) {
                     if (result.success) {
+                        // Handle both old and new paginated format
+                        var employees = [];
+                        if (result.data && result.data.employees && Array.isArray(result.data.employees)) {
+                            // New paginated format
+                            employees = result.data.employees;
+                        } else if (Array.isArray(result.data)) {
+                            // Old array format
+                            employees = result.data;
+                        } else {
+                            showError('Unexpected response format');
+                            return;
+                        }
+
                         const select = document.getElementById('employeeName');
+
+                        // Filter for active employees only (Permanent, Casual, Temporary - no termination date)
+                        var activeEmployees = employees.filter(function(emp) {
+                            var status = emp['EMPLOYMENT STATUS'] || '';
+                            var hasTerminationDate = emp['TERMINATION DATE'] && emp['TERMINATION DATE'] !== '';
+                            return !hasTerminationDate && (status === 'Permanent' || status === 'Casual' || status === 'Temporary');
+                        });
+
                         select.innerHTML = '<option value="">Select Employee</option>' +
-                            result.data
-                                .filter(emp => !emp['TERMINATION DATE']) // Only active employees
+                            activeEmployees
                                 .map(emp => `<option value="${emp.REFNAME}">${emp.REFNAME}</option>`)
                                 .join('');
 

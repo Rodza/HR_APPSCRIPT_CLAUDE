@@ -251,6 +251,12 @@ function formatPhoneNumber(phone) {
 // ============================================================================
 
 /**
+ * Cache for getSheets() to avoid repeated expensive spreadsheet API calls
+ * This cache persists for the duration of a single script execution
+ */
+var _SHEETS_CACHE = null;
+
+/**
  * Get all sheets with proper error handling - VERSION 2 (Cache-busting rename)
  *
  * This is the actual implementation. The original getSheets() delegates to this.
@@ -259,116 +265,63 @@ function formatPhoneNumber(phone) {
  */
 function getSheets_v2() {
   try {
-    console.log('★★★ CODE VERSION: SYNC-2025-11-21-D ★★★');
-    console.log('=== getSheets_v2() START ===');
-
-    // Step 1: Get active spreadsheet
-    console.log('Step 1: Getting active spreadsheet...');
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-    console.log('✓ Spreadsheet retrieved:', ss.getName());
-    console.log('  Spreadsheet ID:', ss.getId());
-
     var sheets = {};
-
-    // Step 2: Get all sheets
-    console.log('Step 2: Getting all sheets...');
     var allSheets = ss.getSheets();
-    console.log('✓ Found', allSheets.length, 'sheets total');
 
-    // Step 3: List all sheet names
-    console.log('Step 3: Listing all sheet names:');
-    for (var i = 0; i < allSheets.length; i++) {
-      console.log('  - Sheet ' + (i + 1) + ':', allSheets[i].getName());
-    }
-
-    // Step 4: Map sheets by name (case-insensitive)
-    console.log('Step 4: Mapping sheets to expected keys...');
+    // Map sheets by name (case-insensitive)
     for (var i = 0; i < allSheets.length; i++) {
       var sheet = allSheets[i];
       var sheetName = sheet.getName().toLowerCase().replace(/\s+/g, ''); // Remove spaces
-      console.log('  Processing sheet:', sheet.getName(), '(normalized:', sheetName + ')');
 
       // Map to expected keys - ORDER MATTERS! Most specific first
-      // Check for clock-in imports (most specific first)
       if (sheetName.indexOf('clockinimports') >= 0 || sheetName.indexOf('clock_in_imports') >= 0) {
         sheets.clockImports = sheet;
-        console.log('    ✓ Mapped to: clockImports');
       }
-      // Check for raw clock data
       else if (sheetName.indexOf('rawclockdata') >= 0 || sheetName.indexOf('raw_clock_data') >= 0 || sheetName.indexOf('clockdata') >= 0) {
         sheets.rawClockData = sheet;
-        console.log('    ✓ Mapped to: rawClockData');
       }
-      // Check loans BEFORE employee to avoid conflict
       else if (sheetName.indexOf('loan') >= 0) {
         sheets.loans = sheet;
-        console.log('    ✓ Mapped to: loans');
       }
-      // Check for employee details/empdetails (but not loans)
       else if (sheetName.indexOf('employeedetails') >= 0 || sheetName === 'empdetails') {
         sheets.empdetails = sheet;
-        console.log('    ✓ Mapped to: empdetails');
       }
-      // Check salary/payroll
       else if (sheetName.indexOf('salary') >= 0 || sheetName.indexOf('payroll') >= 0) {
         sheets.salary = sheet;
-        console.log('    ✓ Mapped to: salary');
       }
-      // Check leave
       else if (sheetName.indexOf('leave') >= 0) {
         sheets.leave = sheet;
-        console.log('    ✓ Mapped to: leave');
       }
-      // Check pending timesheets - MUST be specific! Exclude recon/details sheets
       else if ((sheetName.indexOf('pending') >= 0 && sheetName.indexOf('timesheet') >= 0) &&
                sheetName.indexOf('recon') < 0 && sheetName.indexOf('detail') < 0) {
-        // Only map if not already set, OR if this is the preferred PENDING_TIMESHEETS sheet
         if (!sheets.pending || sheetName === 'pending_timesheets') {
           sheets.pending = sheet;
-          console.log('    ✓ Mapped to: pending (timesheet table)');
-        } else {
-          console.log('    - Skipped: pending already mapped to preferred sheet');
         }
-      } else {
-        console.log('    - Not mapped (no matching key)');
       }
     }
 
-    // Step 5: Summary
-    console.log('Step 5: Summary of mapped sheets:');
-    var mappedKeys = Object.keys(sheets);
-    console.log('  Mapped', mappedKeys.length, 'sheets:', mappedKeys.join(', '));
-
-    if (sheets.empdetails) {
-      console.log('  ✓ empdetails sheet found:', sheets.empdetails.getName());
-    } else {
-      console.warn('  ✗ empdetails sheet NOT found!');
-    }
-
-    console.log('=== getSheets_v2() END ===');
     return sheets;
 
   } catch (error) {
-    console.error('=== getSheets_v2() ERROR ===');
-    console.error('Error type:', error.name);
-    console.error('Error message:', error.message);
-    console.error('Full error:', error.toString());
-    console.error('Stack trace:', error.stack);
     logError('Failed to get sheets', error);
     throw new Error('Failed to access spreadsheet: ' + error.toString());
   }
 }
 
 /**
- * Get all sheets with proper error handling (WRAPPER - calls _v2)
+ * Get all sheets with proper error handling (WRAPPER - calls _v2 with caching)
  *
- * This wrapper ensures all existing callers work while the actual
- * implementation is in getSheets_v2() to bypass Apps Script cache.
+ * This wrapper caches the result to avoid repeated expensive spreadsheet API calls.
+ * The cache persists for the duration of a single script execution.
  *
  * @returns {Object} Object with sheet references
  */
 function getSheets() {
-  return getSheets_v2();
+  if (_SHEETS_CACHE === null) {
+    _SHEETS_CACHE = getSheets_v2();
+  }
+  return _SHEETS_CACHE;
 }
 
 /**
