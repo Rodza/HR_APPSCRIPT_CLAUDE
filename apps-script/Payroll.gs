@@ -37,6 +37,9 @@ function createPayslip(data) {
     if (data.otherIncomeText !== undefined) data['OTHER INCOME TEXT'] = data.otherIncomeText;
     if (data.otherDeductions !== undefined) data['OTHER DEDUCTIONS'] = data.otherDeductions;
     if (data.otherDeductionsText !== undefined) data['OTHER DEDUCTIONS TEXT'] = data.otherDeductionsText;
+    if (data.loanDeductionThisWeek !== undefined) data.LoanDeductionThisWeek = data.loanDeductionThisWeek;
+    if (data.newLoanThisWeek !== undefined) data.NewLoanThisWeek = data.newLoanThisWeek;
+    if (data.loanDisbursementType !== undefined) data.LoanDisbursementType = data.loanDisbursementType;
     if (data.weekEnding !== undefined) data.WEEKENDING = data.weekEnding;
     if (data.notes !== undefined) data.NOTES = data.notes;
 
@@ -329,6 +332,9 @@ function updatePayslip(recordNumber, data) {
     if (data.otherIncomeText !== undefined) data['OTHER INCOME TEXT'] = data.otherIncomeText;
     if (data.otherDeductions !== undefined) data['OTHER DEDUCTIONS'] = data.otherDeductions;
     if (data.otherDeductionsText !== undefined) data['OTHER DEDUCTIONS TEXT'] = data.otherDeductionsText;
+    if (data.loanDeductionThisWeek !== undefined) data.LoanDeductionThisWeek = data.loanDeductionThisWeek;
+    if (data.newLoanThisWeek !== undefined) data.NewLoanThisWeek = data.newLoanThisWeek;
+    if (data.loanDisbursementType !== undefined) data.LoanDisbursementType = data.loanDisbursementType;
     if (data.weekEnding !== undefined) data.WEEKENDING = data.weekEnding;
     if (data.notes !== undefined) data.NOTES = data.notes;
     if (data.employeeName !== undefined) data['EMPLOYEE NAME'] = data.employeeName;
