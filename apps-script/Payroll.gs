@@ -1149,33 +1149,56 @@ function updatePayslipLoanPayment(recordNumber, loanData) {
     Logger.log('✅ Loan payment updated for payslip #' + recordNumber);
     Logger.log('✅ Paid to Account: ' + formatCurrency(currentPayslip.PaidtoAccount));
 
-    // Sync loan transaction to EmployeeLoans sheet
+    // Sync loan transaction to EmployeeLoans sheet - OPTION 1 with fallback to OPTION 3
     Logger.log('🔄🔄🔄 SYNC BLOCK START 🔄🔄🔄');
     try {
-      Logger.log('🔄 Step 1: Preparing sync data from currentPayslip');
-      Logger.log('🔄 currentPayslip.RECORDNUMBER: ' + currentPayslip.RECORDNUMBER);
-      Logger.log('🔄 currentPayslip["EMPLOYEE NAME"]: ' + currentPayslip['EMPLOYEE NAME']);
-      Logger.log('🔄 currentPayslip.id: ' + currentPayslip.id);
-      Logger.log('🔄 currentPayslip.NewLoanThisWeek: ' + currentPayslip.NewLoanThisWeek);
-      Logger.log('🔄 currentPayslip.LoanDeductionThisWeek: ' + currentPayslip.LoanDeductionThisWeek);
-      Logger.log('🔄 currentPayslip.LoanDisbursementType: ' + currentPayslip.LoanDisbursementType);
-      Logger.log('🔄 currentPayslip.UpdatedLoanBalance: ' + currentPayslip.UpdatedLoanBalance);
+      Logger.log('🔄 Attempting OPTION 1: Using syncLoanForPayslip()');
 
-      const syncData = {
-        employeeName: currentPayslip['EMPLOYEE NAME'],
-        employeeId: currentPayslip.id,
-        recordNumber: currentPayslip.RECORDNUMBER,
-        newLoan: parseFloat(currentPayslip.NewLoanThisWeek) || 0,
-        loanDeduction: parseFloat(currentPayslip.LoanDeductionThisWeek) || 0,
-        disbursementType: currentPayslip.LoanDisbursementType || 'Separate',
-        updatedBalance: parseFloat(currentPayslip.UpdatedLoanBalance) || 0,
-        weekEnding: currentPayslip.WEEKENDING
-      };
+      // Call the correct sync function (from Loans.gs)
+      const syncResult = syncLoanForPayslip(recordNumber);
 
-      Logger.log('🔄 Step 2: Sync data prepared: ' + JSON.stringify(syncData));
+      if (syncResult.success) {
+        Logger.log('✅ Loan transaction synced via syncLoanForPayslip');
 
-      syncLoanTransactionFromPayslip(syncData);
-      Logger.log('✅ Loan transaction synced to EmployeeLoans sheet');
+        // Validate the sync worked correctly
+        const validation = validateLoanSync(recordNumber, currentPayslip);
+
+        if (validation.success) {
+          Logger.log('✅ VALIDATION PASSED: Loan sync verified correct');
+        } else {
+          Logger.log('⚠️ VALIDATION FAILED: ' + validation.error);
+          Logger.log('🔄 Falling back to OPTION 3: Refreshing loan balance and retrying');
+
+          // OPTION 3 FALLBACK: Refresh CurrentLoanBalance before recalculating
+          const freshBalance = getCurrentLoanBalance(currentPayslip.id);
+          if (freshBalance.success) {
+            currentPayslip.CurrentLoanBalance = freshBalance.data;
+            Logger.log('🔄 Refreshed CurrentLoanBalance: ' + freshBalance.data);
+
+            // Recalculate with fresh balance
+            const recalc = calculatePayslip(currentPayslip);
+            Object.assign(currentPayslip, recalc);
+
+            // Update the sheet with corrected values
+            const correctedRow = objectToRow(currentPayslip, headers);
+            salarySheet.getRange(sheetRowIndex, 1, 1, headers.length).setValues([correctedRow]);
+            SpreadsheetApp.flush();
+            Logger.log('✅ Payslip recalculated with fresh loan balance');
+
+            // Retry sync with corrected data
+            const retrySync = syncLoanForPayslip(recordNumber);
+            if (retrySync.success) {
+              Logger.log('✅ RETRY SUCCESSFUL: Loan synced with corrected balance');
+            } else {
+              Logger.log('❌ RETRY FAILED: ' + retrySync.error);
+            }
+          } else {
+            Logger.log('❌ Could not fetch fresh loan balance: ' + freshBalance.error);
+          }
+        }
+      } else {
+        Logger.log('❌ ERROR: syncLoanForPayslip failed: ' + syncResult.error);
+      }
     } catch (syncError) {
       Logger.log('❌ ERROR: Failed to sync loan transaction: ' + syncError.message);
       Logger.log('❌ Stack: ' + syncError.stack);
@@ -1191,6 +1214,109 @@ function updatePayslipLoanPayment(recordNumber, loanData) {
   } catch (error) {
     Logger.log('❌ ERROR in updatePayslipLoanPayment: ' + error.message);
     return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Validates that loan sync was successful and created correct records
+ *
+ * @param {number} recordNumber - Payslip record number
+ * @param {Object} payslip - Payslip data object
+ * @returns {Object} Result with success flag and error if validation fails
+ */
+function validateLoanSync(recordNumber, payslip) {
+  try {
+    Logger.log('🔍 Validating loan sync for payslip #' + recordNumber);
+
+    // Check if there's actually a loan transaction to validate
+    const loanDeduction = parseFloat(payslip.LoanDeductionThisWeek) || 0;
+    const newLoan = parseFloat(payslip.NewLoanThisWeek) || 0;
+
+    if (loanDeduction === 0 && newLoan === 0) {
+      Logger.log('✅ No loan activity - validation not needed');
+      return { success: true };
+    }
+
+    // Find the loan record by SalaryLink
+    const loanRecord = findLoanRecordBySalaryLink(recordNumber);
+
+    if (!loanRecord.success) {
+      return { success: false, error: 'Failed to query loan records: ' + loanRecord.error };
+    }
+
+    if (!loanRecord.data) {
+      return { success: false, error: 'No loan record found with SalaryLink=' + recordNumber };
+    }
+
+    const record = loanRecord.data;
+    Logger.log('🔍 Found loan record: LoanID=' + record.LoanID);
+
+    // Validation 1: Check LoanID is UUID format (not numeric)
+    const loanId = String(record.LoanID);
+    const isUUID = loanId.includes('-') && loanId.length > 10;
+
+    if (!isUUID) {
+      return {
+        success: false,
+        error: 'Invalid LoanID format (expected UUID, got: ' + loanId + '). This indicates wrong sync function was used.'
+      };
+    }
+    Logger.log('✅ LoanID is valid UUID format');
+
+    // Validation 2: Check loan amount matches payslip
+    const expectedAmount = loanDeduction > 0 ? -loanDeduction : newLoan;
+    const actualAmount = parseFloat(record.LoanAmount) || 0;
+
+    if (Math.abs(expectedAmount - actualAmount) > 0.01) {
+      return {
+        success: false,
+        error: 'Loan amount mismatch (expected: ' + expectedAmount + ', actual: ' + actualAmount + ')'
+      };
+    }
+    Logger.log('✅ Loan amount matches payslip');
+
+    // Validation 3: Check balance is sensible (BalanceAfter exists and is not null)
+    const balanceAfter = parseFloat(record.BalanceAfter);
+
+    if (balanceAfter === null || balanceAfter === undefined || isNaN(balanceAfter)) {
+      return {
+        success: false,
+        error: 'BalanceAfter is missing or invalid: ' + record.BalanceAfter
+      };
+    }
+    Logger.log('✅ BalanceAfter is valid: ' + balanceAfter);
+
+    // Validation 4: Check BalanceBefore exists
+    const balanceBefore = parseFloat(record.BalanceBefore);
+
+    if (balanceBefore === null || balanceBefore === undefined || isNaN(balanceBefore)) {
+      return {
+        success: false,
+        error: 'BalanceBefore is missing or invalid: ' + record.BalanceBefore
+      };
+    }
+    Logger.log('✅ BalanceBefore is valid: ' + balanceBefore);
+
+    // Validation 5: Check balance calculation is correct
+    const expectedBalanceAfter = balanceBefore + actualAmount;
+
+    if (Math.abs(expectedBalanceAfter - balanceAfter) > 0.01) {
+      return {
+        success: false,
+        error: 'Balance calculation error (Before: ' + balanceBefore +
+               ', Amount: ' + actualAmount +
+               ', Expected After: ' + expectedBalanceAfter +
+               ', Actual After: ' + balanceAfter + ')'
+      };
+    }
+    Logger.log('✅ Balance calculation is correct');
+
+    Logger.log('✅✅✅ ALL VALIDATIONS PASSED ✅✅✅');
+    return { success: true };
+
+  } catch (error) {
+    Logger.log('❌ ERROR in validateLoanSync: ' + error.message);
+    return { success: false, error: 'Validation error: ' + error.message };
   }
 }
 
@@ -1341,247 +1467,61 @@ function test_calculatePayslip_Overtime() {
 
   Logger.log('========== TEST COMPLETE ==========\n');
 }
-
-/**
- * Sync loan transaction from payslip to EmployeeLoans table
- * With comprehensive debugging to track failures
- *
- * @param {Object} data - Sync data from payslip
- */
-function syncLoanTransactionFromPayslip(data) {
-  Logger.log('🔄🔄🔄 syncLoanTransactionFromPayslip START 🔄🔄🔄');
-  Logger.log('🔄 Input data: ' + JSON.stringify(data));
-
-  try {
-    // Step 1: Validate input
-    Logger.log('🔄 Step 1: Validating input data...');
-    if (!data) {
-      throw new Error('No data provided to syncLoanTransactionFromPayslip');
-    }
-    if (!data.employeeName) {
-      throw new Error('Missing employeeName in sync data');
-    }
-    if (!data.employeeId) {
-      throw new Error('Missing employeeId in sync data');
-    }
-    Logger.log('✅ Step 1: Input validation passed');
-
-    // Step 2: Check if there's actually a loan transaction
-    Logger.log('🔄 Step 2: Checking for loan transaction...');
-    const newLoan = parseFloat(data.newLoan) || 0;
-    const loanDeduction = parseFloat(data.loanDeduction) || 0;
-    Logger.log('🔄 newLoan: ' + newLoan);
-    Logger.log('🔄 loanDeduction: ' + loanDeduction);
-
-    if (newLoan === 0 && loanDeduction === 0) {
-      Logger.log('ℹ️ No loan transaction to sync (both newLoan and loanDeduction are 0)');
-      Logger.log('🔄🔄🔄 syncLoanTransactionFromPayslip END (no transaction) 🔄🔄🔄');
-      return { success: true, message: 'No loan transaction to sync' };
-    }
-    Logger.log('✅ Step 2: Loan transaction found');
-
-    // Step 3: Get the EmployeeLoans sheet
-    Logger.log('🔄 Step 3: Getting EmployeeLoans sheet...');
-    const sheets = getSheets();
-    Logger.log('🔄 sheets object keys: ' + Object.keys(sheets).join(', '));
-
-    const loansSheet = sheets.loans;
-    if (!loansSheet) {
-      Logger.log('❌ Available sheets: ' + Object.keys(sheets).join(', '));
-      throw new Error('EmployeeLoans sheet not found in sheets object');
-    }
-    Logger.log('✅ Step 3: EmployeeLoans sheet found: ' + loansSheet.getName());
-
-    // Step 4: Get headers and existing data
-    Logger.log('🔄 Step 4: Getting sheet headers and data...');
-    const allData = loansSheet.getDataRange().getValues();
-    Logger.log('🔄 Total rows in sheet: ' + allData.length);
-
-    if (allData.length === 0) {
-      throw new Error('EmployeeLoans sheet is empty (no headers)');
-    }
-
-    const headers = allData[0];
-    Logger.log('🔄 Headers: ' + JSON.stringify(headers));
-    Logger.log('✅ Step 4: Headers retrieved (' + headers.length + ' columns)');
-
-    // Step 5: Find column indices
-    Logger.log('🔄 Step 5: Finding column indices...');
-    const colIndices = {
-      loanId: findColumnIndex(headers, 'LoanID'),
-      employeeName: findColumnIndex(headers, 'Employee Name'),
-      employeeId: findColumnIndex(headers, 'Employee ID'),
-      timestamp: findColumnIndex(headers, 'Timestamp'),
-      transactionDate: findColumnIndex(headers, 'TransactionDate'),
-      loanAmount: findColumnIndex(headers, 'LoanAmount'),
-      loanType: findColumnIndex(headers, 'LoanType'),
-      disbursementMode: findColumnIndex(headers, 'DisbursementMode'),
-      salaryLink: findColumnIndex(headers, 'SalaryLink'),
-      notes: findColumnIndex(headers, 'Notes'),
-      balanceBefore: findColumnIndex(headers, 'BalanceBefore'),
-      balanceAfter: findColumnIndex(headers, 'BalanceAfter')
-    };
-    Logger.log('🔄 Column indices: ' + JSON.stringify(colIndices));
-
-    // Check for missing columns
-    for (const [key, value] of Object.entries(colIndices)) {
-      if (value === -1) {
-        Logger.log('⚠️ Warning: Column not found: ' + key);
-      }
-    }
-    Logger.log('✅ Step 5: Column indices found');
-
-    // Step 6: Check for existing record with same SalaryLink (payslip)
-    Logger.log('🔄 Step 6: Checking for existing record for payslip #' + data.recordNumber + '...');
-    let existingRowIndex = -1;
-    let existingLoanId = null;
-    const rows = allData.slice(1);
-
-    if (colIndices.salaryLink !== -1) {
-      for (let i = 0; i < rows.length; i++) {
-        const salaryLinkVal = String(rows[i][colIndices.salaryLink]);
-        if (salaryLinkVal === String(data.recordNumber)) {
-          existingRowIndex = i + 2; // +2 because: +1 for header, +1 for 1-based index
-          existingLoanId = rows[i][colIndices.loanId];
-          Logger.log('🔄 Found existing record at row ' + existingRowIndex + ' with LoanID ' + existingLoanId);
-          break;
-        }
-      }
-    }
-
-    // Generate new LoanID only if no existing record
-    let loanId;
-    if (existingRowIndex === -1) {
-      let maxLoanId = 0;
-      rows.forEach((row) => {
-        const loanIdVal = row[colIndices.loanId];
-        if (loanIdVal && typeof loanIdVal === 'number' && loanIdVal > maxLoanId) {
-          maxLoanId = loanIdVal;
-        }
-      });
-      loanId = maxLoanId + 1;
-      Logger.log('🔄 No existing record found. New LoanID: ' + loanId);
-    } else {
-      loanId = existingLoanId;
-      Logger.log('🔄 Will UPDATE existing record with LoanID: ' + loanId);
-    }
-    Logger.log('✅ Step 6: Record check complete');
-
-    // Step 7: Calculate balances and transaction details
-    Logger.log('🔄 Step 7: Calculating transaction details...');
-    let loanAmount, loanType, disbursementMode;
-    const updatedBalance = parseFloat(data.updatedBalance) || 0;
-
-    if (newLoan > 0) {
-      // Disbursement
-      loanAmount = newLoan;
-      loanType = 'Disbursement';
-      disbursementMode = data.disbursementType || 'Separate';
-    } else {
-      // Repayment
-      loanAmount = -loanDeduction; // Negative for repayment
-      loanType = 'Repayment';
-      disbursementMode = 'N/A';
-    }
-
-    const balanceBefore = updatedBalance - loanAmount;
-    const balanceAfter = updatedBalance;
-
-    Logger.log('🔄 loanAmount: ' + loanAmount);
-    Logger.log('🔄 loanType: ' + loanType);
-    Logger.log('🔄 disbursementMode: ' + disbursementMode);
-    Logger.log('🔄 balanceBefore: ' + balanceBefore);
-    Logger.log('🔄 balanceAfter: ' + balanceAfter);
-    Logger.log('✅ Step 7: Transaction details calculated');
-
-    // Step 8: Build the row data
-    Logger.log('🔄 Step 8: Building row data...');
-    const rowData = new Array(headers.length).fill('');
-
-    if (colIndices.loanId !== -1) rowData[colIndices.loanId] = loanId;
-    if (colIndices.employeeName !== -1) rowData[colIndices.employeeName] = data.employeeName;
-    if (colIndices.employeeId !== -1) rowData[colIndices.employeeId] = data.employeeId;
-    if (colIndices.timestamp !== -1) rowData[colIndices.timestamp] = new Date();
-    if (colIndices.transactionDate !== -1) rowData[colIndices.transactionDate] = data.weekEnding || new Date();
-    if (colIndices.loanAmount !== -1) rowData[colIndices.loanAmount] = loanAmount;
-    if (colIndices.loanType !== -1) rowData[colIndices.loanType] = loanType;
-    if (colIndices.disbursementMode !== -1) rowData[colIndices.disbursementMode] = disbursementMode;
-    if (colIndices.salaryLink !== -1) rowData[colIndices.salaryLink] = data.recordNumber || '';
-    if (colIndices.notes !== -1) rowData[colIndices.notes] = 'Auto-synced from payslip #' + (data.recordNumber || 'unknown');
-    if (colIndices.balanceBefore !== -1) rowData[colIndices.balanceBefore] = balanceBefore;
-    if (colIndices.balanceAfter !== -1) rowData[colIndices.balanceAfter] = balanceAfter;
-
-    Logger.log('🔄 Row data: ' + JSON.stringify(rowData));
-    Logger.log('✅ Step 8: Row built');
-
-    // Step 9: Update existing row OR append new row
-    if (existingRowIndex !== -1) {
-      Logger.log('🔄 Step 9: UPDATING existing row ' + existingRowIndex + '...');
-      loansSheet.getRange(existingRowIndex, 1, 1, headers.length).setValues([rowData]);
-      SpreadsheetApp.flush();
-      Logger.log('✅ Step 9: Row UPDATED successfully');
-    } else {
-      Logger.log('🔄 Step 9: APPENDING new row to EmployeeLoans sheet...');
-      loansSheet.appendRow(rowData);
-      SpreadsheetApp.flush();
-      Logger.log('✅ Step 9: Row APPENDED successfully');
-    }
-
-    // Step 10: Verify the row was added
-    Logger.log('🔄 Step 10: Verifying row was added...');
-    const newData = loansSheet.getDataRange().getValues();
-    Logger.log('🔄 New total rows: ' + newData.length);
-    Logger.log('✅ Step 10: Verification complete');
-
-    Logger.log('✅✅✅ LOAN TRANSACTION SYNCED SUCCESSFULLY ✅✅✅');
-    Logger.log('🔄🔄🔄 syncLoanTransactionFromPayslip END 🔄🔄🔄');
-
-    return { success: true, loanId: newLoanId };
-
-  } catch (error) {
-    Logger.log('❌❌❌ ERROR in syncLoanTransactionFromPayslip ❌❌❌');
-    Logger.log('❌ Error message: ' + error.message);
-    Logger.log('❌ Error stack: ' + error.stack);
-    Logger.log('🔄🔄🔄 syncLoanTransactionFromPayslip END (with error) 🔄🔄🔄');
-    throw error;
-  }
-}
-
 /**
  * TEST FUNCTION - Run this directly from Apps Script editor
- * to verify code version and sync functionality
+ * to verify loan sync implementation
  */
-function test_VerifyCodeVersion() {
-  Logger.log('========== CODE VERSION VERIFICATION TEST ==========');
-  Logger.log('');
-  Logger.log('Expected version markers:');
-  Logger.log('  - PAYROLL.GS: SYNC-2025-11-21-D');
-  Logger.log('  - UTILS.GS: SYNC-2025-11-21-D');
+function test_VerifyLoanSyncImplementation() {
+  Logger.log('========== LOAN SYNC IMPLEMENTATION TEST ==========');
   Logger.log('');
 
-  // Check if syncLoanTransactionFromPayslip exists
-  Logger.log('Checking if syncLoanTransactionFromPayslip exists...');
-  if (typeof syncLoanTransactionFromPayslip === 'function') {
-    Logger.log('✅ syncLoanTransactionFromPayslip function EXISTS');
+  // Check if correct sync function exists (from Loans.gs)
+  Logger.log('Checking if syncLoanForPayslip exists...');
+  if (typeof syncLoanForPayslip === 'function') {
+    Logger.log('✅ syncLoanForPayslip function EXISTS (correct function from Loans.gs)');
   } else {
-    Logger.log('❌ syncLoanTransactionFromPayslip function NOT FOUND');
+    Logger.log('❌ syncLoanForPayslip function NOT FOUND');
   }
 
-  // Check updatePayslipLoanPayment
+  // Check if validation function exists
   Logger.log('');
-  Logger.log('Checking updatePayslipLoanPayment function...');
+  Logger.log('Checking if validateLoanSync exists...');
+  if (typeof validateLoanSync === 'function') {
+    Logger.log('✅ validateLoanSync function EXISTS');
+  } else {
+    Logger.log('❌ validateLoanSync function NOT FOUND');
+  }
+
+  // Check updatePayslipLoanPayment uses correct function
+  Logger.log('');
+  Logger.log('Checking updatePayslipLoanPayment implementation...');
   const funcStr = updatePayslipLoanPayment.toString();
 
-  if (funcStr.includes('SYNC BLOCK START')) {
-    Logger.log('✅ Sync block EXISTS in updatePayslipLoanPayment');
+  if (funcStr.includes('syncLoanForPayslip')) {
+    Logger.log('✅ updatePayslipLoanPayment calls syncLoanForPayslip (correct)');
   } else {
-    Logger.log('❌ Sync block NOT FOUND in updatePayslipLoanPayment');
+    Logger.log('❌ updatePayslipLoanPayment does NOT call syncLoanForPayslip');
   }
 
-  if (funcStr.includes('PAYROLL.GS VERSION')) {
-    Logger.log('✅ Version marker EXISTS in updatePayslipLoanPayment');
+  if (funcStr.includes('validateLoanSync')) {
+    Logger.log('✅ updatePayslipLoanPayment includes validation');
   } else {
-    Logger.log('❌ Version marker NOT FOUND in updatePayslipLoanPayment');
+    Logger.log('❌ updatePayslipLoanPayment does NOT include validation');
+  }
+
+  if (funcStr.includes('OPTION 3')) {
+    Logger.log('✅ updatePayslipLoanPayment includes Option 3 fallback');
+  } else {
+    Logger.log('❌ updatePayslipLoanPayment does NOT include Option 3 fallback');
+  }
+
+  // Verify broken function is removed
+  Logger.log('');
+  Logger.log('Verifying broken function was removed...');
+  if (typeof syncLoanTransactionFromPayslip === 'function') {
+    Logger.log('⚠️ WARNING: syncLoanTransactionFromPayslip still exists (should be removed)');
+  } else {
+    Logger.log('✅ syncLoanTransactionFromPayslip removed (correct)');
   }
 
   Logger.log('');
