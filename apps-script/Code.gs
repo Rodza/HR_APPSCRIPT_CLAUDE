@@ -471,15 +471,20 @@ function getCurrentUser() {
   try {
     // Method 1: Try getActiveUser() - works when "Execute as: User accessing the web app"
     var activeEmail = Session.getActiveUser().getEmail();
-    if (activeEmail && activeEmail !== '') {
+    if (activeEmail && activeEmail !== '' && activeEmail !== 'system') {
+      Logger.log('Got user from getActiveUser(): ' + activeEmail);
       return activeEmail;
     }
 
     // Method 2: Try getEffectiveUser() - works when "Execute as: Me"
     var effectiveEmail = Session.getEffectiveUser().getEmail();
-    if (effectiveEmail && effectiveEmail !== '') {
+    if (effectiveEmail && effectiveEmail !== '' && effectiveEmail !== 'system') {
+      Logger.log('Got user from getEffectiveUser(): ' + effectiveEmail);
       return effectiveEmail;
     }
+
+    // Log what we got for debugging
+    Logger.log('⚠️ Could not get user email. Active: "' + activeEmail + '", Effective: "' + effectiveEmail + '"');
 
     // If both methods fail, return unknown
     return 'Unknown User';
@@ -516,11 +521,26 @@ function isAuthorizedUser() {
   var userEmail = getCurrentUser();
 
   // Unknown users are not authorized
-  if (userEmail === 'Unknown User') {
+  if (userEmail === 'Unknown User' || userEmail === '' || userEmail === 'system') {
     return false;
   }
 
-  // Check against UserConfig sheet
+  // SAFETY: If whitelist is empty, allow the script owner (for initial setup)
+  var authorizedUsers = getAuthorizedUsers();
+  if (authorizedUsers.length === 0) {
+    // Allow the owner to access when whitelist is empty
+    try {
+      var effectiveEmail = Session.getEffectiveUser().getEmail();
+      if (effectiveEmail && effectiveEmail !== '' && effectiveEmail === userEmail) {
+        Logger.log('⚠️ Whitelist is empty - granting access to owner: ' + effectiveEmail);
+        return true;
+      }
+    } catch (error) {
+      Logger.log('Error checking owner access: ' + error.toString());
+    }
+  }
+
+  // Check against whitelist
   return isUserAuthorized(userEmail);
 }
 
