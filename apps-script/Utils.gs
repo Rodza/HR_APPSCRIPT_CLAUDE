@@ -990,17 +990,36 @@ function parseCSV(csvString, hasHeaders) {
 
 /**
  * Get list of authorized user emails from UserConfig sheet
- * Returns empty array if sheet doesn't exist or has no data
+ * First tries to load from Script Properties (doesn't require spreadsheet access)
+ * Falls back to reading from UserConfig sheet if properties not set
  *
  * @returns {Array<string>} Array of authorized email addresses
  */
 function getAuthorizedUsers() {
   try {
+    // Method 1: Try Script Properties first (doesn't require spreadsheet access for users)
+    var scriptProperties = PropertiesService.getScriptProperties();
+    var whitelistJson = scriptProperties.getProperty('USER_WHITELIST');
+
+    if (whitelistJson) {
+      try {
+        var whitelist = JSON.parse(whitelistJson);
+        if (Array.isArray(whitelist) && whitelist.length > 0) {
+          logInfo('Loaded ' + whitelist.length + ' authorized users from Script Properties');
+          return whitelist;
+        }
+      } catch (parseError) {
+        logWarning('Failed to parse whitelist from Script Properties: ' + parseError.toString());
+      }
+    }
+
+    // Method 2: Fall back to UserConfig sheet (requires spreadsheet access)
+    // This will only work if the user has access to the spreadsheet
     var sheets = getSheets();
 
     // Check if UserConfig sheet exists
     if (!sheets.userConfig) {
-      logWarning('UserConfig sheet not found - no users authorized');
+      logWarning('UserConfig sheet not found and no Script Properties set - no users authorized');
       return [];
     }
 
@@ -1033,7 +1052,7 @@ function getAuthorizedUsers() {
       }
     }
 
-    logInfo('Loaded ' + authorizedEmails.length + ' authorized users from UserConfig');
+    logInfo('Loaded ' + authorizedEmails.length + ' authorized users from UserConfig sheet');
     return authorizedEmails;
 
   } catch (error) {
@@ -1112,6 +1131,117 @@ function setupUserConfigSheet() {
     return {
       success: false,
       error: 'Failed to create UserConfig sheet: ' + error.toString()
+    };
+  }
+}
+
+/**
+ * Sync UserConfig sheet to Script Properties
+ * This allows the whitelist to be accessed without requiring spreadsheet access
+ * Call this function after updating the UserConfig sheet
+ *
+ * @returns {Object} Result object with success status
+ */
+function syncUserConfigToProperties() {
+  try {
+    var sheets = getSheets();
+
+    // Check if UserConfig sheet exists
+    if (!sheets.userConfig) {
+      return {
+        success: false,
+        error: 'UserConfig sheet not found. Create it first using "Setup UserConfig Sheet".'
+      };
+    }
+
+    var sheet = sheets.userConfig;
+    var data = sheet.getDataRange().getValues();
+
+    // Check if sheet has data
+    if (data.length <= 1) {
+      return {
+        success: false,
+        error: 'UserConfig sheet is empty. Add authorized users first.'
+      };
+    }
+
+    // Get headers
+    var headers = data[0];
+    var emailIndex = indexOf(headers, 'Email');
+    var nameIndex = indexOf(headers, 'Name');
+
+    if (emailIndex === -1) {
+      return {
+        success: false,
+        error: 'UserConfig sheet missing "Email" column'
+      };
+    }
+
+    // Extract emails (skip header row)
+    var authorizedEmails = [];
+    for (var i = 1; i < data.length; i++) {
+      var email = data[i][emailIndex];
+
+      // Skip empty rows
+      if (email && typeof email === 'string' && email.trim() !== '') {
+        authorizedEmails.push(email.trim().toLowerCase());
+      }
+    }
+
+    if (authorizedEmails.length === 0) {
+      return {
+        success: false,
+        error: 'No valid email addresses found in UserConfig sheet'
+      };
+    }
+
+    // Save to Script Properties
+    var scriptProperties = PropertiesService.getScriptProperties();
+    scriptProperties.setProperty('USER_WHITELIST', JSON.stringify(authorizedEmails));
+    scriptProperties.setProperty('USER_WHITELIST_LAST_SYNC', new Date().toISOString());
+
+    logSuccess('Synced ' + authorizedEmails.length + ' users to Script Properties');
+
+    return {
+      success: true,
+      message: 'Successfully synced ' + authorizedEmails.length + ' authorized users',
+      count: authorizedEmails.length,
+      users: authorizedEmails
+    };
+
+  } catch (error) {
+    logError('Failed to sync UserConfig to properties', error);
+    return {
+      success: false,
+      error: 'Failed to sync: ' + error.toString()
+    };
+  }
+}
+
+/**
+ * Clear user whitelist from Script Properties
+ * Use this to reset the whitelist
+ *
+ * @returns {Object} Result object with success status
+ */
+function clearUserWhitelist() {
+  try {
+    var scriptProperties = PropertiesService.getScriptProperties();
+    scriptProperties.deleteProperty('USER_WHITELIST');
+    scriptProperties.deleteProperty('USER_WHITELIST_LAST_SYNC');
+
+    logSuccess('User whitelist cleared from Script Properties');
+
+    return {
+      success: true,
+      message: 'User whitelist cleared successfully'
+    };
+
+  } catch (error) {
+    logError('Failed to clear user whitelist', error);
+    return {
+      success: false,
+      error: 'Failed to clear whitelist: ' + error.toString()
     };
   }
 }

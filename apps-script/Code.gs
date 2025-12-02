@@ -392,14 +392,26 @@ function createConfigurationErrorPage(errorDetails) {
     '        <li>Click the <strong>Edit</strong> icon (pencil) on the active deployment</li>' +
     '        <li>Configure these settings:' +
     '          <ul>' +
-    '            <li><span class="highlight">Execute as:</span> User accessing the web app</li>' +
+    '            <li><span class="highlight">Execute as:</span> Me (owner email)</li>' +
     '            <li><span class="highlight">Who has access:</span> Anyone with Google account</li>' +
     '          </ul>' +
     '        </li>' +
     '        <li>Click <strong>New version</strong></li>' +
     '        <li>Click <strong>Deploy</strong></li>' +
+    '        <li><strong>IMPORTANT:</strong> In the spreadsheet, go to <code>HR System → User Access → Sync to Script Properties</code></li>' +
+    '        <li>This stores the whitelist without requiring spreadsheet access for users</li>' +
     '        <li>Copy the new web app URL and share it with users</li>' +
-    '        <li>Users will need to authorize the app on first access</li>' +
+    '      </ol>' +
+    '    </div>' +
+    '    <h2>Alternative: Share Spreadsheet with Users</h2>' +
+    '    <p>If the error persists, you may need to share the spreadsheet with your users:</p>' +
+    '    <div class="steps">' +
+    '      <ol>' +
+    '        <li>Open the spreadsheet</li>' +
+    '        <li>Click <strong>Share</strong> button (top right)</li>' +
+    '        <li>Add user emails or share with "Anyone in organization"</li>' +
+    '        <li>Set permission to <strong>Viewer</strong> (they don\'t need Edit access)</li>' +
+    '        <li>Users can now access the web app</li>' +
     '      </ol>' +
     '    </div>' +
     '    <h2>Users: Authorization Required</h2>' +
@@ -901,6 +913,11 @@ function runViewAuthorizedUsers() {
     // Get authorized users
     var authorizedUsers = getAuthorizedUsers();
 
+    // Check sync status
+    var scriptProperties = PropertiesService.getScriptProperties();
+    var lastSync = scriptProperties.getProperty('USER_WHITELIST_LAST_SYNC');
+    var syncStatus = lastSync ? '\n\nLast synced: ' + new Date(lastSync).toLocaleString() : '\n\n⚠️ Not synced to Script Properties yet';
+
     var message;
     if (authorizedUsers.length === 0) {
       message = 'No authorized users found.\n\n' +
@@ -908,15 +925,65 @@ function runViewAuthorizedUsers() {
                 'Use "Setup UserConfig Sheet" to create it.';
     } else {
       message = 'Authorized Users (' + authorizedUsers.length + '):\n\n';
-      for (var i = 0; i < authorizedUsers.length; i++) {
+      for (var i = 0; i < Math.min(authorizedUsers.length, 10); i++) {
         message += (i + 1) + '. ' + authorizedUsers[i] + '\n';
       }
-      message += '\n' +
-                 'Current user: ' + getCurrentUser() + '\n' +
+      if (authorizedUsers.length > 10) {
+        message += '... and ' + (authorizedUsers.length - 10) + ' more\n';
+      }
+      message += syncStatus;
+      message += '\n\nCurrent user: ' + getCurrentUser() + '\n' +
                  'Is authorized: ' + (isAuthorizedUser() ? 'YES ✓' : 'NO ✗');
     }
 
     ui.alert('Authorized Users', message, ui.ButtonSet.OK);
+
+  } catch (error) {
+    SpreadsheetApp.getUi().alert('Error: ' + error.toString());
+  }
+}
+
+/**
+ * Menu handler for syncing UserConfig to Script Properties
+ */
+function runSyncUserConfig() {
+  try {
+    var ui = SpreadsheetApp.getUi();
+
+    // Confirm with user
+    var response = ui.alert(
+      'Sync User Whitelist',
+      'This will copy the email addresses from UserConfig sheet to Script Properties.\n\n' +
+      'This allows users to access the web app without needing spreadsheet access.\n\n' +
+      '⚠️ IMPORTANT: Run this after adding/removing users from UserConfig sheet.\n\n' +
+      'Continue?',
+      ui.ButtonSet.YES_NO
+    );
+
+    if (response !== ui.Button.YES) {
+      return;
+    }
+
+    // Run sync
+    var result = syncUserConfigToProperties();
+
+    if (result.success) {
+      var userList = result.users.slice(0, 10).join('\n');
+      if (result.users.length > 10) {
+        userList += '\n... and ' + (result.users.length - 10) + ' more';
+      }
+
+      ui.alert(
+        'Success',
+        result.message + '\n\n' +
+        'Synced users:\n' + userList + '\n\n' +
+        '✓ Users can now access the web app without spreadsheet permissions\n' +
+        '✓ Deploy as "Execute as: Me" for best security',
+        ui.ButtonSet.OK
+      );
+    } else {
+      ui.alert('Error', 'Sync failed: ' + result.error, ui.ButtonSet.OK);
+    }
 
   } catch (error) {
     SpreadsheetApp.getUi().alert('Error: ' + error.toString());
@@ -953,7 +1020,9 @@ function onOpen() {
   // Add User Access submenu
   menu.addSubMenu(ui.createMenu('User Access')
     .addItem('⚙️ Setup UserConfig Sheet', 'runSetupUserConfigSheet')
-    .addItem('👥 View Authorized Users', 'runViewAuthorizedUsers'));
+    .addItem('👥 View Authorized Users', 'runViewAuthorizedUsers')
+    .addSeparator()
+    .addItem('🔄 Sync to Script Properties', 'runSyncUserConfig'));
 
   // Add other submenus (if you want to add more later)
   // menu.addSubMenu(ui.createMenu('Reports')...);
