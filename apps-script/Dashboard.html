@@ -521,9 +521,11 @@
         }
 
         function loadDashboardStats() {
+            console.log('Loading dashboard stats...');
             // Load employee count with proper error handling
             google.script.run
                 .withSuccessHandler(function(result) {
+                    console.log('listEmployees result:', result);
                     // FIX: Add null check before accessing properties
                     if (result && result.success && result.data && result.data.pagination) {
                         document.getElementById('totalEmployees').textContent = result.data.pagination.total;
@@ -544,6 +546,7 @@
             // Load outstanding loans total
             google.script.run
                 .withSuccessHandler(function(result) {
+                    console.log('getTotalOutstandingLoans result:', result);
                     if (result && result.success && result.data) {
                         document.getElementById('outstandingLoans').textContent = formatCurrency(result.data.total);
                     } else {
