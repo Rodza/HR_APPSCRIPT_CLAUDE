@@ -521,12 +521,14 @@
         }
 
         function loadDashboardStats() {
+            console.log('Loading dashboard stats...');
             // Load employee count with proper error handling
             google.script.run
                 .withSuccessHandler(function(result) {
+                    console.log('listEmployees result:', result);
                     // FIX: Add null check before accessing properties
-                    if (result && result.success && result.data) {
-                        document.getElementById('totalEmployees').textContent = result.data.length;
+                    if (result && result.success && result.data && result.data.pagination) {
+                        document.getElementById('totalEmployees').textContent = result.data.pagination.total;
                     } else if (result && Array.isArray(result)) {
                         // Handle case where listEmployees returns array directly
                         document.getElementById('totalEmployees').textContent = result.length;
@@ -539,11 +541,12 @@
                     console.error('Failed to load employee count:', error);
                     document.getElementById('totalEmployees').textContent = 'Error';
                 })
-                .listEmployees({ activeOnly: true });
+                .listEmployees({ activeOnly: true }, SESSION_TOKEN);
 
             // Load outstanding loans total
             google.script.run
                 .withSuccessHandler(function(result) {
+                    console.log('getTotalOutstandingLoans result:', result);
                     if (result && result.success && result.data) {
                         document.getElementById('outstandingLoans').textContent = formatCurrency(result.data.total);
                     } else {
@@ -554,7 +557,7 @@
                     console.error('Failed to load outstanding loans:', error);
                     document.getElementById('outstandingLoans').textContent = 'Error';
                 })
-                .getTotalOutstandingLoans();
+                .getTotalOutstandingLoans(SESSION_TOKEN);
 
             hideLoading();
         }
