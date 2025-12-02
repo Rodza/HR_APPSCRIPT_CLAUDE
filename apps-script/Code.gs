@@ -463,23 +463,28 @@ function include(filename) {
 
 /**
  * Get current user email
- * Tries multiple methods to get the user's email address
+ * When deployed as "Execute as: Me", this returns the owner's email for all users
+ * Use getActiveUser() with special handling for "Execute as: Me" deployments
  *
  * @returns {string} Email address of current user
  */
 function getCurrentUser() {
   try {
-    // Method 1: Try getActiveUser() - works when "Execute as: User accessing the web app"
+    // When deployed as "Execute as: Me", getActiveUser() returns blank
+    // and getEffectiveUser() returns owner's email
+
+    // Method 1: Try getActiveUser() - returns actual user when "Execute as: User"
     var activeEmail = Session.getActiveUser().getEmail();
     if (activeEmail && activeEmail !== '' && activeEmail !== 'system') {
       Logger.log('Got user from getActiveUser(): ' + activeEmail);
       return activeEmail;
     }
 
-    // Method 2: Try getEffectiveUser() - works when "Execute as: Me"
+    // Method 2: Try getEffectiveUser() - returns owner when "Execute as: Me"
     var effectiveEmail = Session.getEffectiveUser().getEmail();
     if (effectiveEmail && effectiveEmail !== '' && effectiveEmail !== 'system') {
-      Logger.log('Got user from getEffectiveUser(): ' + effectiveEmail);
+      Logger.log('Got user from getEffectiveUser() (owner): ' + effectiveEmail);
+      // When deployed as "Execute as: Me", everyone is identified as owner
       return effectiveEmail;
     }
 
