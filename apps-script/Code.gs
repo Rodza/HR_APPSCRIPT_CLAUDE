@@ -176,21 +176,35 @@ function diagnoseAuthorization() {
  */
 function doGet(e) {
   try {
+    logInfo('doGet called');
+
     // Check if user has a valid session
-    var sessionToken = e.parameter.session;
-    var userEmail = getUserFromSession(sessionToken);
+    var sessionToken = e.parameter ? e.parameter.session : null;
+    logInfo('Session token from URL: ' + (sessionToken ? 'Present' : 'Missing'));
+
+    var userEmail = null;
+    if (sessionToken) {
+      userEmail = getUserFromSession(sessionToken);
+      logInfo('User from session: ' + (userEmail || 'None'));
+    }
 
     if (userEmail) {
       // Valid session - show dashboard
+      logInfo('Showing dashboard for: ' + userEmail);
       return createDashboardPage(userEmail, sessionToken);
     }
 
     // No valid session - show login page
+    logInfo('No valid session, showing login page');
     return createLoginPage();
 
   } catch (error) {
+    logError('doGet error', error);
     return HtmlService.createHtmlOutput(
-      '<h1>Error</h1><p>Failed to load application: ' + error.toString() + '</p>'
+      '<h1>Error Loading Application</h1>' +
+      '<p><strong>Error:</strong> ' + error.toString() + '</p>' +
+      '<p><strong>Stack:</strong> ' + error.stack + '</p>' +
+      '<p><a href="' + ScriptApp.getService().getUrl() + '">Try Again</a></p>'
     ).setTitle('Error');
   }
 }
@@ -261,15 +275,28 @@ function createLoginPage() {
  * @returns {HtmlOutput} Dashboard page
  */
 function createDashboardPage(userEmail, sessionToken) {
-  var template = HtmlService.createTemplateFromFile('Dashboard');
-  template.userEmail = userEmail;
-  template.sessionToken = sessionToken;
+  try {
+    logInfo('Creating dashboard page for: ' + userEmail);
+    logInfo('Session token: ' + (sessionToken ? 'Present' : 'Missing'));
 
-  return template.evaluate()
-    .setTitle('SA HR Payroll System')
-    .setSandboxMode(HtmlService.SandboxMode.IFRAME)
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
-    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+    var template = HtmlService.createTemplateFromFile('Dashboard');
+    template.userEmail = userEmail;
+    template.sessionToken = sessionToken;
+
+    logInfo('Template created, evaluating...');
+    var output = template.evaluate()
+      .setTitle('SA HR Payroll System')
+      .setSandboxMode(HtmlService.SandboxMode.IFRAME)
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+
+    logInfo('Dashboard page created successfully');
+    return output;
+
+  } catch (error) {
+    logError('createDashboardPage error', error);
+    throw error;
+  }
 }
 
 /**
