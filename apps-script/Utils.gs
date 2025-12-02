@@ -989,6 +989,38 @@ function parseCSV(csvString, hasHeaders) {
 // ============================================================================
 
 /**
+ * Generates a random salt for password hashing.
+ * @returns {string} A unique salt.
+ */
+function generateSalt() {
+  return Utilities.getUuid();
+}
+
+/**
+ * Hashes a password with a given salt.
+ * @param {string} password The plain text password.
+ * @param {string} salt The salt to use for hashing.
+ * @returns {string} The hashed password.
+ */
+function hashPassword(password, salt) {
+  var saltedPassword = password + salt;
+  var signature = Utilities.computeHmacSha256Signature(saltedPassword, salt);
+  return Utilities.base64Encode(signature);
+}
+
+/**
+ * Verifies a password against a salt and hash.
+ * @param {string} password The plain text password to verify.
+ * @param {string} salt The salt used for the original hash.
+ * @param {string} hash The stored password hash.
+ * @returns {boolean} True if the password is correct, false otherwise.
+ */
+function verifyPassword(password, salt, hash) {
+  var newHash = hashPassword(password, salt);
+  return newHash === hash;
+}
+
+/**
  * Get list of authorized user emails from UserConfig sheet
  * First tries to load from Script Properties (doesn't require spreadsheet access)
  * Falls back to reading from UserConfig sheet if properties not set
@@ -997,66 +1029,16 @@ function parseCSV(csvString, hasHeaders) {
  */
 function getAuthorizedUsers() {
   try {
-    // Method 1: Try Script Properties first (doesn't require spreadsheet access for users)
     var scriptProperties = PropertiesService.getScriptProperties();
-    var whitelistJson = scriptProperties.getProperty('USER_WHITELIST');
+    var userConfigJson = scriptProperties.getProperty('USER_CONFIG_DATA');
 
-    if (whitelistJson) {
-      try {
-        var whitelist = JSON.parse(whitelistJson);
-        if (Array.isArray(whitelist) && whitelist.length > 0) {
-          logInfo('Loaded ' + whitelist.length + ' authorized users from Script Properties');
-          return whitelist;
-        }
-      } catch (parseError) {
-        logWarning('Failed to parse whitelist from Script Properties: ' + parseError.toString());
-      }
+    if (userConfigJson) {
+      var users = JSON.parse(userConfigJson);
+      return users.map(function(u) { return u.Email.toLowerCase(); });
     }
-
-    // Method 2: Fall back to UserConfig sheet (requires spreadsheet access)
-    // This will only work if the user has access to the spreadsheet
-    var sheets = getSheets();
-
-    // Check if UserConfig sheet exists
-    if (!sheets.userConfig) {
-      logWarning('UserConfig sheet not found and no Script Properties set - no users authorized');
-      return [];
-    }
-
-    var sheet = sheets.userConfig;
-    var data = sheet.getDataRange().getValues();
-
-    // Check if sheet has data
-    if (data.length <= 1) {
-      logWarning('UserConfig sheet is empty - no users authorized');
-      return [];
-    }
-
-    // Get headers
-    var headers = data[0];
-    var emailIndex = indexOf(headers, 'Email');
-
-    if (emailIndex === -1) {
-      logError('UserConfig sheet missing "Email" column');
-      return [];
-    }
-
-    // Extract emails (skip header row)
-    var authorizedEmails = [];
-    for (var i = 1; i < data.length; i++) {
-      var email = data[i][emailIndex];
-
-      // Skip empty rows
-      if (email && typeof email === 'string' && email.trim() !== '') {
-        authorizedEmails.push(email.trim().toLowerCase());
-      }
-    }
-
-    logInfo('Loaded ' + authorizedEmails.length + ' authorized users from UserConfig sheet');
-    return authorizedEmails;
-
+    return [];
   } catch (error) {
-    logError('Failed to get authorized users', error);
+    logError('Failed to get authorized users from Script Properties', error);
     return [];
   }
 }
@@ -1071,11 +1053,8 @@ function isUserAuthorized(userEmail) {
   if (!userEmail || typeof userEmail !== 'string') {
     return false;
   }
-
   var authorizedUsers = getAuthorizedUsers();
-  var normalizedEmail = userEmail.trim().toLowerCase();
-
-  return authorizedUsers.indexOf(normalizedEmail) >= 0;
+  return authorizedUsers.indexOf(userEmail.trim().toLowerCase()) !== -1;
 }
 
 /**
@@ -1147,7 +1126,6 @@ function syncUserConfigToProperties() {
   try {
     var sheets = getSheets();
 
-    // Check if UserConfig sheet exists
     if (!sheets.userConfig) {
       return {
         success: false,
@@ -1158,7 +1136,6 @@ function syncUserConfigToProperties() {
     var sheet = sheets.userConfig;
     var data = sheet.getDataRange().getValues();
 
-    // Check if sheet has data
     if (data.length <= 1) {
       return {
         success: false,
@@ -1166,48 +1143,38 @@ function syncUserConfigToProperties() {
       };
     }
 
-    // Get headers
     var headers = data[0];
-    var emailIndex = indexOf(headers, 'Email');
-    var nameIndex = indexOf(headers, 'Name');
-
-    if (emailIndex === -1) {
-      return {
-        success: false,
-        error: 'UserConfig sheet missing "Email" column'
-      };
-    }
-
-    // Extract emails (skip header row)
-    var authorizedEmails = [];
+    var users = [];
     for (var i = 1; i < data.length; i++) {
-      var email = data[i][emailIndex];
-
-      // Skip empty rows
-      if (email && typeof email === 'string' && email.trim() !== '') {
-        authorizedEmails.push(email.trim().toLowerCase());
+      var user = buildObjectFromRow(data[i], headers);
+      if (user.Email) { // only add users with email
+        users.push(user);
       }
     }
 
-    if (authorizedEmails.length === 0) {
+    if (users.length === 0) {
       return {
         success: false,
-        error: 'No valid email addresses found in UserConfig sheet'
+        error: 'No valid users found in UserConfig sheet'
       };
     }
 
     // Save to Script Properties
     var scriptProperties = PropertiesService.getScriptProperties();
-    scriptProperties.setProperty('USER_WHITELIST', JSON.stringify(authorizedEmails));
-    scriptProperties.setProperty('USER_WHITELIST_LAST_SYNC', new Date().toISOString());
+    scriptProperties.setProperty('USER_CONFIG_DATA', JSON.stringify(users));
+    scriptProperties.setProperty('USER_CONFIG_LAST_SYNC', new Date().toISOString());
 
-    logSuccess('Synced ' + authorizedEmails.length + ' users to Script Properties');
+    // Clean up old property
+    scriptProperties.deleteProperty('USER_WHITELIST');
+    scriptProperties.deleteProperty('USER_WHITELIST_LAST_SYNC');
+
+    logSuccess('Synced ' + users.length + ' users to Script Properties');
 
     return {
       success: true,
-      message: 'Successfully synced ' + authorizedEmails.length + ' authorized users',
-      count: authorizedEmails.length,
-      users: authorizedEmails
+      message: 'Successfully synced ' + users.length + ' authorized users',
+      count: users.length,
+      users: users.map(function(u) { return u.Email; })
     };
 
   } catch (error) {
@@ -1258,83 +1225,43 @@ function clearUserWhitelist() {
 function authenticateUser(email, password) {
   try {
     if (!email || !password) {
-      return {
-        success: false,
-        error: 'Email and password are required'
-      };
+      return { success: false, error: 'Email and password are required' };
     }
 
-    var sheets = getSheets();
-    if (!sheets.userConfig) {
-      return {
-        success: false,
-        error: 'User configuration not found. Contact administrator.'
-      };
+    var scriptProperties = PropertiesService.getScriptProperties();
+    var userConfigJson = scriptProperties.getProperty('USER_CONFIG_DATA');
+
+    if (!userConfigJson) {
+      return { success: false, error: 'User configuration not found. Please sync users.' };
     }
 
-    var sheet = sheets.userConfig;
-    var data = sheet.getDataRange().getValues();
-
-    if (data.length <= 1) {
-      return {
-        success: false,
-        error: 'No users configured. Contact administrator.'
-      };
-    }
-
-    // Get headers
-    var headers = data[0];
-    var emailIndex = indexOf(headers, 'Email');
-    var passwordIndex = indexOf(headers, 'Password');
-    var nameIndex = indexOf(headers, 'Name');
-
-    if (emailIndex === -1 || passwordIndex === -1) {
-      return {
-        success: false,
-        error: 'User configuration is invalid. Contact administrator.'
-      };
-    }
-
-    // Find user
+    var users = JSON.parse(userConfigJson);
     var normalizedEmail = email.trim().toLowerCase();
-    for (var i = 1; i < data.length; i++) {
-      var rowEmail = String(data[i][emailIndex] || '').trim().toLowerCase();
-      var rowPassword = String(data[i][passwordIndex] || '');
-      var rowName = String(data[i][nameIndex] || '');
+    var user = users.find(function(u) {
+      return u.Email.toLowerCase() === normalizedEmail;
+    });
 
-      if (rowEmail === normalizedEmail) {
-        // Found user - check password
-        if (rowPassword === password) {
-          logSuccess('User authenticated: ' + email);
-          return {
-            success: true,
-            user: {
-              email: email.trim(),
-              name: rowName
-            }
-          };
-        } else {
-          logWarning('Failed login attempt for: ' + email);
-          return {
-            success: false,
-            error: 'Invalid password'
-          };
-        }
+    if (user) {
+      if (verifyPassword(password, user.PasswordSalt, user.PasswordHash)) {
+        logSuccess('User authenticated: ' + email);
+        return {
+          success: true,
+          user: {
+            email: user.Email,
+            name: user.Name
+          }
+        };
+      } else {
+        logWarning('Failed login attempt for: ' + email);
+        return { success: false, error: 'Invalid password' };
       }
+    } else {
+      logWarning('Login attempt for unknown user: ' + email);
+      return { success: false, error: 'User not found' };
     }
-
-    logWarning('Login attempt for unknown user: ' + email);
-    return {
-      success: false,
-      error: 'User not found'
-    };
-
   } catch (error) {
     logError('Authentication error', error);
-    return {
-      success: false,
-      error: 'Authentication failed: ' + error.toString()
-    };
+    return { success: false, error: 'Authentication failed: ' + error.toString() };
   }
 }
 
@@ -1387,6 +1314,54 @@ function destroySession(sessionToken) {
   cache.remove('session_' + sessionToken);
 
   logInfo('Session destroyed');
+}
+
+/**
+ * Creates a new user with a salted and hashed password.
+ * @param {string} name The user's full name.
+ * @param {string} email The user's email address.
+ * @param {string} password The user's plain text password.
+ * @returns {Object} A result object indicating success or failure.
+ */
+function createNewUser(name, email, password) {
+  try {
+    var salt = generateSalt();
+    var hash = hashPassword(password, salt);
+
+    var sheets = getSheets();
+    if (!sheets.userConfig) {
+      setupUserConfigSheet();
+      sheets = getSheets();
+    }
+    var sheet = sheets.userConfig;
+    var data = sheet.getDataRange().getValues();
+    var headers = data[0];
+    var emailIndex = indexOf(headers, 'Email');
+
+    // Check if user already exists
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][emailIndex] === email) {
+        return { success: false, error: 'User already exists' };
+      }
+    }
+
+    var newRow = objectToRow({
+      'Name': name,
+      'Email': email,
+      'PasswordHash': hash,
+      'PasswordSalt': salt
+    }, headers);
+
+    sheet.appendRow(newRow);
+
+    // Sync properties after adding the new user
+    syncUserConfigToProperties();
+
+    return { success: true, user: { name: name, email: email } };
+  } catch (error) {
+    logError('Failed to create new user', error);
+    return { success: false, error: 'Failed to create new user: ' + error.toString() };
+  }
 }
 
 // ============================================================================

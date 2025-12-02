@@ -360,7 +360,8 @@ var PENDING_TIMESHEETS_COLUMNS = [
 var USER_CONFIG_COLUMNS = [
   'Name',                          // User's full name
   'Email',                         // User's email address
-  'Password'                       // User's password for login
+  'PasswordHash',                  // The salted hash of the user's password
+  'PasswordSalt'                   // The salt used for the password hash
 ];
 
 // ==================== ERROR MESSAGES ====================
