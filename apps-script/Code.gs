@@ -178,79 +178,14 @@ function doGet() {
     // CHECK AUTHORIZATION FIRST
     var currentUser = getCurrentUser();
 
+    // If we can't get the user's email, show configuration error
+    if (currentUser === 'Unknown User' || currentUser === '') {
+      return createConfigurationErrorPage();
+    }
+
     if (!isAuthorizedUser()) {
       // User is not authorized - show access denied page
-      var deniedHtml =
-        '<!DOCTYPE html>' +
-        '<html>' +
-        '<head>' +
-        '  <meta charset="utf-8">' +
-        '  <meta name="viewport" content="width=device-width, initial-scale=1">' +
-        '  <title>Access Denied - SA HR Payroll System</title>' +
-        '  <style>' +
-        '    body {' +
-        '      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;' +
-        '      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);' +
-        '      display: flex;' +
-        '      align-items: center;' +
-        '      justify-content: center;' +
-        '      min-height: 100vh;' +
-        '      margin: 0;' +
-        '      padding: 20px;' +
-        '    }' +
-        '    .container {' +
-        '      background: white;' +
-        '      border-radius: 12px;' +
-        '      box-shadow: 0 20px 60px rgba(0,0,0,0.3);' +
-        '      padding: 40px;' +
-        '      max-width: 500px;' +
-        '      text-align: center;' +
-        '    }' +
-        '    .icon {' +
-        '      font-size: 64px;' +
-        '      margin-bottom: 20px;' +
-        '    }' +
-        '    h1 {' +
-        '      color: #dc3545;' +
-        '      margin: 0 0 20px 0;' +
-        '      font-size: 28px;' +
-        '    }' +
-        '    p {' +
-        '      color: #666;' +
-        '      line-height: 1.6;' +
-        '      margin: 10px 0;' +
-        '    }' +
-        '    .user-info {' +
-        '      background: #f8f9fa;' +
-        '      border-radius: 6px;' +
-        '      padding: 15px;' +
-        '      margin: 20px 0;' +
-        '      font-family: monospace;' +
-        '      color: #495057;' +
-        '    }' +
-        '    .help-text {' +
-        '      font-size: 14px;' +
-        '      color: #6c757d;' +
-        '      margin-top: 30px;' +
-        '    }' +
-        '  </style>' +
-        '</head>' +
-        '<body>' +
-        '  <div class="container">' +
-        '    <div class="icon">🔒</div>' +
-        '    <h1>Access Denied</h1>' +
-        '    <p>You are not authorized to access this application.</p>' +
-        '    <div class="user-info">Your email: ' + currentUser + '</div>' +
-        '    <p class="help-text">' +
-        '      If you believe you should have access, please contact your administrator ' +
-        '      and provide them with your email address shown above.' +
-        '    </p>' +
-        '  </div>' +
-        '</body>' +
-        '</html>';
-
-      return HtmlService.createHtmlOutput(deniedHtml)
-        .setTitle('Access Denied');
+      return createAccessDeniedPage(currentUser);
     }
 
     // User is authorized - serve the dashboard
@@ -261,11 +196,229 @@ function doGet() {
       .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 
   } catch (error) {
-    // If Dashboard.html doesn't exist or other error, return error page
+    // Check if it's a permissions error
+    if (error.toString().indexOf('access') >= 0 || error.toString().indexOf('permission') >= 0) {
+      return createConfigurationErrorPage(error.toString());
+    }
+
+    // Other errors
     return HtmlService.createHtmlOutput(
       '<h1>Error</h1><p>Failed to load dashboard: ' + error.toString() + '</p>'
     ).setTitle('Error');
   }
+}
+
+/**
+ * Create access denied page HTML
+ * @param {string} userEmail - User's email address
+ * @returns {HtmlOutput} Access denied page
+ */
+function createAccessDeniedPage(userEmail) {
+  var deniedHtml =
+    '<!DOCTYPE html>' +
+    '<html>' +
+    '<head>' +
+    '  <meta charset="utf-8">' +
+    '  <meta name="viewport" content="width=device-width, initial-scale=1">' +
+    '  <title>Access Denied - SA HR Payroll System</title>' +
+    '  <style>' +
+    '    body {' +
+    '      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;' +
+    '      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);' +
+    '      display: flex;' +
+    '      align-items: center;' +
+    '      justify-content: center;' +
+    '      min-height: 100vh;' +
+    '      margin: 0;' +
+    '      padding: 20px;' +
+    '    }' +
+    '    .container {' +
+    '      background: white;' +
+    '      border-radius: 12px;' +
+    '      box-shadow: 0 20px 60px rgba(0,0,0,0.3);' +
+    '      padding: 40px;' +
+    '      max-width: 500px;' +
+    '      text-align: center;' +
+    '    }' +
+    '    .icon {' +
+    '      font-size: 64px;' +
+    '      margin-bottom: 20px;' +
+    '    }' +
+    '    h1 {' +
+    '      color: #dc3545;' +
+    '      margin: 0 0 20px 0;' +
+    '      font-size: 28px;' +
+    '    }' +
+    '    p {' +
+    '      color: #666;' +
+    '      line-height: 1.6;' +
+    '      margin: 10px 0;' +
+    '    }' +
+    '    .user-info {' +
+    '      background: #f8f9fa;' +
+    '      border-radius: 6px;' +
+    '      padding: 15px;' +
+    '      margin: 20px 0;' +
+    '      font-family: monospace;' +
+    '      color: #495057;' +
+    '    }' +
+    '    .help-text {' +
+    '      font-size: 14px;' +
+    '      color: #6c757d;' +
+    '      margin-top: 30px;' +
+    '    }' +
+    '  </style>' +
+    '</head>' +
+    '<body>' +
+    '  <div class="container">' +
+    '    <div class="icon">🔒</div>' +
+    '    <h1>Access Denied</h1>' +
+    '    <p>You are not authorized to access this application.</p>' +
+    '    <div class="user-info">Your email: ' + userEmail + '</div>' +
+    '    <p class="help-text">' +
+    '      If you believe you should have access, please contact your administrator ' +
+    '      and provide them with your email address shown above.' +
+    '    </p>' +
+    '  </div>' +
+    '</body>' +
+    '</html>';
+
+  return HtmlService.createHtmlOutput(deniedHtml)
+    .setTitle('Access Denied');
+}
+
+/**
+ * Create configuration error page HTML
+ * @param {string} errorDetails - Optional error details
+ * @returns {HtmlOutput} Configuration error page
+ */
+function createConfigurationErrorPage(errorDetails) {
+  var configErrorHtml =
+    '<!DOCTYPE html>' +
+    '<html>' +
+    '<head>' +
+    '  <meta charset="utf-8">' +
+    '  <meta name="viewport" content="width=device-width, initial-scale=1">' +
+    '  <title>Configuration Error - SA HR Payroll System</title>' +
+    '  <style>' +
+    '    body {' +
+    '      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;' +
+    '      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);' +
+    '      display: flex;' +
+    '      align-items: center;' +
+    '      justify-content: center;' +
+    '      min-height: 100vh;' +
+    '      margin: 0;' +
+    '      padding: 20px;' +
+    '    }' +
+    '    .container {' +
+    '      background: white;' +
+    '      border-radius: 12px;' +
+    '      box-shadow: 0 20px 60px rgba(0,0,0,0.3);' +
+    '      padding: 40px;' +
+    '      max-width: 600px;' +
+    '    }' +
+    '    .icon {' +
+    '      font-size: 64px;' +
+    '      margin-bottom: 20px;' +
+    '      text-align: center;' +
+    '    }' +
+    '    h1 {' +
+    '      color: #dc3545;' +
+    '      margin: 0 0 20px 0;' +
+    '      font-size: 28px;' +
+    '      text-align: center;' +
+    '    }' +
+    '    h2 {' +
+    '      color: #495057;' +
+    '      font-size: 18px;' +
+    '      margin: 30px 0 15px 0;' +
+    '    }' +
+    '    p, li {' +
+    '      color: #666;' +
+    '      line-height: 1.6;' +
+    '      margin: 10px 0;' +
+    '    }' +
+    '    .error-box {' +
+    '      background: #fff3cd;' +
+    '      border: 1px solid #ffc107;' +
+    '      border-radius: 6px;' +
+    '      padding: 15px;' +
+    '      margin: 20px 0;' +
+    '      font-size: 14px;' +
+    '      color: #856404;' +
+    '    }' +
+    '    .steps {' +
+    '      background: #f8f9fa;' +
+    '      border-radius: 6px;' +
+    '      padding: 20px;' +
+    '      margin: 20px 0;' +
+    '    }' +
+    '    .steps ol {' +
+    '      margin: 10px 0;' +
+    '      padding-left: 25px;' +
+    '    }' +
+    '    .steps li {' +
+    '      margin: 8px 0;' +
+    '    }' +
+    '    code {' +
+    '      background: #e9ecef;' +
+    '      padding: 2px 6px;' +
+    '      border-radius: 3px;' +
+    '      font-family: monospace;' +
+    '      font-size: 13px;' +
+    '    }' +
+    '    .highlight {' +
+    '      background: #fff3cd;' +
+    '      padding: 2px 6px;' +
+    '      border-radius: 3px;' +
+    '      font-weight: bold;' +
+    '    }' +
+    '  </style>' +
+    '</head>' +
+    '<body>' +
+    '  <div class="container">' +
+    '    <div class="icon">⚙️</div>' +
+    '    <h1>Web App Configuration Required</h1>' +
+    '    <p>The web app deployment settings need to be configured to allow user identification.</p>' +
+    (errorDetails ? '<div class="error-box"><strong>Error:</strong> ' + errorDetails + '</div>' : '') +
+    '    <h2>Administrator: Fix This Issue</h2>' +
+    '    <div class="steps">' +
+    '      <p><strong>Follow these steps to fix the configuration:</strong></p>' +
+    '      <ol>' +
+    '        <li>Open the spreadsheet in Google Sheets</li>' +
+    '        <li>Go to <code>Extensions → Apps Script</code></li>' +
+    '        <li>Click <code>Deploy → Manage deployments</code></li>' +
+    '        <li>Click the <strong>Edit</strong> icon (pencil) on the active deployment</li>' +
+    '        <li>Configure these settings:' +
+    '          <ul>' +
+    '            <li><span class="highlight">Execute as:</span> User accessing the web app</li>' +
+    '            <li><span class="highlight">Who has access:</span> Anyone with Google account</li>' +
+    '          </ul>' +
+    '        </li>' +
+    '        <li>Click <strong>New version</strong></li>' +
+    '        <li>Click <strong>Deploy</strong></li>' +
+    '        <li>Copy the new web app URL and share it with users</li>' +
+    '        <li>Users will need to authorize the app on first access</li>' +
+    '      </ol>' +
+    '    </div>' +
+    '    <h2>Users: Authorization Required</h2>' +
+    '    <p>When you first access the app after redeployment, you\'ll see an authorization screen:</p>' +
+    '    <div class="steps">' +
+    '      <ol>' +
+    '        <li>Click <strong>Review Permissions</strong></li>' +
+    '        <li>Select your Google account</li>' +
+    '        <li>Click <strong>Advanced</strong> (if you see a warning)</li>' +
+    '        <li>Click <strong>Go to [App Name] (unsafe)</strong> - This is safe, it\'s your organization\'s app</li>' +
+    '        <li>Review and click <strong>Allow</strong></li>' +
+    '      </ol>' +
+    '    </div>' +
+    '  </div>' +
+    '</body>' +
+    '</html>';
+
+  return HtmlService.createHtmlOutput(configErrorHtml)
+    .setTitle('Configuration Error');
 }
 
 /**
@@ -298,13 +451,28 @@ function include(filename) {
 
 /**
  * Get current user email
- * 
+ * Tries multiple methods to get the user's email address
+ *
  * @returns {string} Email address of current user
  */
 function getCurrentUser() {
   try {
-    return Session.getActiveUser().getEmail();
+    // Method 1: Try getActiveUser() - works when "Execute as: User accessing the web app"
+    var activeEmail = Session.getActiveUser().getEmail();
+    if (activeEmail && activeEmail !== '') {
+      return activeEmail;
+    }
+
+    // Method 2: Try getEffectiveUser() - works when "Execute as: Me"
+    var effectiveEmail = Session.getEffectiveUser().getEmail();
+    if (effectiveEmail && effectiveEmail !== '') {
+      return effectiveEmail;
+    }
+
+    // If both methods fail, return unknown
+    return 'Unknown User';
   } catch (error) {
+    Logger.log('Error getting user email: ' + error.toString());
     return 'Unknown User';
   }
 }
