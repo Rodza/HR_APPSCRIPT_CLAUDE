@@ -47,6 +47,11 @@
  */
 function addLoanTransaction(data) {
   try {
+    // Check authorization
+    if (!isAuthorizedUser()) {
+      throw new Error('Unauthorized: You do not have permission to add loan transactions');
+    }
+
     Logger.log('\n========== ADD LOAN TRANSACTION ==========');
     Logger.log('Input: ' + JSON.stringify(data));
 

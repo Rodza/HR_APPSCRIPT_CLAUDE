@@ -23,6 +23,11 @@
  */
 function createPayslip(data) {
   try {
+    // Check authorization
+    if (!isAuthorizedUser()) {
+      throw new Error('Unauthorized: You do not have permission to create payslips');
+    }
+
     // Map UI field names to internal field names (if needed)
     if (data.hours !== undefined) data.HOURS = data.hours;
     if (data.minutes !== undefined) data.MINUTES = data.minutes;
@@ -285,6 +290,11 @@ function getPayslip(recordNumber) {
  */
 function updatePayslip(recordNumber, data) {
   try {
+    // Check authorization
+    if (!isAuthorizedUser()) {
+      throw new Error('Unauthorized: You do not have permission to update payslips');
+    }
+
     Logger.log('\n========== UPDATE PAYSLIP ==========');
     Logger.log('ℹ️ Record Number: ' + recordNumber);
 
@@ -904,6 +914,11 @@ function test_calculatePayslip_UIF() {
  */
 function deletePayslip(recordNumber) {
   try {
+    // Check authorization
+    if (!isAuthorizedUser()) {
+      throw new Error('Unauthorized: You do not have permission to delete payslips');
+    }
+
     Logger.log('\n========== DELETE PAYSLIP ==========');
     Logger.log('ℹ️ Record Number: ' + recordNumber);
 

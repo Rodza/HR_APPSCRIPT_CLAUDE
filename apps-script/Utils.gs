@@ -299,6 +299,9 @@ function getSheets_v2() {
           sheets.pending = sheet;
         }
       }
+      else if (sheetName.indexOf('userconfig') >= 0 || sheetName.indexOf('authorizedusers') >= 0) {
+        sheets.userConfig = sheet;
+      }
     }
 
     return sheets;
@@ -979,6 +982,411 @@ function parseCSV(csvString, hasHeaders) {
   }
 
   return result;
+}
+
+// ============================================================================
+// USER AUTHORIZATION UTILITIES
+// ============================================================================
+
+/**
+ * Get list of authorized user emails from UserConfig sheet
+ * First tries to load from Script Properties (doesn't require spreadsheet access)
+ * Falls back to reading from UserConfig sheet if properties not set
+ *
+ * @returns {Array<string>} Array of authorized email addresses
+ */
+function getAuthorizedUsers() {
+  try {
+    // Method 1: Try Script Properties first (doesn't require spreadsheet access for users)
+    var scriptProperties = PropertiesService.getScriptProperties();
+    var whitelistJson = scriptProperties.getProperty('USER_WHITELIST');
+
+    if (whitelistJson) {
+      try {
+        var whitelist = JSON.parse(whitelistJson);
+        if (Array.isArray(whitelist) && whitelist.length > 0) {
+          logInfo('Loaded ' + whitelist.length + ' authorized users from Script Properties');
+          return whitelist;
+        }
+      } catch (parseError) {
+        logWarning('Failed to parse whitelist from Script Properties: ' + parseError.toString());
+      }
+    }
+
+    // Method 2: Fall back to UserConfig sheet (requires spreadsheet access)
+    // This will only work if the user has access to the spreadsheet
+    var sheets = getSheets();
+
+    // Check if UserConfig sheet exists
+    if (!sheets.userConfig) {
+      logWarning('UserConfig sheet not found and no Script Properties set - no users authorized');
+      return [];
+    }
+
+    var sheet = sheets.userConfig;
+    var data = sheet.getDataRange().getValues();
+
+    // Check if sheet has data
+    if (data.length <= 1) {
+      logWarning('UserConfig sheet is empty - no users authorized');
+      return [];
+    }
+
+    // Get headers
+    var headers = data[0];
+    var emailIndex = indexOf(headers, 'Email');
+
+    if (emailIndex === -1) {
+      logError('UserConfig sheet missing "Email" column');
+      return [];
+    }
+
+    // Extract emails (skip header row)
+    var authorizedEmails = [];
+    for (var i = 1; i < data.length; i++) {
+      var email = data[i][emailIndex];
+
+      // Skip empty rows
+      if (email && typeof email === 'string' && email.trim() !== '') {
+        authorizedEmails.push(email.trim().toLowerCase());
+      }
+    }
+
+    logInfo('Loaded ' + authorizedEmails.length + ' authorized users from UserConfig sheet');
+    return authorizedEmails;
+
+  } catch (error) {
+    logError('Failed to get authorized users', error);
+    return [];
+  }
+}
+
+/**
+ * Check if a user email is in the authorized users list
+ *
+ * @param {string} userEmail - Email address to check
+ * @returns {boolean} True if user is authorized
+ */
+function isUserAuthorized(userEmail) {
+  if (!userEmail || typeof userEmail !== 'string') {
+    return false;
+  }
+
+  var authorizedUsers = getAuthorizedUsers();
+  var normalizedEmail = userEmail.trim().toLowerCase();
+
+  return authorizedUsers.indexOf(normalizedEmail) >= 0;
+}
+
+/**
+ * Create UserConfig sheet with headers if it doesn't exist
+ * This is a helper function for initial setup
+ *
+ * @returns {Object} Result object with success status
+ */
+function setupUserConfigSheet() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheets = getSheets();
+
+    // Check if sheet already exists
+    if (sheets.userConfig) {
+      return {
+        success: true,
+        message: 'UserConfig sheet already exists',
+        sheetName: sheets.userConfig.getName()
+      };
+    }
+
+    // Create new sheet
+    var sheet = ss.insertSheet('UserConfig');
+
+    // Add headers
+    var headers = USER_CONFIG_COLUMNS;
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+
+    // Format header row
+    sheet.getRange(1, 1, 1, headers.length)
+      .setFontWeight('bold')
+      .setBackground('#4285f4')
+      .setFontColor('#ffffff');
+
+    // Set column widths
+    sheet.setColumnWidth(1, 200); // Name
+    sheet.setColumnWidth(2, 300); // Email
+    sheet.setColumnWidth(3, 150); // Password
+
+    // Freeze header row
+    sheet.setFrozenRows(1);
+
+    logSuccess('UserConfig sheet created successfully');
+
+    return {
+      success: true,
+      message: 'UserConfig sheet created successfully',
+      sheetName: 'UserConfig'
+    };
+
+  } catch (error) {
+    logError('Failed to create UserConfig sheet', error);
+    return {
+      success: false,
+      error: 'Failed to create UserConfig sheet: ' + error.toString()
+    };
+  }
+}
+
+/**
+ * Sync UserConfig sheet to Script Properties
+ * This allows the whitelist to be accessed without requiring spreadsheet access
+ * Call this function after updating the UserConfig sheet
+ *
+ * @returns {Object} Result object with success status
+ */
+function syncUserConfigToProperties() {
+  try {
+    var sheets = getSheets();
+
+    // Check if UserConfig sheet exists
+    if (!sheets.userConfig) {
+      return {
+        success: false,
+        error: 'UserConfig sheet not found. Create it first using "Setup UserConfig Sheet".'
+      };
+    }
+
+    var sheet = sheets.userConfig;
+    var data = sheet.getDataRange().getValues();
+
+    // Check if sheet has data
+    if (data.length <= 1) {
+      return {
+        success: false,
+        error: 'UserConfig sheet is empty. Add authorized users first.'
+      };
+    }
+
+    // Get headers
+    var headers = data[0];
+    var emailIndex = indexOf(headers, 'Email');
+    var nameIndex = indexOf(headers, 'Name');
+
+    if (emailIndex === -1) {
+      return {
+        success: false,
+        error: 'UserConfig sheet missing "Email" column'
+      };
+    }
+
+    // Extract emails (skip header row)
+    var authorizedEmails = [];
+    for (var i = 1; i < data.length; i++) {
+      var email = data[i][emailIndex];
+
+      // Skip empty rows
+      if (email && typeof email === 'string' && email.trim() !== '') {
+        authorizedEmails.push(email.trim().toLowerCase());
+      }
+    }
+
+    if (authorizedEmails.length === 0) {
+      return {
+        success: false,
+        error: 'No valid email addresses found in UserConfig sheet'
+      };
+    }
+
+    // Save to Script Properties
+    var scriptProperties = PropertiesService.getScriptProperties();
+    scriptProperties.setProperty('USER_WHITELIST', JSON.stringify(authorizedEmails));
+    scriptProperties.setProperty('USER_WHITELIST_LAST_SYNC', new Date().toISOString());
+
+    logSuccess('Synced ' + authorizedEmails.length + ' users to Script Properties');
+
+    return {
+      success: true,
+      message: 'Successfully synced ' + authorizedEmails.length + ' authorized users',
+      count: authorizedEmails.length,
+      users: authorizedEmails
+    };
+
+  } catch (error) {
+    logError('Failed to sync UserConfig to properties', error);
+    return {
+      success: false,
+      error: 'Failed to sync: ' + error.toString()
+    };
+  }
+}
+
+/**
+ * Clear user whitelist from Script Properties
+ * Use this to reset the whitelist
+ *
+ * @returns {Object} Result object with success status
+ */
+function clearUserWhitelist() {
+  try {
+    var scriptProperties = PropertiesService.getScriptProperties();
+    scriptProperties.deleteProperty('USER_WHITELIST');
+    scriptProperties.deleteProperty('USER_WHITELIST_LAST_SYNC');
+
+    logSuccess('User whitelist cleared from Script Properties');
+
+    return {
+      success: true,
+      message: 'User whitelist cleared successfully'
+    };
+
+  } catch (error) {
+    logError('Failed to clear user whitelist', error);
+    return {
+      success: false,
+      error: 'Failed to clear whitelist: ' + error.toString()
+    };
+  }
+}
+
+/**
+ * Authenticate user with email and password
+ * Checks credentials against UserConfig sheet
+ *
+ * @param {string} email - User's email address
+ * @param {string} password - User's password
+ * @returns {Object} Result object with success status and user info
+ */
+function authenticateUser(email, password) {
+  try {
+    if (!email || !password) {
+      return {
+        success: false,
+        error: 'Email and password are required'
+      };
+    }
+
+    var sheets = getSheets();
+    if (!sheets.userConfig) {
+      return {
+        success: false,
+        error: 'User configuration not found. Contact administrator.'
+      };
+    }
+
+    var sheet = sheets.userConfig;
+    var data = sheet.getDataRange().getValues();
+
+    if (data.length <= 1) {
+      return {
+        success: false,
+        error: 'No users configured. Contact administrator.'
+      };
+    }
+
+    // Get headers
+    var headers = data[0];
+    var emailIndex = indexOf(headers, 'Email');
+    var passwordIndex = indexOf(headers, 'Password');
+    var nameIndex = indexOf(headers, 'Name');
+
+    if (emailIndex === -1 || passwordIndex === -1) {
+      return {
+        success: false,
+        error: 'User configuration is invalid. Contact administrator.'
+      };
+    }
+
+    // Find user
+    var normalizedEmail = email.trim().toLowerCase();
+    for (var i = 1; i < data.length; i++) {
+      var rowEmail = String(data[i][emailIndex] || '').trim().toLowerCase();
+      var rowPassword = String(data[i][passwordIndex] || '');
+      var rowName = String(data[i][nameIndex] || '');
+
+      if (rowEmail === normalizedEmail) {
+        // Found user - check password
+        if (rowPassword === password) {
+          logSuccess('User authenticated: ' + email);
+          return {
+            success: true,
+            user: {
+              email: email.trim(),
+              name: rowName
+            }
+          };
+        } else {
+          logWarning('Failed login attempt for: ' + email);
+          return {
+            success: false,
+            error: 'Invalid password'
+          };
+        }
+      }
+    }
+
+    logWarning('Login attempt for unknown user: ' + email);
+    return {
+      success: false,
+      error: 'User not found'
+    };
+
+  } catch (error) {
+    logError('Authentication error', error);
+    return {
+      success: false,
+      error: 'Authentication failed: ' + error.toString()
+    };
+  }
+}
+
+/**
+ * Create session for authenticated user
+ * Stores user email in CacheService for 6 hours
+ *
+ * @param {string} email - User's email address
+ * @returns {string} Session token
+ */
+function createUserSession(email) {
+  var sessionToken = Utilities.getUuid();
+  var cache = CacheService.getScriptCache();
+
+  // Store for 6 hours (21600 seconds)
+  cache.put('session_' + sessionToken, email, 21600);
+
+  logInfo('Session created for: ' + email);
+  return sessionToken;
+}
+
+/**
+ * Get user email from session token
+ *
+ * @param {string} sessionToken - Session token
+ * @returns {string|null} User email or null if session invalid
+ */
+function getUserFromSession(sessionToken) {
+  if (!sessionToken) {
+    return null;
+  }
+
+  var cache = CacheService.getScriptCache();
+  var email = cache.get('session_' + sessionToken);
+
+  return email;
+}
+
+/**
+ * Destroy user session
+ *
+ * @param {string} sessionToken - Session token to destroy
+ */
+function destroySession(sessionToken) {
+  if (!sessionToken) {
+    return;
+  }
+
+  var cache = CacheService.getScriptCache();
+  cache.remove('session_' + sessionToken);
+
+  logInfo('Session destroyed');
 }
 
 // ============================================================================

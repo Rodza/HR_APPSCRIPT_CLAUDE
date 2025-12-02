@@ -171,21 +171,357 @@ function diagnoseAuthorization() {
  * Main entry point for GET requests
  * This function is called when someone visits the web app URL
  *
- * @returns {HtmlOutput} The main dashboard HTML
+ * @param {Object} e - Event parameter with query string
+ * @returns {HtmlOutput} Login page or dashboard
  */
-function doGet() {
+function doGet(e) {
   try {
-    return HtmlService.createHtmlOutputFromFile('Dashboard')
+    logInfo('doGet called');
+
+    // Check if user has a valid session
+    var sessionToken = e.parameter ? e.parameter.session : null;
+    logInfo('Session token from URL: ' + (sessionToken ? 'Present' : 'Missing'));
+
+    var userEmail = null;
+    if (sessionToken) {
+      userEmail = getUserFromSession(sessionToken);
+      logInfo('User from session: ' + (userEmail || 'None'));
+    }
+
+    if (userEmail) {
+      // Valid session - show dashboard
+      logInfo('Showing dashboard for: ' + userEmail);
+      return createDashboardPage(userEmail, sessionToken);
+    }
+
+    // No valid session - show login page
+    logInfo('No valid session, showing login page');
+    return createLoginPage();
+
+  } catch (error) {
+    logError('doGet error', error);
+    return HtmlService.createHtmlOutput(
+      '<h1>Error Loading Application</h1>' +
+      '<p><strong>Error:</strong> ' + error.toString() + '</p>' +
+      '<p><strong>Stack:</strong> ' + error.stack + '</p>' +
+      '<p><a href="' + ScriptApp.getService().getUrl() + '">Try Again</a></p>'
+    ).setTitle('Error');
+  }
+}
+
+/**
+ * Handle login form submission
+ *
+ * @param {string} email - User email
+ * @param {string} password - User password
+ * @returns {Object} Result with session token if successful
+ */
+function handleLogin(email, password) {
+  var result = authenticateUser(email, password);
+
+  if (result.success) {
+    var sessionToken = createUserSession(result.user.email);
+    return {
+      success: true,
+      sessionToken: sessionToken,
+      user: result.user
+    };
+  }
+
+  return result;
+}
+
+/**
+ * Handle logout
+ *
+ * @param {string} sessionToken - Session token to destroy
+ * @returns {Object} Result
+ */
+function handleLogout(sessionToken) {
+  destroySession(sessionToken);
+  return {
+    success: true,
+    message: 'Logged out successfully'
+  };
+}
+
+/**
+ * Get current logged-in user email from session
+ *
+ * @param {string} sessionToken - Session token
+ * @returns {string|null} User email or null
+ */
+function getSessionUser(sessionToken) {
+  return getUserFromSession(sessionToken);
+}
+
+/**
+ * Create login page HTML
+ * @returns {HtmlOutput} Login page
+ */
+function createLoginPage() {
+  var loginHtml = HtmlService.createHtmlOutputFromFile('Login')
+    .setTitle('Login - SA HR Payroll System')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+
+  return loginHtml;
+}
+
+/**
+ * Create dashboard page with session
+ * @param {string} userEmail - Logged in user's email
+ * @param {string} sessionToken - Session token
+ * @returns {HtmlOutput} Dashboard page
+ */
+function createDashboardPage(userEmail, sessionToken) {
+  try {
+    logInfo('Creating dashboard page for: ' + userEmail);
+    logInfo('Session token: ' + (sessionToken ? 'Present' : 'Missing'));
+
+    var template = HtmlService.createTemplateFromFile('Dashboard');
+    template.userEmail = userEmail;
+    template.sessionToken = sessionToken;
+
+    logInfo('Template created, evaluating...');
+    var output = template.evaluate()
       .setTitle('SA HR Payroll System')
       .setSandboxMode(HtmlService.SandboxMode.IFRAME)
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
       .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+
+    logInfo('Dashboard page created successfully');
+    return output;
+
   } catch (error) {
-    // If Dashboard.html doesn't exist, return error page
-    return HtmlService.createHtmlOutput(
-      '<h1>Error</h1><p>Failed to load dashboard: ' + error.toString() + '</p>'
-    ).setTitle('Error');
+    logError('createDashboardPage error', error);
+    throw error;
   }
+}
+
+/**
+ * Create access denied page HTML
+ * @param {string} userEmail - User's email address
+ * @returns {HtmlOutput} Access denied page
+ */
+function createAccessDeniedPage(userEmail) {
+  var deniedHtml =
+    '<!DOCTYPE html>' +
+    '<html>' +
+    '<head>' +
+    '  <meta charset="utf-8">' +
+    '  <meta name="viewport" content="width=device-width, initial-scale=1">' +
+    '  <title>Access Denied - SA HR Payroll System</title>' +
+    '  <style>' +
+    '    body {' +
+    '      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;' +
+    '      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);' +
+    '      display: flex;' +
+    '      align-items: center;' +
+    '      justify-content: center;' +
+    '      min-height: 100vh;' +
+    '      margin: 0;' +
+    '      padding: 20px;' +
+    '    }' +
+    '    .container {' +
+    '      background: white;' +
+    '      border-radius: 12px;' +
+    '      box-shadow: 0 20px 60px rgba(0,0,0,0.3);' +
+    '      padding: 40px;' +
+    '      max-width: 500px;' +
+    '      text-align: center;' +
+    '    }' +
+    '    .icon {' +
+    '      font-size: 64px;' +
+    '      margin-bottom: 20px;' +
+    '    }' +
+    '    h1 {' +
+    '      color: #dc3545;' +
+    '      margin: 0 0 20px 0;' +
+    '      font-size: 28px;' +
+    '    }' +
+    '    p {' +
+    '      color: #666;' +
+    '      line-height: 1.6;' +
+    '      margin: 10px 0;' +
+    '    }' +
+    '    .user-info {' +
+    '      background: #f8f9fa;' +
+    '      border-radius: 6px;' +
+    '      padding: 15px;' +
+    '      margin: 20px 0;' +
+    '      font-family: monospace;' +
+    '      color: #495057;' +
+    '    }' +
+    '    .help-text {' +
+    '      font-size: 14px;' +
+    '      color: #6c757d;' +
+    '      margin-top: 30px;' +
+    '    }' +
+    '  </style>' +
+    '</head>' +
+    '<body>' +
+    '  <div class="container">' +
+    '    <div class="icon">🔒</div>' +
+    '    <h1>Access Denied</h1>' +
+    '    <p>You are not authorized to access this application.</p>' +
+    '    <div class="user-info">Your email: ' + userEmail + '</div>' +
+    '    <p class="help-text">' +
+    '      If you believe you should have access, please contact your administrator ' +
+    '      and provide them with your email address shown above.' +
+    '    </p>' +
+    '  </div>' +
+    '</body>' +
+    '</html>';
+
+  return HtmlService.createHtmlOutput(deniedHtml)
+    .setTitle('Access Denied');
+}
+
+/**
+ * Create configuration error page HTML
+ * @param {string} errorDetails - Optional error details
+ * @returns {HtmlOutput} Configuration error page
+ */
+function createConfigurationErrorPage(errorDetails) {
+  var configErrorHtml =
+    '<!DOCTYPE html>' +
+    '<html>' +
+    '<head>' +
+    '  <meta charset="utf-8">' +
+    '  <meta name="viewport" content="width=device-width, initial-scale=1">' +
+    '  <title>Configuration Error - SA HR Payroll System</title>' +
+    '  <style>' +
+    '    body {' +
+    '      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;' +
+    '      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);' +
+    '      display: flex;' +
+    '      align-items: center;' +
+    '      justify-content: center;' +
+    '      min-height: 100vh;' +
+    '      margin: 0;' +
+    '      padding: 20px;' +
+    '    }' +
+    '    .container {' +
+    '      background: white;' +
+    '      border-radius: 12px;' +
+    '      box-shadow: 0 20px 60px rgba(0,0,0,0.3);' +
+    '      padding: 40px;' +
+    '      max-width: 600px;' +
+    '    }' +
+    '    .icon {' +
+    '      font-size: 64px;' +
+    '      margin-bottom: 20px;' +
+    '      text-align: center;' +
+    '    }' +
+    '    h1 {' +
+    '      color: #dc3545;' +
+    '      margin: 0 0 20px 0;' +
+    '      font-size: 28px;' +
+    '      text-align: center;' +
+    '    }' +
+    '    h2 {' +
+    '      color: #495057;' +
+    '      font-size: 18px;' +
+    '      margin: 30px 0 15px 0;' +
+    '    }' +
+    '    p, li {' +
+    '      color: #666;' +
+    '      line-height: 1.6;' +
+    '      margin: 10px 0;' +
+    '    }' +
+    '    .error-box {' +
+    '      background: #fff3cd;' +
+    '      border: 1px solid #ffc107;' +
+    '      border-radius: 6px;' +
+    '      padding: 15px;' +
+    '      margin: 20px 0;' +
+    '      font-size: 14px;' +
+    '      color: #856404;' +
+    '    }' +
+    '    .steps {' +
+    '      background: #f8f9fa;' +
+    '      border-radius: 6px;' +
+    '      padding: 20px;' +
+    '      margin: 20px 0;' +
+    '    }' +
+    '    .steps ol {' +
+    '      margin: 10px 0;' +
+    '      padding-left: 25px;' +
+    '    }' +
+    '    .steps li {' +
+    '      margin: 8px 0;' +
+    '    }' +
+    '    code {' +
+    '      background: #e9ecef;' +
+    '      padding: 2px 6px;' +
+    '      border-radius: 3px;' +
+    '      font-family: monospace;' +
+    '      font-size: 13px;' +
+    '    }' +
+    '    .highlight {' +
+    '      background: #fff3cd;' +
+    '      padding: 2px 6px;' +
+    '      border-radius: 3px;' +
+    '      font-weight: bold;' +
+    '    }' +
+    '  </style>' +
+    '</head>' +
+    '<body>' +
+    '  <div class="container">' +
+    '    <div class="icon">⚙️</div>' +
+    '    <h1>Web App Configuration Required</h1>' +
+    '    <p>The web app deployment settings need to be configured to allow user identification.</p>' +
+    (errorDetails ? '<div class="error-box"><strong>Error:</strong> ' + errorDetails + '</div>' : '') +
+    '    <h2>Administrator: Fix This Issue</h2>' +
+    '    <div class="steps">' +
+    '      <p><strong>Follow these steps to fix the configuration:</strong></p>' +
+    '      <ol>' +
+    '        <li>Open the spreadsheet in Google Sheets</li>' +
+    '        <li>Go to <code>Extensions → Apps Script</code></li>' +
+    '        <li>Click <code>Deploy → Manage deployments</code></li>' +
+    '        <li>Click the <strong>Edit</strong> icon (pencil) on the active deployment</li>' +
+    '        <li>Configure these settings:' +
+    '          <ul>' +
+    '            <li><span class="highlight">Execute as:</span> Me (owner email)</li>' +
+    '            <li><span class="highlight">Who has access:</span> Anyone with Google account</li>' +
+    '          </ul>' +
+    '        </li>' +
+    '        <li>Click <strong>New version</strong></li>' +
+    '        <li>Click <strong>Deploy</strong></li>' +
+    '        <li><strong>IMPORTANT:</strong> In the spreadsheet, go to <code>HR System → User Access → Sync to Script Properties</code></li>' +
+    '        <li>This stores the whitelist without requiring spreadsheet access for users</li>' +
+    '        <li>Copy the new web app URL and share it with users</li>' +
+    '      </ol>' +
+    '    </div>' +
+    '    <h2>Alternative: Share Spreadsheet with Users</h2>' +
+    '    <p>If the error persists, you may need to share the spreadsheet with your users:</p>' +
+    '    <div class="steps">' +
+    '      <ol>' +
+    '        <li>Open the spreadsheet</li>' +
+    '        <li>Click <strong>Share</strong> button (top right)</li>' +
+    '        <li>Add user emails or share with "Anyone in organization"</li>' +
+    '        <li>Set permission to <strong>Viewer</strong> (they don\'t need Edit access)</li>' +
+    '        <li>Users can now access the web app</li>' +
+    '      </ol>' +
+    '    </div>' +
+    '    <h2>Users: Authorization Required</h2>' +
+    '    <p>When you first access the app after redeployment, you\'ll see an authorization screen:</p>' +
+    '    <div class="steps">' +
+    '      <ol>' +
+    '        <li>Click <strong>Review Permissions</strong></li>' +
+    '        <li>Select your Google account</li>' +
+    '        <li>Click <strong>Advanced</strong> (if you see a warning)</li>' +
+    '        <li>Click <strong>Go to [App Name] (unsafe)</strong> - This is safe, it\'s your organization\'s app</li>' +
+    '        <li>Review and click <strong>Allow</strong></li>' +
+    '      </ol>' +
+    '    </div>' +
+    '  </div>' +
+    '</body>' +
+    '</html>';
+
+  return HtmlService.createHtmlOutput(configErrorHtml)
+    .setTitle('Configuration Error');
 }
 
 /**
@@ -218,32 +554,86 @@ function include(filename) {
 
 /**
  * Get current user email
- * 
+ * For login system, this is called with sessionToken from client
+ *
+ * @param {string} sessionToken - Optional session token from logged-in user
  * @returns {string} Email address of current user
  */
-function getCurrentUser() {
+function getCurrentUser(sessionToken) {
   try {
-    return Session.getActiveUser().getEmail();
+    // If session token provided, use that
+    if (sessionToken) {
+      var email = getUserFromSession(sessionToken);
+      if (email) {
+        return email;
+      }
+    }
+
+    // Fallback: Try to get from Google Session (for spreadsheet menu functions)
+    try {
+      var effectiveEmail = Session.getEffectiveUser().getEmail();
+      if (effectiveEmail && effectiveEmail !== '' && effectiveEmail !== 'system') {
+        return effectiveEmail;
+      }
+    } catch (e) {
+      // Ignore
+    }
+
+    return 'Unknown User';
   } catch (error) {
+    Logger.log('Error getting user email: ' + error.toString());
     return 'Unknown User';
   }
 }
 
 /**
  * Check if user has admin access
- * 
+ *
  * @returns {boolean} True if user is admin
  */
 function isAdmin() {
   var userEmail = getCurrentUser();
-  
+
   // Define admin emails (customize as needed)
   var adminEmails = [
     'admin@sagrindingwheels.co.za',
     'owner@sagrindingwheels.co.za'
   ];
-  
+
   return adminEmails.indexOf(userEmail) >= 0;
+}
+
+/**
+ * Check if user is authorized to access the system
+ * Checks against the UserConfig sheet for whitelisted users
+ *
+ * @returns {boolean} True if user is authorized
+ */
+function isAuthorizedUser() {
+  var userEmail = getCurrentUser();
+
+  // Unknown users are not authorized
+  if (userEmail === 'Unknown User' || userEmail === '' || userEmail === 'system') {
+    return false;
+  }
+
+  // SAFETY: If whitelist is empty, allow the script owner (for initial setup)
+  var authorizedUsers = getAuthorizedUsers();
+  if (authorizedUsers.length === 0) {
+    // Allow the owner to access when whitelist is empty
+    try {
+      var effectiveEmail = Session.getEffectiveUser().getEmail();
+      if (effectiveEmail && effectiveEmail !== '' && effectiveEmail === userEmail) {
+        Logger.log('⚠️ Whitelist is empty - granting access to owner: ' + effectiveEmail);
+        return true;
+      }
+    } catch (error) {
+      Logger.log('Error checking owner access: ' + error.toString());
+    }
+  }
+
+  // Check against whitelist
+  return isUserAuthorized(userEmail);
 }
 
 /**
@@ -288,8 +678,9 @@ function getClientConfig() {
   return {
     user: getCurrentUser(),
     isAdmin: isAdmin(),
-    version: '1.3.0-timesheet-integration', // Version identifier to track deployment
-    lastUpdate: '2025-11-17T00:00:00Z',
+    isAuthorized: isAuthorizedUser(),
+    version: '1.4.0-user-whitelist', // Version identifier to track deployment
+    lastUpdate: '2025-12-01T00:00:00Z',
     features: {
       employees: true,
       leave: true,
@@ -297,7 +688,8 @@ function getClientConfig() {
       timesheets: true,
       timesheetIntegration: true,  // NEW - Clock-in integration
       payroll: true,  // ENABLED - Fixed module loading
-      reports: true
+      reports: true,
+      userWhitelist: true  // NEW - User whitelist access control
     }
   };
 }
@@ -579,6 +971,138 @@ function runCheckPendingTimesheetsHeaders() {
 }
 
 /**
+ * Menu handler for setting up UserConfig sheet
+ */
+function runSetupUserConfigSheet() {
+  try {
+    var ui = SpreadsheetApp.getUi();
+
+    // Confirm with user
+    var response = ui.alert(
+      'Setup UserConfig Sheet',
+      'This will create the UserConfig sheet for managing authorized users.\n\n' +
+      'The sheet will have two columns:\n' +
+      '• Name - User\'s full name\n' +
+      '• Email - User\'s email address (must match their Google account)\n\n' +
+      'Continue?',
+      ui.ButtonSet.YES_NO
+    );
+
+    if (response !== ui.Button.YES) {
+      return;
+    }
+
+    // Run setup
+    var result = setupUserConfigSheet();
+
+    if (result.success) {
+      ui.alert(
+        'Success',
+        result.message + '\n\n' +
+        'Sheet: ' + result.sheetName + '\n\n' +
+        'Next steps:\n' +
+        '1. Add authorized users to the UserConfig sheet\n' +
+        '2. Enter their Name and Email (must match their Google account)\n' +
+        '3. Redeploy the web app for changes to take effect',
+        ui.ButtonSet.OK
+      );
+    } else {
+      ui.alert('Error', 'Setup failed: ' + result.error, ui.ButtonSet.OK);
+    }
+
+  } catch (error) {
+    SpreadsheetApp.getUi().alert('Error: ' + error.toString());
+  }
+}
+
+/**
+ * Menu handler for viewing authorized users
+ */
+function runViewAuthorizedUsers() {
+  try {
+    var ui = SpreadsheetApp.getUi();
+
+    // Get authorized users
+    var authorizedUsers = getAuthorizedUsers();
+
+    // Check sync status
+    var scriptProperties = PropertiesService.getScriptProperties();
+    var lastSync = scriptProperties.getProperty('USER_WHITELIST_LAST_SYNC');
+    var syncStatus = lastSync ? '\n\nLast synced: ' + new Date(lastSync).toLocaleString() : '\n\n⚠️ Not synced to Script Properties yet';
+
+    var message;
+    if (authorizedUsers.length === 0) {
+      message = 'No authorized users found.\n\n' +
+                'The UserConfig sheet may not exist or may be empty.\n\n' +
+                'Use "Setup UserConfig Sheet" to create it.';
+    } else {
+      message = 'Authorized Users (' + authorizedUsers.length + '):\n\n';
+      for (var i = 0; i < Math.min(authorizedUsers.length, 10); i++) {
+        message += (i + 1) + '. ' + authorizedUsers[i] + '\n';
+      }
+      if (authorizedUsers.length > 10) {
+        message += '... and ' + (authorizedUsers.length - 10) + ' more\n';
+      }
+      message += syncStatus;
+      message += '\n\nCurrent user: ' + getCurrentUser() + '\n' +
+                 'Is authorized: ' + (isAuthorizedUser() ? 'YES ✓' : 'NO ✗');
+    }
+
+    ui.alert('Authorized Users', message, ui.ButtonSet.OK);
+
+  } catch (error) {
+    SpreadsheetApp.getUi().alert('Error: ' + error.toString());
+  }
+}
+
+/**
+ * Menu handler for syncing UserConfig to Script Properties
+ */
+function runSyncUserConfig() {
+  try {
+    var ui = SpreadsheetApp.getUi();
+
+    // Confirm with user
+    var response = ui.alert(
+      'Sync User Whitelist',
+      'This will copy the email addresses from UserConfig sheet to Script Properties.\n\n' +
+      'This allows users to access the web app without needing spreadsheet access.\n\n' +
+      '⚠️ IMPORTANT: Run this after adding/removing users from UserConfig sheet.\n\n' +
+      'Continue?',
+      ui.ButtonSet.YES_NO
+    );
+
+    if (response !== ui.Button.YES) {
+      return;
+    }
+
+    // Run sync
+    var result = syncUserConfigToProperties();
+
+    if (result.success) {
+      var userList = result.users.slice(0, 10).join('\n');
+      if (result.users.length > 10) {
+        userList += '\n... and ' + (result.users.length - 10) + ' more';
+      }
+
+      ui.alert(
+        'Success',
+        result.message + '\n\n' +
+        'Synced users:\n' + userList + '\n\n' +
+        '✓ Users can now access the web app without spreadsheet permissions\n' +
+        '✓ Deploy as "Execute as: Me" for best security',
+        ui.ButtonSet.OK
+      );
+    } else {
+      ui.alert('Error', 'Sync failed: ' + result.error, ui.ButtonSet.OK);
+    }
+
+  } catch (error) {
+    SpreadsheetApp.getUi().alert('Error: ' + error.toString());
+  }
+}
+
+/**
  * Create custom menu on spreadsheet open
  * Adds HR System menu with all modules
  */
@@ -605,6 +1129,13 @@ function onOpen() {
     .addSeparator()
     .addItem('📋 Check PendingTimesheets Headers', 'runCheckPendingTimesheetsHeaders'));
 
+  // Add User Access submenu
+  menu.addSubMenu(ui.createMenu('User Access')
+    .addItem('⚙️ Setup UserConfig Sheet', 'runSetupUserConfigSheet')
+    .addItem('👥 View Authorized Users', 'runViewAuthorizedUsers')
+    .addSeparator()
+    .addItem('🔄 Sync to Script Properties', 'runSyncUserConfig'));
+
   // Add other submenus (if you want to add more later)
   // menu.addSubMenu(ui.createMenu('Reports')...);
 
@@ -618,18 +1149,20 @@ function onOpen() {
  */
 function getVersion() {
   return {
-    version: '1.3.0-timesheet-integration',
-    lastUpdate: '2025-11-17T00:00:00Z',
+    version: '1.4.0-user-whitelist',
+    lastUpdate: '2025-12-01T00:00:00Z',
     hasFixedSheetMapping: true,
     hasLoggingFunctions: true,
     hasFormatResponse: true,
     hasPayrollModule: true,
     hasTimesheetIntegration: true,
+    hasUserWhitelist: true,
     payrollFeatures: {
       createPayslip: true,
       calculatePayslipPreview: true,
       fieldMapping: true,
-      moduleLoading: true
+      moduleLoading: true,
+      authorizationCheck: true
     },
     timesheetFeatures: {
       clockInImport: true,
@@ -639,7 +1172,13 @@ function getVersion() {
       employeeValidation: true,
       settingsInterface: true
     },
-    deploymentStatus: 'Payroll + Timesheet Integration fully enabled'
+    securityFeatures: {
+      userWhitelist: true,
+      userConfigSheet: true,
+      entryPointProtection: true,
+      criticalOperationProtection: true
+    },
+    deploymentStatus: 'Payroll + Timesheet Integration + User Whitelist fully enabled'
   };
 }
 
