@@ -359,7 +359,8 @@ var PENDING_TIMESHEETS_COLUMNS = [
  */
 var USER_CONFIG_COLUMNS = [
   'Name',                          // User's full name
-  'Email'                          // User's email address (must match Google account)
+  'Email',                         // User's email address
+  'Password'                       // User's password for login
 ];
 
 // ==================== ERROR MESSAGES ====================

@@ -171,41 +171,105 @@ function diagnoseAuthorization() {
  * Main entry point for GET requests
  * This function is called when someone visits the web app URL
  *
- * @returns {HtmlOutput} The main dashboard HTML
+ * @param {Object} e - Event parameter with query string
+ * @returns {HtmlOutput} Login page or dashboard
  */
-function doGet() {
+function doGet(e) {
   try {
-    // CHECK AUTHORIZATION FIRST
-    var currentUser = getCurrentUser();
+    // Check if user has a valid session
+    var sessionToken = e.parameter.session;
+    var userEmail = getUserFromSession(sessionToken);
 
-    // If we can't get the user's email, show configuration error
-    if (currentUser === 'Unknown User' || currentUser === '') {
-      return createConfigurationErrorPage();
+    if (userEmail) {
+      // Valid session - show dashboard
+      return createDashboardPage(userEmail, sessionToken);
     }
 
-    if (!isAuthorizedUser()) {
-      // User is not authorized - show access denied page
-      return createAccessDeniedPage(currentUser);
-    }
-
-    // User is authorized - serve the dashboard
-    return HtmlService.createHtmlOutputFromFile('Dashboard')
-      .setTitle('SA HR Payroll System')
-      .setSandboxMode(HtmlService.SandboxMode.IFRAME)
-      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
-      .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+    // No valid session - show login page
+    return createLoginPage();
 
   } catch (error) {
-    // Check if it's a permissions error
-    if (error.toString().indexOf('access') >= 0 || error.toString().indexOf('permission') >= 0) {
-      return createConfigurationErrorPage(error.toString());
-    }
-
-    // Other errors
     return HtmlService.createHtmlOutput(
-      '<h1>Error</h1><p>Failed to load dashboard: ' + error.toString() + '</p>'
+      '<h1>Error</h1><p>Failed to load application: ' + error.toString() + '</p>'
     ).setTitle('Error');
   }
+}
+
+/**
+ * Handle login form submission
+ *
+ * @param {string} email - User email
+ * @param {string} password - User password
+ * @returns {Object} Result with session token if successful
+ */
+function handleLogin(email, password) {
+  var result = authenticateUser(email, password);
+
+  if (result.success) {
+    var sessionToken = createUserSession(result.user.email);
+    return {
+      success: true,
+      sessionToken: sessionToken,
+      user: result.user
+    };
+  }
+
+  return result;
+}
+
+/**
+ * Handle logout
+ *
+ * @param {string} sessionToken - Session token to destroy
+ * @returns {Object} Result
+ */
+function handleLogout(sessionToken) {
+  destroySession(sessionToken);
+  return {
+    success: true,
+    message: 'Logged out successfully'
+  };
+}
+
+/**
+ * Get current logged-in user email from session
+ *
+ * @param {string} sessionToken - Session token
+ * @returns {string|null} User email or null
+ */
+function getSessionUser(sessionToken) {
+  return getUserFromSession(sessionToken);
+}
+
+/**
+ * Create login page HTML
+ * @returns {HtmlOutput} Login page
+ */
+function createLoginPage() {
+  var loginHtml = HtmlService.createHtmlOutputFromFile('Login')
+    .setTitle('Login - SA HR Payroll System')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+
+  return loginHtml;
+}
+
+/**
+ * Create dashboard page with session
+ * @param {string} userEmail - Logged in user's email
+ * @param {string} sessionToken - Session token
+ * @returns {HtmlOutput} Dashboard page
+ */
+function createDashboardPage(userEmail, sessionToken) {
+  var template = HtmlService.createTemplateFromFile('Dashboard');
+  template.userEmail = userEmail;
+  template.sessionToken = sessionToken;
+
+  return template.evaluate()
+    .setTitle('SA HR Payroll System')
+    .setSandboxMode(HtmlService.SandboxMode.IFRAME)
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
 /**
@@ -463,35 +527,31 @@ function include(filename) {
 
 /**
  * Get current user email
- * When deployed as "Execute as: Me", this returns the owner's email for all users
- * Use getActiveUser() with special handling for "Execute as: Me" deployments
+ * For login system, this is called with sessionToken from client
  *
+ * @param {string} sessionToken - Optional session token from logged-in user
  * @returns {string} Email address of current user
  */
-function getCurrentUser() {
+function getCurrentUser(sessionToken) {
   try {
-    // When deployed as "Execute as: Me", getActiveUser() returns blank
-    // and getEffectiveUser() returns owner's email
-
-    // Method 1: Try getActiveUser() - returns actual user when "Execute as: User"
-    var activeEmail = Session.getActiveUser().getEmail();
-    if (activeEmail && activeEmail !== '' && activeEmail !== 'system') {
-      Logger.log('Got user from getActiveUser(): ' + activeEmail);
-      return activeEmail;
+    // If session token provided, use that
+    if (sessionToken) {
+      var email = getUserFromSession(sessionToken);
+      if (email) {
+        return email;
+      }
     }
 
-    // Method 2: Try getEffectiveUser() - returns owner when "Execute as: Me"
-    var effectiveEmail = Session.getEffectiveUser().getEmail();
-    if (effectiveEmail && effectiveEmail !== '' && effectiveEmail !== 'system') {
-      Logger.log('Got user from getEffectiveUser() (owner): ' + effectiveEmail);
-      // When deployed as "Execute as: Me", everyone is identified as owner
-      return effectiveEmail;
+    // Fallback: Try to get from Google Session (for spreadsheet menu functions)
+    try {
+      var effectiveEmail = Session.getEffectiveUser().getEmail();
+      if (effectiveEmail && effectiveEmail !== '' && effectiveEmail !== 'system') {
+        return effectiveEmail;
+      }
+    } catch (e) {
+      // Ignore
     }
 
-    // Log what we got for debugging
-    Logger.log('⚠️ Could not get user email. Active: "' + activeEmail + '", Effective: "' + effectiveEmail + '"');
-
-    // If both methods fail, return unknown
     return 'Unknown User';
   } catch (error) {
     Logger.log('Error getting user email: ' + error.toString());

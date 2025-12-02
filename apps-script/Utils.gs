@@ -1114,6 +1114,7 @@ function setupUserConfigSheet() {
     // Set column widths
     sheet.setColumnWidth(1, 200); // Name
     sheet.setColumnWidth(2, 300); // Email
+    sheet.setColumnWidth(3, 150); // Password
 
     // Freeze header row
     sheet.setFrozenRows(1);
@@ -1244,6 +1245,148 @@ function clearUserWhitelist() {
       error: 'Failed to clear whitelist: ' + error.toString()
     };
   }
+}
+
+/**
+ * Authenticate user with email and password
+ * Checks credentials against UserConfig sheet
+ *
+ * @param {string} email - User's email address
+ * @param {string} password - User's password
+ * @returns {Object} Result object with success status and user info
+ */
+function authenticateUser(email, password) {
+  try {
+    if (!email || !password) {
+      return {
+        success: false,
+        error: 'Email and password are required'
+      };
+    }
+
+    var sheets = getSheets();
+    if (!sheets.userConfig) {
+      return {
+        success: false,
+        error: 'User configuration not found. Contact administrator.'
+      };
+    }
+
+    var sheet = sheets.userConfig;
+    var data = sheet.getDataRange().getValues();
+
+    if (data.length <= 1) {
+      return {
+        success: false,
+        error: 'No users configured. Contact administrator.'
+      };
+    }
+
+    // Get headers
+    var headers = data[0];
+    var emailIndex = indexOf(headers, 'Email');
+    var passwordIndex = indexOf(headers, 'Password');
+    var nameIndex = indexOf(headers, 'Name');
+
+    if (emailIndex === -1 || passwordIndex === -1) {
+      return {
+        success: false,
+        error: 'User configuration is invalid. Contact administrator.'
+      };
+    }
+
+    // Find user
+    var normalizedEmail = email.trim().toLowerCase();
+    for (var i = 1; i < data.length; i++) {
+      var rowEmail = String(data[i][emailIndex] || '').trim().toLowerCase();
+      var rowPassword = String(data[i][passwordIndex] || '');
+      var rowName = String(data[i][nameIndex] || '');
+
+      if (rowEmail === normalizedEmail) {
+        // Found user - check password
+        if (rowPassword === password) {
+          logSuccess('User authenticated: ' + email);
+          return {
+            success: true,
+            user: {
+              email: email.trim(),
+              name: rowName
+            }
+          };
+        } else {
+          logWarning('Failed login attempt for: ' + email);
+          return {
+            success: false,
+            error: 'Invalid password'
+          };
+        }
+      }
+    }
+
+    logWarning('Login attempt for unknown user: ' + email);
+    return {
+      success: false,
+      error: 'User not found'
+    };
+
+  } catch (error) {
+    logError('Authentication error', error);
+    return {
+      success: false,
+      error: 'Authentication failed: ' + error.toString()
+    };
+  }
+}
+
+/**
+ * Create session for authenticated user
+ * Stores user email in CacheService for 6 hours
+ *
+ * @param {string} email - User's email address
+ * @returns {string} Session token
+ */
+function createUserSession(email) {
+  var sessionToken = Utilities.getUuid();
+  var cache = CacheService.getScriptCache();
+
+  // Store for 6 hours (21600 seconds)
+  cache.put('session_' + sessionToken, email, 21600);
+
+  logInfo('Session created for: ' + email);
+  return sessionToken;
+}
+
+/**
+ * Get user email from session token
+ *
+ * @param {string} sessionToken - Session token
+ * @returns {string|null} User email or null if session invalid
+ */
+function getUserFromSession(sessionToken) {
+  if (!sessionToken) {
+    return null;
+  }
+
+  var cache = CacheService.getScriptCache();
+  var email = cache.get('session_' + sessionToken);
+
+  return email;
+}
+
+/**
+ * Destroy user session
+ *
+ * @param {string} sessionToken - Session token to destroy
+ */
+function destroySession(sessionToken) {
+  if (!sessionToken) {
+    return;
+  }
+
+  var cache = CacheService.getScriptCache();
+  cache.remove('session_' + sessionToken);
+
+  logInfo('Session destroyed');
 }
 
 // ============================================================================
