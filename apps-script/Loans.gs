@@ -820,8 +820,11 @@ function validateLoan(data) {
  *
  * @returns {Object} Result with success flag and total balance
  */
-function getTotalOutstandingLoans() {
+function getTotalOutstandingLoans(sessionToken) {
   try {
+    if (!isAuthorizedUser(getCurrentUser(sessionToken))) {
+      throw new Error('Unauthorized');
+    }
     Logger.log('\n========== GET TOTAL OUTSTANDING LOANS ==========');
 
     const sheets = getSheets();
