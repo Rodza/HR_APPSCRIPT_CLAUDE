@@ -527,8 +527,8 @@
                 .withSuccessHandler(function(result) {
                     console.log('listEmployees result:', result);
                     // FIX: Add null check before accessing properties
-                    if (result && result.success && result.data) {
-                        document.getElementById('totalEmployees').textContent = result.data.length;
+                    if (result && result.success && result.data && result.data.pagination) {
+                        document.getElementById('totalEmployees').textContent = result.data.pagination.total;
                     } else if (result && Array.isArray(result)) {
                         // Handle case where listEmployees returns array directly
                         document.getElementById('totalEmployees').textContent = result.length;
