@@ -176,30 +176,36 @@ function diagnoseAuthorization() {
  */
 function doGet(e) {
   try {
-    logInfo('doGet called');
+    var timestamp = new Date().toISOString();
+    logInfo('========================================');
+    logInfo('doGet called at: ' + timestamp);
+    logInfo('Deployment URL: ' + ScriptApp.getService().getUrl());
 
     // Check if user has a valid session
     var sessionToken = e.parameter ? e.parameter.session : null;
-    logInfo('Session token from URL: ' + (sessionToken ? 'Present' : 'Missing'));
+    logInfo('Session token from URL: ' + (sessionToken ? 'Present (' + sessionToken.substring(0, 8) + '...)' : 'Missing'));
 
     var userEmail = null;
     if (sessionToken) {
       userEmail = getUserFromSession(sessionToken);
-      logInfo('User from session: ' + (userEmail || 'None'));
+      logInfo('User from session: ' + (userEmail || 'None (session expired or invalid)'));
     }
 
     if (userEmail) {
       // Valid session - show dashboard
-      logInfo('Showing dashboard for: ' + userEmail);
+      logInfo('✅ Valid session found - Showing dashboard for: ' + userEmail);
+      logInfo('========================================');
       return createDashboardPage(userEmail, sessionToken);
     }
 
     // No valid session - show login page
-    logInfo('No valid session, showing login page');
+    logInfo('ℹ️  No valid session - Showing login page');
+    logInfo('========================================');
     return createLoginPage();
 
   } catch (error) {
-    logError('doGet error', error);
+    logError('❌ doGet error', error);
+    logError('Stack trace: ' + error.stack);
     return HtmlService.createHtmlOutput(
       '<h1>Error Loading Application</h1>' +
       '<p><strong>Error:</strong> ' + error.toString() + '</p>' +
@@ -224,7 +230,8 @@ function handleLogin(email, password) {
     return {
       success: true,
       sessionToken: sessionToken,
-      user: result.user
+      user: result.user,
+      redirectUrl: ScriptApp.getService().getUrl() // Add deployment URL for redirect
     };
   }
 
