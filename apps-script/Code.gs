@@ -270,10 +270,7 @@ function createLoginPage() {
   var loginHtml = HtmlService.createHtmlOutputFromFile('Login')
     .setTitle('Login - SA HR Payroll System')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
-    .addMetaTag('viewport', 'width=device-width, initial-scale=1')
-    .addMetaTag('cache-control', 'no-cache, no-store, must-revalidate')
-    .addMetaTag('pragma', 'no-cache')
-    .addMetaTag('expires', '0');
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 
   return loginHtml;
 }
@@ -298,10 +295,7 @@ function createDashboardPage(userEmail, sessionToken) {
       .setTitle('SA HR Payroll System')
       .setSandboxMode(HtmlService.SandboxMode.IFRAME)
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
-      .addMetaTag('viewport', 'width=device-width, initial-scale=1')
-      .addMetaTag('cache-control', 'no-cache, no-store, must-revalidate')
-      .addMetaTag('pragma', 'no-cache')
-      .addMetaTag('expires', '0');
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 
     logInfo('Dashboard page created successfully');
     return output;
