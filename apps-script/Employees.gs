@@ -129,8 +129,11 @@ function sanitizeEmployeeForWeb(emp) {
  * @param {Object} filters - Optional filters {employer, status, search, activeOnly, page, pageSize}
  * @returns {Object} Response with employee list and pagination info
  */
-function listEmployees(filters) {
+function listEmployees(filters, sessionToken) {
   try {
+    if (!isUserAuthorized(getCurrentUser(sessionToken))) {
+      throw new Error('Unauthorized');
+    }
     // Default pagination settings
     var page = (filters && filters.page) ? parseInt(filters.page) : 1;
     var pageSize = (filters && filters.pageSize) ? parseInt(filters.pageSize) : 50;
