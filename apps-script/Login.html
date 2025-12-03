@@ -196,14 +196,19 @@
   </div>
 
   <script>
+    // Version identifier for cache debugging
+    var LOGIN_PAGE_VERSION = '2.0.0-fixed-redirect';
+    var LOGIN_PAGE_UPDATED = '2025-12-03T15:30:00Z';
+
     // Auto-run diagnostics when page loads
     (function() {
       console.log('========================================');
       console.log('📋 SA HR PAYROLL SYSTEM - LOGIN PAGE');
+      console.log('📌 Version: ' + LOGIN_PAGE_VERSION);
+      console.log('🔄 Updated: ' + LOGIN_PAGE_UPDATED);
       console.log('========================================');
       console.log('🕐 Loaded at:', new Date().toLocaleString());
       console.log('🌐 Page URL:', window.location.href);
-      console.log('📱 User Agent:', navigator.userAgent.substring(0, 80) + '...');
       console.log('✅ Login page loaded successfully');
       console.log('📝 Enter your credentials to log in');
       console.log('========================================');
