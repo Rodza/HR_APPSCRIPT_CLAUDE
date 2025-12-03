@@ -609,8 +609,8 @@ function isAdmin() {
  *
  * @returns {boolean} True if user is authorized
  */
-function isAuthorizedUser() {
-  var userEmail = getCurrentUser();
+function isAuthorizedUser(sessionToken) {
+  var userEmail = getCurrentUser(sessionToken);
 
   // Unknown users are not authorized
   if (userEmail === 'Unknown User' || userEmail === '' || userEmail === 'system') {
