@@ -222,11 +222,15 @@
       // Call server-side login function
       google.script.run
         .withSuccessHandler(function(result) {
-          if (result.success) {
+          console.log('Login success handler received:', result);
+          if (result && result.success) {
             // Redirect to dashboard with session token
             const currentUrl = window.location.href.split('?')[0];
-            window.location.href = currentUrl + '?session=' + result.sessionToken;
+            const redirectUrl = currentUrl + '?session=' + result.sessionToken;
+            console.log('Redirecting to:', redirectUrl);
+            window.location.href = redirectUrl;
           } else {
+            console.error('Login failed on client:', result ? result.error : 'No result');
             showError(result.error || 'Login failed');
             loginBtn.disabled = false;
             loginBtn.innerHTML = 'Log In';
