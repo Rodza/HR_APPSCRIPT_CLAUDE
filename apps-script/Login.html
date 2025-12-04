@@ -197,11 +197,11 @@
 
   <script>
     // Version identifier for cache debugging
-    var LOGIN_PAGE_VERSION = '2.0.3-use-location-replace';
-    var LOGIN_PAGE_UPDATED = '2025-12-04T11:30:00Z';
+    var LOGIN_PAGE_VERSION = '2.0.4-production-fix';
+    var LOGIN_PAGE_UPDATED = '2025-12-04T12:00:00Z';
 
-    // Auto-run diagnostics when page loads
-    (function() {
+    // Immediate visibility check
+    document.addEventListener('DOMContentLoaded', function() {
       console.log('========================================');
       console.log('📋 SA HR PAYROLL SYSTEM - LOGIN PAGE');
       console.log('📌 Version: ' + LOGIN_PAGE_VERSION);
@@ -209,10 +209,17 @@
       console.log('========================================');
       console.log('🕐 Loaded at:', new Date().toLocaleString());
       console.log('🌐 Page URL:', window.location.href);
-      console.log('✅ Login page loaded successfully');
-      console.log('📝 Enter your credentials to log in');
+      console.log('🖥️  Window object:', typeof window);
+      console.log('📄 Document object:', typeof document);
+      console.log('🎯 Login container:', document.querySelector('.login-container') ? 'Found' : 'Missing');
+      console.log('✅ DOMContentLoaded fired');
       console.log('========================================');
-    })();
+
+      // Make absolutely sure the page is visible
+      document.body.style.display = 'flex';
+      document.body.style.visibility = 'visible';
+      document.body.style.opacity = '1';
+    });
 
     function showError(message) {
       const errorDiv = document.getElementById('errorMessage');
