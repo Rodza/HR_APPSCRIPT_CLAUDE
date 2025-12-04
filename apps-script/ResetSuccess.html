@@ -115,7 +115,7 @@
       <p>Your account is now secured with your new password.</p>
     </div>
 
-    <a href="<?= ScriptApp.getService().getUrl() ?>" class="btn" id="loginBtn">
+    <a href="<?= webAppUrl ?>" class="btn" id="loginBtn">
       Go to Login Page
     </a>
 
@@ -140,7 +140,7 @@
 
       if (secondsLeft <= 0) {
         clearInterval(countdownInterval);
-        window.location.href = '<?= ScriptApp.getService().getUrl() ?>';
+        window.location.href = '<?= webAppUrl ?>';
       }
     }, 1000);
 
@@ -148,7 +148,7 @@
     document.getElementById('loginBtn').addEventListener('click', function(e) {
       e.preventDefault();
       clearInterval(countdownInterval);
-      window.location.href = '<?= ScriptApp.getService().getUrl() ?>';
+      window.location.href = '<?= webAppUrl ?>';
     });
   </script>
 </body>
