@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Password Reset Successful - SA HR Payroll System</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      padding: 40px;
+      width: 100%;
+      max-width: 500px;
+      text-align: center;
+    }
+
+    .icon {
+      font-size: 72px;
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      color: #333;
+      font-size: 28px;
+      margin-bottom: 15px;
+    }
+
+    .message {
+      color: #666;
+      font-size: 16px;
+      line-height: 1.6;
+      margin-bottom: 30px;
+    }
+
+    .success-box {
+      background: #d4edda;
+      border: 1px solid #c3e6cb;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 20px 0;
+      color: #155724;
+    }
+
+    .success-box p {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 500;
+    }
+
+    .btn {
+      display: inline-block;
+      padding: 12px 30px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      text-decoration: none;
+      border-radius: 6px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      border: none;
+      margin-top: 10px;
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn:active {
+      transform: translateY(0);
+    }
+
+    .countdown {
+      color: #999;
+      font-size: 14px;
+      margin-top: 20px;
+    }
+
+    .footer {
+      margin-top: 30px;
+      padding-top: 20px;
+      border-top: 1px solid #e1e4e8;
+      color: #666;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="icon">✅</div>
+    <h1>Password Reset Successful!</h1>
+    <p class="message">
+      Your password has been successfully reset. You can now log in with your new password.
+    </p>
+
+    <div class="success-box">
+      <p>Your account is now secured with your new password.</p>
+    </div>
+
+    <a href="<?= ScriptApp.getService().getUrl() ?>" class="btn" id="loginBtn">
+      Go to Login Page
+    </a>
+
+    <p class="countdown">
+      Redirecting to login in <span id="countdown">5</span> seconds...
+    </p>
+
+    <div class="footer">
+      SA Grinding Wheels & Scorpio Abrasives<br>
+      &copy; 2025 All rights reserved
+    </div>
+  </div>
+
+  <script>
+    // Auto-redirect to login after 5 seconds
+    var countdownElement = document.getElementById('countdown');
+    var secondsLeft = 5;
+
+    var countdownInterval = setInterval(function() {
+      secondsLeft--;
+      countdownElement.textContent = secondsLeft;
+
+      if (secondsLeft <= 0) {
+        clearInterval(countdownInterval);
+        window.location.href = '<?= ScriptApp.getService().getUrl() ?>';
+      }
+    }, 1000);
+
+    // Allow user to click button to go immediately
+    document.getElementById('loginBtn').addEventListener('click', function(e) {
+      e.preventDefault();
+      clearInterval(countdownInterval);
+      window.location.href = '<?= ScriptApp.getService().getUrl() ?>';
+    });
+  </script>
+</body>
+</html>
