@@ -306,11 +306,11 @@
                             return;
                         }
                         if (result.success) {
-                            window.payrollListData.allPayslips = result.data;
+                            window.payrollListData.allPayslips = result.data.payslips || [];
 
                             // Debug: Check first payslip for loan fields
-                            if (result.data && result.data.length > 0) {
-                                const firstPayslip = result.data[0];
+                            if (result.data.payslips && result.data.payslips.length > 0) {
+                                const firstPayslip = result.data.payslips[0];
                                 console.log('=== PAYSLIP DATA DEBUG ===');
                                 console.log('First payslip RECORDNUMBER:', firstPayslip.RECORDNUMBER);
                                 console.log('First payslip LoanDeductionThisWeek:', firstPayslip.LoanDeductionThisWeek);
