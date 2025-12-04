@@ -1175,8 +1175,6 @@ function onOpen() {
     .addSeparator()
     .addItem('Settings', 'showTimesheetSettings')
     .addSeparator()
-    .addItem('🔍 Debugger', 'showTimesheetDebugger')
-    .addSeparator()
     .addItem('⚙️ Setup Sheets', 'runTimesheetSheetSetup')
     .addItem('🔧 Fix RAW_CLOCK_DATA Headers', 'runFixRawClockDataHeaders')
     .addItem('🔧 Fix PUNCH_TIME Format', 'runFixRawClockDataPunchTimeFormat')

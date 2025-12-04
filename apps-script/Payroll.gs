@@ -226,16 +226,16 @@ function calculatePayslip(data) {
   // 4. UIF (1% for permanent employees ONLY)
   const uif = (employmentStatus === 'Permanent') ? (grossSalary * UIF_RATE) : 0;
 
-  // 5. TOTAL DEDUCTIONS (NOTE: Loan deduction NOT included here - it comes from net)
-  const totalDeductions = uif + otherDeductions;
+  // 5. TOTAL DEDUCTIONS (includes UIF + Other Deductions + Loan Deduction)
+  const totalDeductions = uif + otherDeductions + loanDeduction;
 
   // 6. NET SALARY
   const netSalary = grossSalary - totalDeductions;
 
   // 7. PAID TO ACCOUNT (CRITICAL - actual bank transfer amount)
-  // Net - Loan Repayment + (New Loan if "With Salary")
+  // Net + (New Loan if "With Salary")
   const newLoanToAdd = (loanDisbursementType === 'With Salary') ? newLoan : 0;
-  const paidToAccount = netSalary - loanDeduction + newLoanToAdd;
+  const paidToAccount = netSalary + newLoanToAdd;
 
   // 8. UPDATED LOAN BALANCE
   const currentBalance = parseFloat(data.CurrentLoanBalance) || 0;
