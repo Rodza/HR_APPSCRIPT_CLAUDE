@@ -197,8 +197,8 @@
 
   <script>
     // Version identifier for cache debugging
-    var LOGIN_PAGE_VERSION = '2.0.4-production-fix';
-    var LOGIN_PAGE_UPDATED = '2025-12-04T12:00:00Z';
+    var LOGIN_PAGE_VERSION = '2.0.5-direct-dashboard-no-redirect';
+    var LOGIN_PAGE_UPDATED = '2025-12-04T13:00:00Z';
 
     // Immediate visibility check
     document.addEventListener('DOMContentLoaded', function() {
@@ -249,18 +249,22 @@
         .withSuccessHandler(function(result) {
           console.log('✅ Login success handler received:', result);
           if (result && result.success) {
-            console.log('🔄 Login successful, reloading with session...');
+            console.log('🔄 Login successful!');
             console.log('🔑 Session Token:', result.sessionToken);
+            console.log('📄 Dashboard HTML received:', result.dashboardHtml ? 'Yes (' + result.dashboardHtml.length + ' chars)' : 'No');
 
-            // Get the base URL (without any existing parameters)
-            var baseUrl = window.location.href.split('?')[0];
-
-            // Add session parameter
-            var newUrl = baseUrl + '?session=' + result.sessionToken;
-            console.log('📍 Navigating to:', newUrl);
-
-            // Use window.location.replace to avoid back button issues
-            window.location.replace(newUrl);
+            // Replace the entire page content with the dashboard HTML
+            // This avoids the redirect issue with Apps Script iframe URLs
+            if (result.dashboardHtml) {
+              console.log('🎨 Replacing page content with dashboard...');
+              document.open();
+              document.write(result.dashboardHtml);
+              document.close();
+            } else {
+              showError('Dashboard HTML not received from server');
+              loginBtn.disabled = false;
+              loginBtn.innerHTML = 'Log In';
+            }
           } else {
             console.error('❌ Login failed on client:', result ? result.error : 'No result');
             showError(result.error || 'Login failed');

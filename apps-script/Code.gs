@@ -244,11 +244,29 @@ function handleLogin(email, password) {
 
   if (result.success) {
     var sessionToken = createUserSession(result.user.email);
-    return {
-      success: true,
-      sessionToken: sessionToken,
-      user: result.user
-    };
+
+    // Return the dashboard HTML directly instead of just the session token
+    // This avoids the redirect issue with Apps Script iframe URLs
+    try {
+      var template = HtmlService.createTemplateFromFile('DashboardMinimal');
+      template.userEmail = result.user.email;
+      template.sessionToken = sessionToken;
+
+      var dashboardHtml = template.evaluate().getContent();
+
+      return {
+        success: true,
+        sessionToken: sessionToken,
+        user: result.user,
+        dashboardHtml: dashboardHtml
+      };
+    } catch (error) {
+      logError('Error generating dashboard HTML in handleLogin', error);
+      return {
+        success: false,
+        error: 'Login succeeded but dashboard generation failed: ' + error.toString()
+      };
+    }
   }
 
   return result;
@@ -313,13 +331,15 @@ function createDashboardPage(userEmail, sessionToken) {
     logInfo('Creating dashboard page for: ' + userEmail);
     logInfo('Session token: ' + (sessionToken ? 'Present' : 'Missing'));
 
-    var template = HtmlService.createTemplateFromFile('Dashboard');
+    // Use minimal dashboard for testing
+    logInfo('Using minimal dashboard for testing...');
+    var template = HtmlService.createTemplateFromFile('DashboardMinimal');
     template.userEmail = userEmail;
     template.sessionToken = sessionToken;
 
     logInfo('Template created, evaluating...');
     var output = template.evaluate()
-      .setTitle('SA HR Payroll System');
+      .setTitle('SA HR Payroll System - Test');
 
     logInfo('Dashboard page created successfully');
     return output;
