@@ -554,7 +554,8 @@ function createForgotPasswordPage() {
   try {
     logInfo('Creating forgot password page...');
 
-    var forgotHtml = HtmlService.createHtmlOutputFromFile('ForgotPassword')
+    var template = HtmlService.createTemplateFromFile('ForgotPassword');
+    var forgotHtml = template.evaluate()
       .setTitle('Forgot Password - SA HR Payroll System');
 
     logInfo('Forgot password page created successfully');
@@ -577,7 +578,8 @@ function createResetEmailSentPage() {
   try {
     logInfo('Creating reset email sent page...');
 
-    var sentHtml = HtmlService.createHtmlOutputFromFile('ResetEmailSent')
+    var template = HtmlService.createTemplateFromFile('ResetEmailSent');
+    var sentHtml = template.evaluate()
       .setTitle('Password Reset Email Sent - SA HR Payroll System');
 
     logInfo('Reset email sent page created successfully');
@@ -627,7 +629,8 @@ function createResetSuccessPage() {
   try {
     logInfo('Creating reset success page...');
 
-    var successHtml = HtmlService.createHtmlOutputFromFile('ResetSuccess')
+    var template = HtmlService.createTemplateFromFile('ResetSuccess');
+    var successHtml = template.evaluate()
       .setTitle('Password Reset Successful - SA HR Payroll System');
 
     logInfo('Reset success page created successfully');
