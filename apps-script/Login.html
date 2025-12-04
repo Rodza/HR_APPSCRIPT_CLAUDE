@@ -200,8 +200,8 @@
 
   <script>
     // Version identifier for cache debugging
-    var LOGIN_PAGE_VERSION = '2.0.0-fixed-redirect';
-    var LOGIN_PAGE_UPDATED = '2025-12-03T15:30:00Z';
+    var LOGIN_PAGE_VERSION = '2.0.1-iframe-redirect-fix';
+    var LOGIN_PAGE_UPDATED = '2025-12-04T10:00:00Z';
 
     // Auto-run diagnostics when page loads
     (function() {
@@ -251,8 +251,8 @@
             console.log('📍 Deployment URL:', result.redirectUrl);
             console.log('🔑 Session Token:', result.sessionToken);
 
-            // Force a complete page reload to the new URL
-            window.top.location.href = redirectUrl;
+            // Reload the page with session token (works within iframe)
+            window.location.href = redirectUrl;
           } else {
             console.error('❌ Login failed on client:', result ? result.error : 'No result');
             showError(result.error || 'Login failed');
