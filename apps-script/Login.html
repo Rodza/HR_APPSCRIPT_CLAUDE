@@ -3,6 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>Login - SA HR Payroll System</title>
   <style>
     * {
@@ -196,6 +199,24 @@
   </div>
 
   <script>
+    // Version identifier for cache debugging
+    var LOGIN_PAGE_VERSION = '2.0.0-fixed-redirect';
+    var LOGIN_PAGE_UPDATED = '2025-12-03T15:30:00Z';
+
+    // Auto-run diagnostics when page loads
+    (function() {
+      console.log('========================================');
+      console.log('📋 SA HR PAYROLL SYSTEM - LOGIN PAGE');
+      console.log('📌 Version: ' + LOGIN_PAGE_VERSION);
+      console.log('🔄 Updated: ' + LOGIN_PAGE_UPDATED);
+      console.log('========================================');
+      console.log('🕐 Loaded at:', new Date().toLocaleString());
+      console.log('🌐 Page URL:', window.location.href);
+      console.log('✅ Login page loaded successfully');
+      console.log('📝 Enter your credentials to log in');
+      console.log('========================================');
+    })();
+
     function showError(message) {
       const errorDiv = document.getElementById('errorMessage');
       errorDiv.textContent = message;
@@ -222,21 +243,25 @@
       // Call server-side login function
       google.script.run
         .withSuccessHandler(function(result) {
-          console.log('Login success handler received:', result);
+          console.log('✅ Login success handler received:', result);
           if (result && result.success) {
-            // Redirect to dashboard with session token
-            const currentUrl = window.location.href.split('?')[0];
-            const redirectUrl = currentUrl + '?session=' + result.sessionToken;
-            console.log('Redirecting to:', redirectUrl);
-            window.location.href = redirectUrl;
+            // Use the deployment URL from server, not window.location
+            const redirectUrl = result.redirectUrl + '?session=' + result.sessionToken;
+            console.log('🔄 Redirecting to:', redirectUrl);
+            console.log('📍 Deployment URL:', result.redirectUrl);
+            console.log('🔑 Session Token:', result.sessionToken);
+
+            // Force a complete page reload to the new URL
+            window.top.location.href = redirectUrl;
           } else {
-            console.error('Login failed on client:', result ? result.error : 'No result');
+            console.error('❌ Login failed on client:', result ? result.error : 'No result');
             showError(result.error || 'Login failed');
             loginBtn.disabled = false;
             loginBtn.innerHTML = 'Log In';
           }
         })
         .withFailureHandler(function(error) {
+          console.error('❌ Login error:', error);
           showError('Login error: ' + error.message);
           loginBtn.disabled = false;
           loginBtn.innerHTML = 'Log In';

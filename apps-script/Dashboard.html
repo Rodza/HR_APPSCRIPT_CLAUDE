@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>SA HR Payroll System</title>
 
     <script>
@@ -278,16 +281,28 @@
     <script>
         // ==================== SESSION MANAGEMENT ====================
 
+        // Version identifier for cache debugging
+        var DASHBOARD_VERSION = '2.0.0-fixed-redirect';
+        var DASHBOARD_UPDATED = '2025-12-03T15:30:00Z';
+
         try {
             // Store session token and user email from server-side template
             var SESSION_TOKEN = '<?!= sessionToken || "" ?>';
             var USER_EMAIL = '<?!= userEmail || "" ?>';
 
-            console.log('Dashboard loaded successfully');
-            console.log('Session token:', SESSION_TOKEN ? 'Present' : 'Missing');
-            console.log('User email:', USER_EMAIL || 'Not set');
+            console.log('========================================');
+            console.log('📊 SA HR PAYROLL SYSTEM - DASHBOARD');
+            console.log('📌 Version: ' + DASHBOARD_VERSION);
+            console.log('🔄 Updated: ' + DASHBOARD_UPDATED);
+            console.log('========================================');
+            console.log('🕐 Loaded at:', new Date().toLocaleString());
+            console.log('🌐 Page URL:', window.location.href);
+            console.log('👤 User Email:', USER_EMAIL || '❌ Not set');
+            console.log('🔑 Session Token:', SESSION_TOKEN ? '✅ Present (' + SESSION_TOKEN.substring(0, 8) + '...)' : '❌ Missing');
+            console.log('✅ Dashboard loaded successfully');
+            console.log('========================================');
         } catch (e) {
-            console.error('Error initializing session:', e);
+            console.error('❌ Error initializing session:', e);
             var SESSION_TOKEN = '';
             var USER_EMAIL = '';
         }
