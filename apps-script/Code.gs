@@ -247,8 +247,7 @@ function handleLogin(email, password) {
     return {
       success: true,
       sessionToken: sessionToken,
-      user: result.user,
-      redirectUrl: ScriptApp.getService().getUrl() // Add deployment URL for redirect
+      user: result.user
     };
   }
 
@@ -284,11 +283,23 @@ function getSessionUser(sessionToken) {
  * @returns {HtmlOutput} Login page
  */
 function createLoginPage() {
-  var loginHtml = HtmlService.createHtmlOutputFromFile('Login')
-    .setTitle('Login - SA HR Payroll System')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  try {
+    logInfo('Creating login page...');
 
-  return loginHtml;
+    var loginHtml = HtmlService.createHtmlOutputFromFile('Login')
+      .setTitle('Login - SA HR Payroll System');
+
+    logInfo('Login page created successfully');
+    return loginHtml;
+  } catch (error) {
+    logError('createLoginPage error', error);
+    // Return error page instead of throwing
+    return HtmlService.createHtmlOutput(
+      '<h1>Login Page Error</h1>' +
+      '<p>Error: ' + error.toString() + '</p>' +
+      '<pre>' + error.stack + '</pre>'
+    );
+  }
 }
 
 /**
@@ -308,16 +319,20 @@ function createDashboardPage(userEmail, sessionToken) {
 
     logInfo('Template created, evaluating...');
     var output = template.evaluate()
-      .setTitle('SA HR Payroll System')
-      .setSandboxMode(HtmlService.SandboxMode.IFRAME)
-      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+      .setTitle('SA HR Payroll System');
 
     logInfo('Dashboard page created successfully');
     return output;
 
   } catch (error) {
     logError('createDashboardPage error', error);
-    throw error;
+    // Return error page instead of throwing
+    return HtmlService.createHtmlOutput(
+      '<h1>Dashboard Error</h1>' +
+      '<p>Error creating dashboard for: ' + userEmail + '</p>' +
+      '<p>Error: ' + error.toString() + '</p>' +
+      '<pre>' + error.stack + '</pre>'
+    );
   }
 }
 

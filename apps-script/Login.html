@@ -197,8 +197,8 @@
 
   <script>
     // Version identifier for cache debugging
-    var LOGIN_PAGE_VERSION = '2.0.2-google-docs-error-fix';
-    var LOGIN_PAGE_UPDATED = '2025-12-04T11:00:00Z';
+    var LOGIN_PAGE_VERSION = '2.0.3-use-location-replace';
+    var LOGIN_PAGE_UPDATED = '2025-12-04T11:30:00Z';
 
     // Auto-run diagnostics when page loads
     (function() {
@@ -242,14 +242,18 @@
         .withSuccessHandler(function(result) {
           console.log('✅ Login success handler received:', result);
           if (result && result.success) {
-            // Use the deployment URL from server, not window.location
-            const redirectUrl = result.redirectUrl + '?session=' + result.sessionToken;
-            console.log('🔄 Redirecting to:', redirectUrl);
-            console.log('📍 Deployment URL:', result.redirectUrl);
+            console.log('🔄 Login successful, reloading with session...');
             console.log('🔑 Session Token:', result.sessionToken);
 
-            // Reload the page with session token (works within iframe)
-            window.location.href = redirectUrl;
+            // Get the base URL (without any existing parameters)
+            var baseUrl = window.location.href.split('?')[0];
+
+            // Add session parameter
+            var newUrl = baseUrl + '?session=' + result.sessionToken;
+            console.log('📍 Navigating to:', newUrl);
+
+            // Use window.location.replace to avoid back button issues
+            window.location.replace(newUrl);
           } else {
             console.error('❌ Login failed on client:', result ? result.error : 'No result');
             showError(result.error || 'Login failed');
