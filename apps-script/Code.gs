@@ -248,7 +248,7 @@ function handleLogin(email, password) {
     // Return the dashboard HTML directly instead of just the session token
     // This avoids the redirect issue with Apps Script iframe URLs
     try {
-      var template = HtmlService.createTemplateFromFile('DashboardMinimal');
+      var template = HtmlService.createTemplateFromFile('Dashboard');
       template.userEmail = result.user.email;
       template.sessionToken = sessionToken;
 
@@ -331,15 +331,13 @@ function createDashboardPage(userEmail, sessionToken) {
     logInfo('Creating dashboard page for: ' + userEmail);
     logInfo('Session token: ' + (sessionToken ? 'Present' : 'Missing'));
 
-    // Use minimal dashboard for testing
-    logInfo('Using minimal dashboard for testing...');
-    var template = HtmlService.createTemplateFromFile('DashboardMinimal');
+    var template = HtmlService.createTemplateFromFile('Dashboard');
     template.userEmail = userEmail;
     template.sessionToken = sessionToken;
 
     logInfo('Template created, evaluating...');
     var output = template.evaluate()
-      .setTitle('SA HR Payroll System - Test');
+      .setTitle('SA HR Payroll System');
 
     logInfo('Dashboard page created successfully');
     return output;
