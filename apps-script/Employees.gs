@@ -181,8 +181,9 @@ function listEmployees(filters, sessionToken) {
 
       if (filters.activeOnly) {
         employees = employees.filter(function(emp) {
-          return emp['EMPLOYMENT STATUS'] !== 'Terminated' &&
-                 emp['EMPLOYMENT STATUS'] !== 'Resigned';
+          var status = emp['EMPLOYMENT STATUS'] || '';
+          // Only include Permanent and Temporary employees
+          return (status === 'Permanent' || status === 'Temporary');
         });
       }
     }
