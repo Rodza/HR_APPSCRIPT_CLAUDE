@@ -427,6 +427,41 @@ var SUCCESS_MESSAGES = {
   SYNC_COMPLETE: 'Loan sync completed successfully'
 };
 
+// ==================== PASSWORD RESET CONFIGURATION ====================
+
+/**
+ * Password reset token expiration time (milliseconds)
+ * Default: 1 hour (3600000 ms)
+ */
+var PASSWORD_RESET_TOKEN_EXPIRY = 3600000; // 1 hour
+
+/**
+ * Maximum password reset requests per email per hour
+ * Prevents abuse of the reset system
+ */
+var PASSWORD_RESET_MAX_REQUESTS_PER_HOUR = 3;
+
+/**
+ * Email templates for password reset
+ */
+var EMAIL_TEMPLATES = {
+  passwordReset: {
+    subject: 'Password Reset Request - SA HR Payroll System',
+    getBody: function(resetLink, userName) {
+      return 'Dear ' + (userName || 'User') + ',\n\n' +
+             'You have requested to reset your password for the SA HR Payroll System.\n\n' +
+             'Please click the link below to reset your password:\n' +
+             resetLink + '\n\n' +
+             'This link will expire in 1 hour.\n\n' +
+             'If you did not request this password reset, please ignore this email. ' +
+             'Your password will remain unchanged.\n\n' +
+             'Best regards,\n' +
+             'SA HR Payroll System\n' +
+             'SA Grinding Wheels & Scorpio Abrasives';
+    }
+  }
+};
+
 // ==================== HELPER FUNCTIONS ====================
 
 /**
@@ -448,7 +483,10 @@ function getConfig(key) {
     UIF_RATE: UIF_RATE,
     OVERTIME_MULTIPLIER: OVERTIME_MULTIPLIER,
     CURRENCY_SYMBOL: CURRENCY_SYMBOL,
-    COMPANY_INFO: COMPANY_INFO
+    COMPANY_INFO: COMPANY_INFO,
+    EMAIL_TEMPLATES: EMAIL_TEMPLATES,
+    PASSWORD_RESET_TOKEN_EXPIRY: PASSWORD_RESET_TOKEN_EXPIRY,
+    PASSWORD_RESET_MAX_REQUESTS_PER_HOUR: PASSWORD_RESET_MAX_REQUESTS_PER_HOUR
   };
 
   return configs[key];

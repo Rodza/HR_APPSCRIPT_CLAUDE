@@ -1365,6 +1365,275 @@ function createNewUser(name, email, password) {
 }
 
 // ============================================================================
+// PASSWORD RESET UTILITIES
+// ============================================================================
+
+/**
+ * Generate a password reset token
+ * Stores token with email and expiry in Script Properties
+ *
+ * @param {string} email - User's email address
+ * @returns {Object} Result with token if successful
+ */
+function generatePasswordResetToken(email) {
+  try {
+    if (!email) {
+      return { success: false, error: 'Email is required' };
+    }
+
+    // Check if user exists
+    var scriptProperties = PropertiesService.getScriptProperties();
+    var userConfigJson = scriptProperties.getProperty('USER_CONFIG_DATA');
+
+    if (!userConfigJson) {
+      return { success: false, error: 'User configuration not found' };
+    }
+
+    var users = JSON.parse(userConfigJson);
+    var normalizedEmail = email.trim().toLowerCase();
+    var user = users.find(function(u) {
+      return u.Email.toLowerCase() === normalizedEmail;
+    });
+
+    if (!user) {
+      // Don't reveal that user doesn't exist (security best practice)
+      return { success: true, message: 'If this email exists, a reset link has been sent' };
+    }
+
+    // Check rate limiting
+    var rateLimitKey = 'reset_rate_' + normalizedEmail;
+    var rateLimitData = scriptProperties.getProperty(rateLimitKey);
+
+    if (rateLimitData) {
+      var rateLimit = JSON.parse(rateLimitData);
+      var now = new Date().getTime();
+
+      // Clean up old requests (older than 1 hour)
+      rateLimit.requests = rateLimit.requests.filter(function(timestamp) {
+        return now - timestamp < 3600000; // 1 hour
+      });
+
+      // Check if exceeded max requests
+      if (rateLimit.requests.length >= PASSWORD_RESET_MAX_REQUESTS_PER_HOUR) {
+        return {
+          success: false,
+          error: 'Too many reset requests. Please try again later.'
+        };
+      }
+
+      rateLimit.requests.push(now);
+      scriptProperties.setProperty(rateLimitKey, JSON.stringify(rateLimit));
+    } else {
+      scriptProperties.setProperty(rateLimitKey, JSON.stringify({
+        requests: [new Date().getTime()]
+      }));
+    }
+
+    // Generate unique token
+    var token = Utilities.getUuid();
+    var expiry = new Date().getTime() + PASSWORD_RESET_TOKEN_EXPIRY;
+
+    // Store token with email and expiry
+    var tokenKey = 'reset_token_' + token;
+    var tokenData = {
+      email: user.Email,
+      expiry: expiry,
+      used: false
+    };
+
+    scriptProperties.setProperty(tokenKey, JSON.stringify(tokenData));
+
+    logInfo('Password reset token generated for: ' + email);
+
+    return {
+      success: true,
+      token: token,
+      userName: user.Name,
+      userEmail: user.Email
+    };
+
+  } catch (error) {
+    logError('Failed to generate password reset token', error);
+    return { success: false, error: 'Failed to generate reset token: ' + error.toString() };
+  }
+}
+
+/**
+ * Validate a password reset token
+ * Checks if token exists, is not expired, and has not been used
+ *
+ * @param {string} token - Reset token to validate
+ * @returns {Object} Result with email if valid
+ */
+function validatePasswordResetToken(token) {
+  try {
+    if (!token) {
+      return { success: false, error: 'Token is required' };
+    }
+
+    var scriptProperties = PropertiesService.getScriptProperties();
+    var tokenKey = 'reset_token_' + token;
+    var tokenDataJson = scriptProperties.getProperty(tokenKey);
+
+    if (!tokenDataJson) {
+      return { success: false, error: 'Invalid or expired reset token' };
+    }
+
+    var tokenData = JSON.parse(tokenDataJson);
+    var now = new Date().getTime();
+
+    // Check if token has expired
+    if (now > tokenData.expiry) {
+      scriptProperties.deleteProperty(tokenKey);
+      return { success: false, error: 'Reset token has expired' };
+    }
+
+    // Check if token has been used
+    if (tokenData.used) {
+      return { success: false, error: 'Reset token has already been used' };
+    }
+
+    return {
+      success: true,
+      email: tokenData.email
+    };
+
+  } catch (error) {
+    logError('Failed to validate password reset token', error);
+    return { success: false, error: 'Failed to validate token: ' + error.toString() };
+  }
+}
+
+/**
+ * Reset user password using a valid token
+ * Marks token as used after successful reset
+ *
+ * @param {string} token - Reset token
+ * @param {string} newPassword - New password
+ * @returns {Object} Result indicating success or failure
+ */
+function resetPasswordWithToken(token, newPassword) {
+  try {
+    if (!token || !newPassword) {
+      return { success: false, error: 'Token and new password are required' };
+    }
+
+    // Validate token first
+    var validation = validatePasswordResetToken(token);
+    if (!validation.success) {
+      return validation;
+    }
+
+    var email = validation.email;
+
+    // Update password in UserConfig sheet
+    var sheets = getSheets();
+    if (!sheets.userConfig) {
+      return { success: false, error: 'UserConfig sheet not found' };
+    }
+
+    var sheet = sheets.userConfig;
+    var data = sheet.getDataRange().getValues();
+    var headers = data[0];
+    var emailIndex = indexOf(headers, 'Email');
+    var hashIndex = indexOf(headers, 'PasswordHash');
+    var saltIndex = indexOf(headers, 'PasswordSalt');
+
+    // Find user row
+    var userRowIndex = -1;
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][emailIndex].toLowerCase() === email.toLowerCase()) {
+        userRowIndex = i;
+        break;
+      }
+    }
+
+    if (userRowIndex === -1) {
+      return { success: false, error: 'User not found' };
+    }
+
+    // Generate new salt and hash
+    var newSalt = generateSalt();
+    var newHash = hashPassword(newPassword, newSalt);
+
+    // Update the sheet
+    sheet.getRange(userRowIndex + 1, hashIndex + 1).setValue(newHash);
+    sheet.getRange(userRowIndex + 1, saltIndex + 1).setValue(newSalt);
+
+    // Mark token as used
+    var scriptProperties = PropertiesService.getScriptProperties();
+    var tokenKey = 'reset_token_' + token;
+    var tokenDataJson = scriptProperties.getProperty(tokenKey);
+    var tokenData = JSON.parse(tokenDataJson);
+    tokenData.used = true;
+    scriptProperties.setProperty(tokenKey, JSON.stringify(tokenData));
+
+    // Sync to Script Properties
+    syncUserConfigToProperties();
+
+    logSuccess('Password reset successful for: ' + email);
+
+    return {
+      success: true,
+      message: 'Password reset successfully'
+    };
+
+  } catch (error) {
+    logError('Failed to reset password', error);
+    return { success: false, error: 'Failed to reset password: ' + error.toString() };
+  }
+}
+
+/**
+ * Send password reset email
+ * Generates token and sends email with reset link
+ *
+ * @param {string} email - User's email address
+ * @param {string} resetUrl - Base URL for password reset page
+ * @returns {Object} Result indicating success or failure
+ */
+function sendPasswordResetEmail(email, resetUrl) {
+  try {
+    // Generate token
+    var tokenResult = generatePasswordResetToken(email);
+
+    if (!tokenResult.success) {
+      // If user doesn't exist, still return success to not reveal user existence
+      if (!tokenResult.token) {
+        return { success: true, message: 'If this email exists, a reset link has been sent' };
+      }
+      return tokenResult;
+    }
+
+    // Build reset link
+    var resetLink = resetUrl + '&page=reset&token=' + tokenResult.token;
+
+    // Get email template
+    var template = EMAIL_TEMPLATES.passwordReset;
+    var subject = template.subject;
+    var body = template.getBody(resetLink, tokenResult.userName);
+
+    // Send email
+    MailApp.sendEmail({
+      to: tokenResult.userEmail,
+      subject: subject,
+      body: body
+    });
+
+    logSuccess('Password reset email sent to: ' + email);
+
+    return {
+      success: true,
+      message: 'Password reset email sent successfully'
+    };
+
+  } catch (error) {
+    logError('Failed to send password reset email', error);
+    return { success: false, error: 'Failed to send reset email: ' + error.toString() };
+  }
+}
+
+// ============================================================================
 // EXPORT UTILITIES FOR TESTING
 // ============================================================================
 

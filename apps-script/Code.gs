@@ -181,6 +181,36 @@ function doGet(e) {
     logInfo('doGet called at: ' + timestamp);
     logInfo('Deployment URL: ' + ScriptApp.getService().getUrl());
 
+    // Get page parameter for routing
+    var page = (e && e.parameter) ? e.parameter.page : null;
+    logInfo('Page requested: ' + (page || 'default (login/dashboard)'));
+
+    // Handle password reset pages (no authentication required)
+    if (page === 'forgot') {
+      logInfo('Showing forgot password page');
+      return createForgotPasswordPage();
+    }
+
+    if (page === 'reset-sent') {
+      logInfo('Showing reset email sent page');
+      return createResetEmailSentPage();
+    }
+
+    if (page === 'reset') {
+      var token = (e && e.parameter) ? e.parameter.token : null;
+      if (!token) {
+        logWarning('Reset page requested without token');
+        return createLoginPage();
+      }
+      logInfo('Showing password reset page with token');
+      return createResetPasswordPage(token);
+    }
+
+    if (page === 'reset-success') {
+      logInfo('Showing password reset success page');
+      return createResetSuccessPage();
+    }
+
     // Check if user has a valid session (handle undefined e parameter)
     var sessionToken = (e && e.parameter) ? e.parameter.session : null;
     logInfo('Session token from URL: ' + (sessionToken ? 'Present (' + sessionToken.substring(0, 8) + '...)' : 'Missing'));
@@ -284,6 +314,89 @@ function handleLogout(sessionToken) {
     success: true,
     message: 'Logged out successfully'
   };
+}
+
+/**
+ * Handle password reset request
+ * Sends reset email to user if email exists
+ *
+ * @param {string} email - User's email address
+ * @returns {Object} Result
+ */
+function handlePasswordResetRequest(email) {
+  try {
+    if (!email) {
+      return { success: false, error: 'Email is required' };
+    }
+
+    // Get the current web app URL (without parameters)
+    var webAppUrl = ScriptApp.getService().getUrl();
+
+    // Send reset email
+    var result = sendPasswordResetEmail(email, webAppUrl);
+
+    return result;
+
+  } catch (error) {
+    logError('handlePasswordResetRequest error', error);
+    return {
+      success: false,
+      error: 'Failed to process reset request: ' + error.toString()
+    };
+  }
+}
+
+/**
+ * Handle password reset with token
+ * Validates token and updates password
+ *
+ * @param {string} token - Reset token
+ * @param {string} newPassword - New password
+ * @returns {Object} Result
+ */
+function handlePasswordReset(token, newPassword) {
+  try {
+    if (!token || !newPassword) {
+      return { success: false, error: 'Token and new password are required' };
+    }
+
+    // Validate password strength (optional but recommended)
+    if (newPassword.length < 6) {
+      return { success: false, error: 'Password must be at least 6 characters long' };
+    }
+
+    // Reset password
+    var result = resetPasswordWithToken(token, newPassword);
+
+    return result;
+
+  } catch (error) {
+    logError('handlePasswordReset error', error);
+    return {
+      success: false,
+      error: 'Failed to reset password: ' + error.toString()
+    };
+  }
+}
+
+/**
+ * Validate password reset token
+ * Returns whether token is valid without consuming it
+ *
+ * @param {string} token - Reset token to validate
+ * @returns {Object} Result with validation status
+ */
+function handleValidateResetToken(token) {
+  try {
+    var result = validatePasswordResetToken(token);
+    return result;
+  } catch (error) {
+    logError('handleValidateResetToken error', error);
+    return {
+      success: false,
+      error: 'Failed to validate token: ' + error.toString()
+    };
+  }
 }
 
 /**
@@ -431,6 +544,102 @@ function createAccessDeniedPage(userEmail) {
 
   return HtmlService.createHtmlOutput(deniedHtml)
     .setTitle('Access Denied');
+}
+
+/**
+ * Create forgot password page
+ * @returns {HtmlOutput} Forgot password page
+ */
+function createForgotPasswordPage() {
+  try {
+    logInfo('Creating forgot password page...');
+
+    var forgotHtml = HtmlService.createHtmlOutputFromFile('ForgotPassword')
+      .setTitle('Forgot Password - SA HR Payroll System');
+
+    logInfo('Forgot password page created successfully');
+    return forgotHtml;
+  } catch (error) {
+    logError('createForgotPasswordPage error', error);
+    return HtmlService.createHtmlOutput(
+      '<h1>Page Error</h1>' +
+      '<p>Error: ' + error.toString() + '</p>' +
+      '<pre>' + error.stack + '</pre>'
+    );
+  }
+}
+
+/**
+ * Create reset email sent confirmation page
+ * @returns {HtmlOutput} Reset email sent page
+ */
+function createResetEmailSentPage() {
+  try {
+    logInfo('Creating reset email sent page...');
+
+    var sentHtml = HtmlService.createHtmlOutputFromFile('ResetEmailSent')
+      .setTitle('Password Reset Email Sent - SA HR Payroll System');
+
+    logInfo('Reset email sent page created successfully');
+    return sentHtml;
+  } catch (error) {
+    logError('createResetEmailSentPage error', error);
+    return HtmlService.createHtmlOutput(
+      '<h1>Page Error</h1>' +
+      '<p>Error: ' + error.toString() + '</p>' +
+      '<pre>' + error.stack + '</pre>'
+    );
+  }
+}
+
+/**
+ * Create password reset form page
+ * @param {string} token - Reset token
+ * @returns {HtmlOutput} Password reset page
+ */
+function createResetPasswordPage(token) {
+  try {
+    logInfo('Creating reset password page...');
+
+    var template = HtmlService.createTemplateFromFile('ResetPassword');
+    template.token = token;
+
+    var resetHtml = template.evaluate()
+      .setTitle('Reset Password - SA HR Payroll System');
+
+    logInfo('Reset password page created successfully');
+    return resetHtml;
+  } catch (error) {
+    logError('createResetPasswordPage error', error);
+    return HtmlService.createHtmlOutput(
+      '<h1>Page Error</h1>' +
+      '<p>Error: ' + error.toString() + '</p>' +
+      '<pre>' + error.stack + '</pre>'
+    );
+  }
+}
+
+/**
+ * Create reset success page
+ * @returns {HtmlOutput} Reset success page
+ */
+function createResetSuccessPage() {
+  try {
+    logInfo('Creating reset success page...');
+
+    var successHtml = HtmlService.createHtmlOutputFromFile('ResetSuccess')
+      .setTitle('Password Reset Successful - SA HR Payroll System');
+
+    logInfo('Reset success page created successfully');
+    return successHtml;
+  } catch (error) {
+    logError('createResetSuccessPage error', error);
+    return HtmlService.createHtmlOutput(
+      '<h1>Page Error</h1>' +
+      '<p>Error: ' + error.toString() + '</p>' +
+      '<pre>' + error.stack + '</pre>'
+    );
+  }
 }
 
 /**
