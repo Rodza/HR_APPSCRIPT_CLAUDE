@@ -259,10 +259,6 @@
                 <div class="menu-item" onclick="loadModule('reports', event)">
                     <i class="fas fa-file-alt"></i> Reports
                 </div>
-                <hr>
-                <div class="menu-item" onclick="loadModule('timesheetDebugger', event)">
-                    <i class="fas fa-bug"></i> 🔍 Debugger
-                </div>
             </div>
 
             <!-- Content Area -->
@@ -442,9 +438,6 @@
                     break;
                 case 'timesheetSettings':
                     loadTimesheetSettingsModule();
-                    break;
-                case 'timesheetDebugger':
-                    loadTimesheetDebuggerModule();
                     break;
                 case 'timesheetBreakdown':
                     loadTimesheetBreakdownModule();
@@ -872,22 +865,6 @@
                 })
                 .withFailureHandler(handleError)
                 .include('TimesheetSettings');
-        }
-
-        function loadTimesheetDebuggerModule() {
-            google.script.run
-                .withSuccessHandler(function(html) {
-                    if (html) {
-                        const contentArea = document.getElementById('contentArea');
-                        contentArea.innerHTML = html;
-                        executeModuleScripts(contentArea);
-                    } else {
-                        showError('Failed to load Timesheet Debugger module');
-                    }
-                    hideLoading();
-                })
-                .withFailureHandler(handleError)
-                .include('TimesheetDebugger');
         }
 
         function loadTimesheetBreakdownModule() {
