@@ -187,21 +187,38 @@ function doGet(e) {
 
     var userEmail = null;
     if (sessionToken) {
-      userEmail = getUserFromSession(sessionToken);
-      logInfo('User from session: ' + (userEmail || 'None (session expired or invalid)'));
+      try {
+        userEmail = getUserFromSession(sessionToken);
+        logInfo('User from session: ' + (userEmail || 'None (session expired or invalid)'));
+      } catch (sessionError) {
+        logError('Error getting user from session', sessionError);
+        // Clear session and show login
+        sessionToken = null;
+        userEmail = null;
+      }
     }
 
     if (userEmail) {
       // Valid session - show dashboard
       logInfo('✅ Valid session found - Showing dashboard for: ' + userEmail);
       logInfo('========================================');
-      return createDashboardPage(userEmail, sessionToken);
+      try {
+        return createDashboardPage(userEmail, sessionToken);
+      } catch (dashError) {
+        logError('Error creating dashboard', dashError);
+        throw dashError;
+      }
     }
 
     // No valid session - show login page
     logInfo('ℹ️  No valid session - Showing login page');
     logInfo('========================================');
-    return createLoginPage();
+    try {
+      return createLoginPage();
+    } catch (loginError) {
+      logError('Error creating login page', loginError);
+      throw loginError;
+    }
 
   } catch (error) {
     logError('❌ doGet error', error);
@@ -269,8 +286,7 @@ function getSessionUser(sessionToken) {
 function createLoginPage() {
   var loginHtml = HtmlService.createHtmlOutputFromFile('Login')
     .setTitle('Login - SA HR Payroll System')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
-    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 
   return loginHtml;
 }
@@ -294,8 +310,7 @@ function createDashboardPage(userEmail, sessionToken) {
     var output = template.evaluate()
       .setTitle('SA HR Payroll System')
       .setSandboxMode(HtmlService.SandboxMode.IFRAME)
-      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
-      .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 
     logInfo('Dashboard page created successfully');
     return output;
