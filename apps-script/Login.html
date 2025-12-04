@@ -190,7 +190,7 @@
     </form>
 
     <div style="text-align: center; margin-top: 15px;">
-      <a href="?page=forgot" style="color: #667eea; text-decoration: none; font-size: 14px;">
+      <a href="#" onclick="goToForgotPassword(); return false;" style="color: #667eea; text-decoration: none; font-size: 14px; cursor: pointer;">
         Forgot Password?
       </a>
     </div>
@@ -236,6 +236,13 @@
     function hideError() {
       const errorDiv = document.getElementById('errorMessage');
       errorDiv.classList.remove('show');
+    }
+
+    function goToForgotPassword() {
+      // Get current URL and add page parameter
+      var currentUrl = window.location.href;
+      var baseUrl = currentUrl.split('?')[0]; // Remove any existing parameters
+      window.location.href = baseUrl + '?page=forgot';
     }
 
     function handleLoginSubmit(event) {
