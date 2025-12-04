@@ -181,8 +181,8 @@ function doGet(e) {
     logInfo('doGet called at: ' + timestamp);
     logInfo('Deployment URL: ' + ScriptApp.getService().getUrl());
 
-    // Check if user has a valid session
-    var sessionToken = e.parameter ? e.parameter.session : null;
+    // Check if user has a valid session (handle undefined e parameter)
+    var sessionToken = (e && e.parameter) ? e.parameter.session : null;
     logInfo('Session token from URL: ' + (sessionToken ? 'Present (' + sessionToken.substring(0, 8) + '...)' : 'Missing'));
 
     var userEmail = null;

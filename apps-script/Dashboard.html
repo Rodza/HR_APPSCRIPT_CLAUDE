@@ -279,13 +279,17 @@
         // ==================== SESSION MANAGEMENT ====================
 
         // Version identifier for cache debugging
-        var DASHBOARD_VERSION = '2.0.2-google-docs-error-fix';
-        var DASHBOARD_UPDATED = '2025-12-04T11:00:00Z';
+        var DASHBOARD_VERSION = '2.0.4-production-fix';
+        var DASHBOARD_UPDATED = '2025-12-04T12:00:00Z';
+
+        // Initialize session variables with safer template syntax
+        var SESSION_TOKEN = '';
+        var USER_EMAIL = '';
 
         try {
-            // Store session token and user email from server-side template
-            var SESSION_TOKEN = '<?!= sessionToken || "" ?>';
-            var USER_EMAIL = '<?!= userEmail || "" ?>';
+            // Use safer template evaluation
+            SESSION_TOKEN = '<?!= typeof sessionToken !== "undefined" ? sessionToken : "" ?>';
+            USER_EMAIL = '<?!= typeof userEmail !== "undefined" ? userEmail : "" ?>';
 
             console.log('========================================');
             console.log('📊 SA HR PAYROLL SYSTEM - DASHBOARD');
@@ -296,12 +300,14 @@
             console.log('🌐 Page URL:', window.location.href);
             console.log('👤 User Email:', USER_EMAIL || '❌ Not set');
             console.log('🔑 Session Token:', SESSION_TOKEN ? '✅ Present (' + SESSION_TOKEN.substring(0, 8) + '...)' : '❌ Missing');
-            console.log('✅ Dashboard loaded successfully');
+            console.log('✅ Dashboard template variables loaded');
             console.log('========================================');
         } catch (e) {
             console.error('❌ Error initializing session:', e);
-            var SESSION_TOKEN = '';
-            var USER_EMAIL = '';
+            console.error('Stack:', e.stack);
+            // Ensure variables exist even if error
+            SESSION_TOKEN = SESSION_TOKEN || '';
+            USER_EMAIL = USER_EMAIL || '';
         }
 
         // ==================== INITIALIZATION ====================
