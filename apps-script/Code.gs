@@ -244,11 +244,29 @@ function handleLogin(email, password) {
 
   if (result.success) {
     var sessionToken = createUserSession(result.user.email);
-    return {
-      success: true,
-      sessionToken: sessionToken,
-      user: result.user
-    };
+
+    // Return the dashboard HTML directly instead of just the session token
+    // This avoids the redirect issue with Apps Script iframe URLs
+    try {
+      var template = HtmlService.createTemplateFromFile('DashboardMinimal');
+      template.userEmail = result.user.email;
+      template.sessionToken = sessionToken;
+
+      var dashboardHtml = template.evaluate().getContent();
+
+      return {
+        success: true,
+        sessionToken: sessionToken,
+        user: result.user,
+        dashboardHtml: dashboardHtml
+      };
+    } catch (error) {
+      logError('Error generating dashboard HTML in handleLogin', error);
+      return {
+        success: false,
+        error: 'Login succeeded but dashboard generation failed: ' + error.toString()
+      };
+    }
   }
 
   return result;
