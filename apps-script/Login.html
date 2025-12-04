@@ -190,7 +190,7 @@
     </form>
 
     <div style="text-align: center; margin-top: 15px;">
-      <a href="#" onclick="goToForgotPassword(); return false;" style="color: #667eea; text-decoration: none; font-size: 14px; cursor: pointer;">
+      <a href="#" id="forgotPasswordLink" style="color: #667eea; text-decoration: none; font-size: 14px; cursor: pointer;">
         Forgot Password?
       </a>
     </div>
@@ -225,6 +225,19 @@
       document.body.style.display = 'flex';
       document.body.style.visibility = 'visible';
       document.body.style.opacity = '1';
+
+      // Add forgot password link event listener
+      var forgotLink = document.getElementById('forgotPasswordLink');
+      if (forgotLink) {
+        forgotLink.addEventListener('click', function(e) {
+          e.preventDefault();
+          console.log('🔑 Forgot Password clicked');
+          goToForgotPassword();
+        });
+        console.log('✅ Forgot password link event listener attached');
+      } else {
+        console.error('❌ Forgot password link not found!');
+      }
     });
 
     function showError(message) {
