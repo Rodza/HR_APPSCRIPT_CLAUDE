@@ -36,7 +36,7 @@ function generateOutstandingLoansReport(asOfDate) {
       throw new Error('Failed to get employees: ' + empResult.error);
     }
 
-    const employees = empResult.data;
+    const employees = empResult.data.employees;
     Logger.log('📊 Processing ' + employees.length + ' employees');
 
     // Get loan balances for each employee
