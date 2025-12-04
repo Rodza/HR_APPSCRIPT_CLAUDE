@@ -607,7 +607,7 @@
                     pageSize: 1
                 }, SESSION_TOKEN);
 
-            // Load pending timesheets (Yes/No)
+            // Load pending timesheets (Yes/No) - only count STATUS='Pending'
             google.script.run
                 .withSuccessHandler(function(result) {
                     console.log('listPendingTimesheets result:', result);
@@ -622,7 +622,7 @@
                     console.error('Failed to load pending timesheets:', error);
                     document.getElementById('pendingTimesheets').textContent = 'Error';
                 })
-                .listPendingTimesheets({}, SESSION_TOKEN);
+                .listPendingTimesheets({ status: 'Pending' }, SESSION_TOKEN);
 
             hideLoading();
         }
