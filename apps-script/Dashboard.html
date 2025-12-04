@@ -577,6 +577,53 @@
                 })
                 .getTotalOutstandingLoans(SESSION_TOKEN);
 
+            // Load payslips this month
+            const now = new Date();
+            const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+            const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+            const formatDate = function(date) {
+                return date.getFullYear() + '-' +
+                       String(date.getMonth() + 1).padStart(2, '0') + '-' +
+                       String(date.getDate()).padStart(2, '0');
+            };
+
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    console.log('listPayslips result:', result);
+                    if (result && result.success && result.data && result.data.pagination) {
+                        document.getElementById('totalPayslips').textContent = result.data.pagination.total;
+                    } else {
+                        document.getElementById('totalPayslips').textContent = '0';
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    console.error('Failed to load payslips:', error);
+                    document.getElementById('totalPayslips').textContent = 'Error';
+                })
+                .listPayslips({
+                    startDate: formatDate(firstDay),
+                    endDate: formatDate(lastDay),
+                    page: 1,
+                    pageSize: 1
+                }, SESSION_TOKEN);
+
+            // Load pending timesheets (Yes/No)
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    console.log('listPendingTimesheets result:', result);
+                    if (result && result.success && result.data) {
+                        const hasPending = result.data.length > 0;
+                        document.getElementById('pendingTimesheets').textContent = hasPending ? 'Yes' : 'No';
+                    } else {
+                        document.getElementById('pendingTimesheets').textContent = 'No';
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    console.error('Failed to load pending timesheets:', error);
+                    document.getElementById('pendingTimesheets').textContent = 'Error';
+                })
+                .listPendingTimesheets({}, SESSION_TOKEN);
+
             hideLoading();
         }
 
