@@ -36,7 +36,7 @@ function generateOutstandingLoansReport(asOfDate) {
       throw new Error('Failed to get employees: ' + empResult.error);
     }
 
-    const employees = empResult.data;
+    const employees = empResult.data.employees;
     Logger.log('📊 Processing ' + employees.length + ' employees');
 
     // Get loan balances for each employee
@@ -338,7 +338,7 @@ function generateWeeklyPayrollSummaryReport(weekEnding) {
       throw new Error('Failed to get payslips: ' + payslipsResult.error);
     }
 
-    const payslips = payslipsResult.data;
+    const payslips = payslipsResult.data.payslips;
     Logger.log('📊 Processing ' + payslips.length + ' payslips');
 
     if (payslips.length === 0) {
@@ -685,7 +685,7 @@ function generateMonthlyPayrollSummaryReport(monthDate) {
       throw new Error('Failed to get payslips: ' + payslipsResult.error);
     }
 
-    const payslips = payslipsResult.data;
+    const payslips = payslipsResult.data.payslips;
     Logger.log('📊 Processing ' + payslips.length + ' payslips');
 
     if (payslips.length === 0) {
