@@ -254,8 +254,21 @@
     function goToForgotPassword() {
       // Get current URL and add page parameter
       var currentUrl = window.location.href;
+      console.log('Current URL:', currentUrl);
+
       var baseUrl = currentUrl.split('?')[0]; // Remove any existing parameters
-      window.location.href = baseUrl + '?page=forgot';
+      var newUrl = baseUrl + '?page=forgot';
+
+      console.log('Base URL:', baseUrl);
+      console.log('New URL:', newUrl);
+      console.log('Navigating to forgot password page...');
+
+      window.location.href = newUrl;
+
+      // Double check
+      setTimeout(function() {
+        console.log('After navigation, URL is:', window.location.href);
+      }, 100);
     }
 
     function handleLoginSubmit(event) {
