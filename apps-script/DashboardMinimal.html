@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard Test</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 40px;
+      background: #f0f0f0;
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    .success {
+      color: green;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1 class="success">✅ Dashboard Test - SUCCESS!</h1>
+    <p>If you see this, the dashboard template is working.</p>
+
+    <h2>Session Information:</h2>
+    <ul>
+      <li><strong>User Email:</strong> <span id="userEmail">Loading...</span></li>
+      <li><strong>Session Token:</strong> <span id="sessionToken">Loading...</span></li>
+    </ul>
+
+    <button onclick="testGoogleScript()">Test Google Script Connection</button>
+    <div id="testResult"></div>
+  </div>
+
+  <script>
+    // Test template variable injection
+    var USER_EMAIL = '<?!= typeof userEmail !== "undefined" ? userEmail : "ERROR: userEmail not set" ?>';
+    var SESSION_TOKEN = '<?!= typeof sessionToken !== "undefined" ? sessionToken : "ERROR: sessionToken not set" ?>';
+
+    console.log('========================================');
+    console.log('🧪 MINIMAL DASHBOARD TEST');
+    console.log('========================================');
+    console.log('👤 User Email:', USER_EMAIL);
+    console.log('🔑 Session Token:', SESSION_TOKEN ? SESSION_TOKEN.substring(0, 20) + '...' : 'Not set');
+    console.log('🌐 URL:', window.location.href);
+    console.log('========================================');
+
+    // Display on page
+    document.getElementById('userEmail').textContent = USER_EMAIL;
+    document.getElementById('sessionToken').textContent = SESSION_TOKEN ? SESSION_TOKEN.substring(0, 20) + '...' : 'Not set';
+
+    function testGoogleScript() {
+      console.log('Testing google.script.run...');
+      document.getElementById('testResult').innerHTML = '<p>Testing...</p>';
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          console.log('✅ Google Script works:', result);
+          document.getElementById('testResult').innerHTML = '<p style="color:green">✅ Google Script connection works!</p>';
+        })
+        .withFailureHandler(function(error) {
+          console.error('❌ Google Script error:', error);
+          document.getElementById('testResult').innerHTML = '<p style="color:red">❌ Error: ' + error.message + '</p>';
+        })
+        .getCurrentUser();
+    }
+
+    // Force visibility
+    document.body.style.display = 'block';
+    document.body.style.visibility = 'visible';
+    document.body.style.opacity = '1';
+  </script>
+</body>
+</html>

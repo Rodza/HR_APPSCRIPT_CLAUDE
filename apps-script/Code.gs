@@ -313,13 +313,15 @@ function createDashboardPage(userEmail, sessionToken) {
     logInfo('Creating dashboard page for: ' + userEmail);
     logInfo('Session token: ' + (sessionToken ? 'Present' : 'Missing'));
 
-    var template = HtmlService.createTemplateFromFile('Dashboard');
+    // Use minimal dashboard for testing
+    logInfo('Using minimal dashboard for testing...');
+    var template = HtmlService.createTemplateFromFile('DashboardMinimal');
     template.userEmail = userEmail;
     template.sessionToken = sessionToken;
 
     logInfo('Template created, evaluating...');
     var output = template.evaluate()
-      .setTitle('SA HR Payroll System');
+      .setTitle('SA HR Payroll System - Test');
 
     logInfo('Dashboard page created successfully');
     return output;
