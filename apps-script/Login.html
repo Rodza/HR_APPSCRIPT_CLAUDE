@@ -252,23 +252,28 @@
     }
 
     function goToForgotPassword() {
-      // Get current URL and add page parameter
-      var currentUrl = window.location.href;
-      console.log('Current URL:', currentUrl);
+      console.log('🔑 Navigating to forgot password...');
 
-      var baseUrl = currentUrl.split('?')[0]; // Remove any existing parameters
-      var newUrl = baseUrl + '?page=forgot';
+      // Get the deployment URL (need to use the exec URL, not iframe URL)
+      var deploymentUrl = 'https://script.google.com/macros/s/AKfycbzBLkAmlYLi23YwW-973jF1XQ_HFJPYFwCxj5wmQ_Jn29R4zj0WzRja9fa_yZO1LR4AsQ/exec';
+      var newUrl = deploymentUrl + '?page=forgot';
 
-      console.log('Base URL:', baseUrl);
-      console.log('New URL:', newUrl);
-      console.log('Navigating to forgot password page...');
+      console.log('Target URL:', newUrl);
 
-      window.location.href = newUrl;
-
-      // Double check
-      setTimeout(function() {
-        console.log('After navigation, URL is:', window.location.href);
-      }, 100);
+      // Try to navigate the top window (in case we're in an iframe)
+      try {
+        if (window.top && window.top !== window) {
+          console.log('In iframe, navigating parent window');
+          window.top.location.href = newUrl;
+        } else {
+          console.log('Not in iframe, navigating current window');
+          window.location.href = newUrl;
+        }
+      } catch (e) {
+        console.error('Navigation error:', e);
+        // Fallback: force navigation
+        window.location.href = newUrl;
+      }
     }
 
     function handleLoginSubmit(event) {
