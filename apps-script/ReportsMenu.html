@@ -203,7 +203,7 @@
                     if (result.success) {
                         const select = document.getElementById('statementEmployee');
                         select.innerHTML = '<option value="">Select Employee</option>' +
-                            result.data.map(emp =>
+                            result.data.employees.map(emp =>
                                 `<option value="${emp.id}">${emp.REFNAME}</option>`
                             ).join('');
                     } else {

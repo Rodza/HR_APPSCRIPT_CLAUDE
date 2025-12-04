@@ -338,7 +338,7 @@ function generateWeeklyPayrollSummaryReport(weekEnding) {
       throw new Error('Failed to get payslips: ' + payslipsResult.error);
     }
 
-    const payslips = payslipsResult.data;
+    const payslips = payslipsResult.data.payslips;
     Logger.log('📊 Processing ' + payslips.length + ' payslips');
 
     if (payslips.length === 0) {
@@ -685,7 +685,7 @@ function generateMonthlyPayrollSummaryReport(monthDate) {
       throw new Error('Failed to get payslips: ' + payslipsResult.error);
     }
 
-    const payslips = payslipsResult.data;
+    const payslips = payslipsResult.data.payslips;
     Logger.log('📊 Processing ' + payslips.length + ' payslips');
 
     if (payslips.length === 0) {
