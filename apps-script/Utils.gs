@@ -1606,7 +1606,12 @@ function sendPasswordResetEmail(email, resetUrl) {
     }
 
     // Build reset link
-    var resetLink = resetUrl + '&page=reset&token=' + tokenResult.token;
+    // Check if URL already has query parameters
+    var separator = resetUrl.indexOf('?') > -1 ? '&' : '?';
+    var resetLink = resetUrl + separator + 'page=reset&token=' + tokenResult.token;
+
+    logInfo('Reset URL base: ' + resetUrl);
+    logInfo('Reset link generated: ' + resetLink);
 
     // Get email template
     var template = EMAIL_TEMPLATES.passwordReset;

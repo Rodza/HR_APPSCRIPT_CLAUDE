@@ -344,6 +344,8 @@ function handlePasswordResetRequest(email) {
     // Get the current web app URL (without parameters)
     var webAppUrl = ScriptApp.getService().getUrl();
 
+    logInfo('Web app URL for password reset: ' + webAppUrl);
+
     // Send reset email
     var result = sendPasswordResetEmail(email, webAppUrl);
 
