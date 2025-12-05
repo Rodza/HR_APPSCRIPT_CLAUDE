@@ -106,13 +106,25 @@ function forceAuthorization() {
     file.setTrashed(true);
     console.log('✅ Drive access confirmed - Test file deleted');
 
+    // 4. Test Mail access (CRITICAL for password reset)
+    console.log('\nStep 4: Testing Mail access...');
+    var testEmail = Session.getActiveUser().getEmail();
+    // Just check if we can access MailApp (doesn't actually send)
+    var quotaRemaining = MailApp.getRemainingDailyQuota();
+    console.log('✅ Mail access confirmed - Remaining quota: ' + quotaRemaining);
+
     console.log('\n🎉 AUTHORIZATION SUCCESSFUL!');
+    console.log('All required permissions have been granted:');
+    console.log('  ✅ Spreadsheets');
+    console.log('  ✅ Documents');
+    console.log('  ✅ Drive');
+    console.log('  ✅ Mail (Send Email)');
     console.log('\nNext steps:');
     console.log('1. Deploy → Manage deployments');
     console.log('2. Click edit (pencil icon) on your deployment');
     console.log('3. Select "New version"');
     console.log('4. Click "Deploy"');
-    console.log('5. Test PDF generation in your web app');
+    console.log('5. Test Excel import and password reset in your web app');
     console.log('\n========== AUTHORIZATION COMPLETE ==========');
 
     return { success: true, message: 'All permissions granted successfully!' };
