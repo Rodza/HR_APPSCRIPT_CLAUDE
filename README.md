@@ -247,14 +247,21 @@ The system automatically syncs loan transactions when payslips are created/edite
 - Check Google Drive permissions
 - Verify "Payslip PDFs" folder access
 
+**Authorization Errors (DriveApp.createFile or MailApp.sendEmail)**
+- Error: "You do not have permission to call DriveApp.createFile/MailApp.sendEmail"
+- Solution: The web app needs to be redeployed and reauthorized
+- See **REAUTHORIZATION_GUIDE.md** for step-by-step instructions
+- This typically happens after OAuth scopes are added to appsscript.json
+
 ## 📚 Documentation
 
-Complete documentation available in `/Documentation`:
-- **FINAL_REQUIREMENTS.md** - Complete system specification
-- **DATA_MODEL_REFERENCE.md** - All table structures, fields, formulas
-- **CODE_STANDARDS.md** - Coding conventions, patterns, standards
-- **PHASE_CHECKLISTS.md** - Acceptance criteria for each phase
-- **IMPLEMENTATION_GUIDE.md** - Detailed deployment guide
+Complete documentation available:
+- **REAUTHORIZATION_GUIDE.md** - Fix OAuth permission errors (IMPORTANT!)
+- `/Documentation/FINAL_REQUIREMENTS.md` - Complete system specification
+- `/Documentation/DATA_MODEL_REFERENCE.md` - All table structures, fields, formulas
+- `/Documentation/CODE_STANDARDS.md` - Coding conventions, patterns, standards
+- `/Documentation/PHASE_CHECKLISTS.md` - Acceptance criteria for each phase
+- `/Documentation/IMPLEMENTATION_GUIDE.md` - Detailed deployment guide
 
 ## 🎯 Success Criteria
 
