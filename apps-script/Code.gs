@@ -555,7 +555,7 @@ function createForgotPasswordPage() {
     logInfo('Creating forgot password page...');
 
     var template = HtmlService.createTemplateFromFile('ForgotPassword');
-    template.webAppUrl = ScriptApp.getService().getUrl();
+    template.webAppUrl = 'https://script.google.com/macros/s/AKfycbzBLkAmlYLi23YwW-973jF1XQ_HFJPYFwCxj5wmQ_Jn29R4zj0WzRja9fa_yZO1LR4AsQ/exec';
 
     var forgotHtml = template.evaluate()
       .setTitle('Forgot Password - SA HR Payroll System');
@@ -581,7 +581,7 @@ function createResetEmailSentPage() {
     logInfo('Creating reset email sent page...');
 
     var template = HtmlService.createTemplateFromFile('ResetEmailSent');
-    template.webAppUrl = ScriptApp.getService().getUrl();
+    template.webAppUrl = 'https://script.google.com/macros/s/AKfycbzBLkAmlYLi23YwW-973jF1XQ_HFJPYFwCxj5wmQ_Jn29R4zj0WzRja9fa_yZO1LR4AsQ/exec';
 
     var sentHtml = template.evaluate()
       .setTitle('Password Reset Email Sent - SA HR Payroll System');
@@ -609,7 +609,7 @@ function createResetPasswordPage(token) {
 
     var template = HtmlService.createTemplateFromFile('ResetPassword');
     template.token = token;
-    template.webAppUrl = ScriptApp.getService().getUrl();
+    template.webAppUrl = 'https://script.google.com/macros/s/AKfycbzBLkAmlYLi23YwW-973jF1XQ_HFJPYFwCxj5wmQ_Jn29R4zj0WzRja9fa_yZO1LR4AsQ/exec';
 
     var resetHtml = template.evaluate()
       .setTitle('Reset Password - SA HR Payroll System');
@@ -635,7 +635,7 @@ function createResetSuccessPage() {
     logInfo('Creating reset success page...');
 
     var template = HtmlService.createTemplateFromFile('ResetSuccess');
-    template.webAppUrl = ScriptApp.getService().getUrl();
+    template.webAppUrl = 'https://script.google.com/macros/s/AKfycbzBLkAmlYLi23YwW-973jF1XQ_HFJPYFwCxj5wmQ_Jn29R4zj0WzRja9fa_yZO1LR4AsQ/exec';
 
     var successHtml = template.evaluate()
       .setTitle('Password Reset Successful - SA HR Payroll System');
