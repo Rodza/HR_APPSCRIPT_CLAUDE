@@ -128,14 +128,21 @@
       Didn't receive an email? You can try requesting another reset link in a few minutes.
     </p>
 
-    <a href="<?= webAppUrl ?>" class="btn">
+    <button onclick="backToLogin()" class="btn" id="backBtn">
       Back to Login
-    </a>
+    </button>
 
     <div class="footer">
       SA Grinding Wheels & Scorpio Abrasives<br>
       &copy; 2025 All rights reserved
     </div>
   </div>
+
+  <script>
+    function backToLogin() {
+      var baseUrl = window.location.href.split('?')[0].split('#')[0];
+      window.location.href = baseUrl;
+    }
+  </script>
 </body>
 </html>
