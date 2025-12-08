@@ -572,10 +572,7 @@ function createForgotPasswordPage() {
   try {
     logInfo('Creating forgot password page...');
 
-    var template = HtmlService.createTemplateFromFile('ForgotPassword');
-    template.webAppUrl = 'https://script.google.com/macros/s/AKfycbzBLkAmlYLi23YwW-973jF1XQ_HFJPYFwCxj5wmQ_Jn29R4zj0WzRja9fa_yZO1LR4AsQ/exec';
-
-    var forgotHtml = template.evaluate()
+    var forgotHtml = HtmlService.createHtmlOutputFromFile('ForgotPassword')
       .setTitle('Forgot Password - SA HR Payroll System');
 
     logInfo('Forgot password page created successfully');
@@ -598,10 +595,7 @@ function createResetEmailSentPage() {
   try {
     logInfo('Creating reset email sent page...');
 
-    var template = HtmlService.createTemplateFromFile('ResetEmailSent');
-    template.webAppUrl = 'https://script.google.com/macros/s/AKfycbzBLkAmlYLi23YwW-973jF1XQ_HFJPYFwCxj5wmQ_Jn29R4zj0WzRja9fa_yZO1LR4AsQ/exec';
-
-    var sentHtml = template.evaluate()
+    var sentHtml = HtmlService.createHtmlOutputFromFile('ResetEmailSent')
       .setTitle('Password Reset Email Sent - SA HR Payroll System');
 
     logInfo('Reset email sent page created successfully');
@@ -627,7 +621,6 @@ function createResetPasswordPage(token) {
 
     var template = HtmlService.createTemplateFromFile('ResetPassword');
     template.token = token;
-    template.webAppUrl = 'https://script.google.com/macros/s/AKfycbzBLkAmlYLi23YwW-973jF1XQ_HFJPYFwCxj5wmQ_Jn29R4zj0WzRja9fa_yZO1LR4AsQ/exec';
 
     var resetHtml = template.evaluate()
       .setTitle('Reset Password - SA HR Payroll System');
@@ -652,10 +645,7 @@ function createResetSuccessPage() {
   try {
     logInfo('Creating reset success page...');
 
-    var template = HtmlService.createTemplateFromFile('ResetSuccess');
-    template.webAppUrl = 'https://script.google.com/macros/s/AKfycbzBLkAmlYLi23YwW-973jF1XQ_HFJPYFwCxj5wmQ_Jn29R4zj0WzRja9fa_yZO1LR4AsQ/exec';
-
-    var successHtml = template.evaluate()
+    var successHtml = HtmlService.createHtmlOutputFromFile('ResetSuccess')
       .setTitle('Password Reset Successful - SA HR Payroll System');
 
     logInfo('Reset success page created successfully');
