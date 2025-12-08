@@ -254,19 +254,12 @@
     function goToForgotPassword() {
       console.log('🔑 Navigating to forgot password...');
 
-      // Get the current URL and extract the base deployment URL
-      var currentUrl = window.location.href;
-      console.log('Current URL:', currentUrl);
-
-      // Extract base URL (everything before the query string or hash)
-      var baseUrl = currentUrl.split('?')[0].split('#')[0];
-
-      // If we're in an iframe, the URL might be different, try to get parent URL
-      var deploymentUrl = baseUrl;
+      // Use the deployment URL provided by server
+      var deploymentUrl = '<?= deploymentUrl ?>';
+      console.log('Server-provided deployment URL:', deploymentUrl);
 
       // Build the forgot password URL
       var newUrl = deploymentUrl + '?page=forgot';
-
       console.log('Target URL:', newUrl);
 
       // Try to navigate the top window (in case we're in an iframe)
