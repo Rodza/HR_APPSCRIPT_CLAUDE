@@ -625,11 +625,13 @@ function createResetPasswordPage(token) {
 
     var template = HtmlService.createTemplateFromFile('ResetPassword');
     template.token = token;
+    template.deploymentUrl = ScriptApp.getService().getUrl();
 
     var resetHtml = template.evaluate()
       .setTitle('Reset Password - SA HR Payroll System');
 
     logInfo('Reset password page created successfully');
+    logInfo('Deployment URL passed to reset password page: ' + template.deploymentUrl);
     return resetHtml;
   } catch (error) {
     logError('createResetPasswordPage error', error);
