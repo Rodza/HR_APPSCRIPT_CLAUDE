@@ -161,6 +161,40 @@
                         </button>
                     </div>
                 </div>
+
+                <!-- Report 5: Employee Leave Trends -->
+                <div class="col-md-4 mb-4">
+                    <div class="report-card">
+                        <div class="report-icon">
+                            <i class="fas fa-chart-line text-danger"></i>
+                        </div>
+                        <h5>Employee Leave Trends</h5>
+                        <p class="text-muted">
+                            Analyze leave patterns to identify potential leave abuse
+                        </p>
+
+                        <div class="mb-3">
+                            <label class="form-label">Employee (Optional):</label>
+                            <select class="form-select" id="leaveTrendsEmployee">
+                                <option value="">All Employees</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Start Date:</label>
+                            <input type="date" class="form-control" id="leaveTrendsStartDate">
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">End Date:</label>
+                            <input type="date" class="form-control" id="leaveTrendsEndDate">
+                        </div>
+
+                        <button class="btn btn-primary w-100" onclick="generateLeaveTrendsReport()">
+                            <i class="fas fa-file-excel"></i> Generate Report
+                        </button>
+                    </div>
+                </div>
             </div>
 
             <!-- Report Results -->
@@ -188,6 +222,7 @@
                     <li><strong>Individual Statement:</strong> Shows opening balance, all transactions, and closing balance for one employee</li>
                     <li><strong>Weekly Payroll Summary:</strong> Complete payroll register with summary totals by employer</li>
                     <li><strong>Monthly Payroll Summary:</strong> Monthly salary totals per employee from first Friday to last Friday of the month</li>
+                    <li><strong>Employee Leave Trends:</strong> Analyzes leave patterns including day of week, single vs multi-day, month-end proximity, and calculates risk scores to identify potential leave abuse</li>
                 </ul>
                 <p class="mt-2 mb-0">
                     <small>All reports are saved to your "Payroll Reports" folder in Google Drive and are shareable via link.</small>
@@ -206,6 +241,12 @@
         const currentMonth = new Date().toISOString().substring(0, 7);
         document.getElementById('monthlyReportMonth').value = currentMonth;
 
+        // Set default dates for leave trends report (past year)
+        const oneYearAgo = new Date();
+        oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+        document.getElementById('leaveTrendsStartDate').value = oneYearAgo.toISOString().split('T')[0];
+        document.getElementById('leaveTrendsEndDate').value = today;
+
         // Load employees for Individual Statement dropdown
         function loadEmployees() {
             google.script.run
@@ -215,6 +256,13 @@
                         select.innerHTML = '<option value="">Select Employee</option>' +
                             result.data.employees.map(emp =>
                                 `<option value="${emp.id}">${emp.REFNAME}</option>`
+                            ).join('');
+
+                        // Also populate leave trends employee dropdown
+                        const leaveTrendsSelect = document.getElementById('leaveTrendsEmployee');
+                        leaveTrendsSelect.innerHTML = '<option value="">All Employees</option>' +
+                            result.data.employees.map(emp =>
+                                `<option value="${emp.REFNAME}">${emp.REFNAME}</option>`
                             ).join('');
                     } else {
                         showError('Failed to load employees: ' + result.error);
@@ -363,6 +411,45 @@
                     showError('Error: ' + error.message);
                 })
                 .generateMonthlyPayrollSummaryReport(monthDate);
+        }
+
+        function generateLeaveTrendsReport() {
+            const employeeName = document.getElementById('leaveTrendsEmployee').value;
+            const startDate = document.getElementById('leaveTrendsStartDate').value;
+            const endDate = document.getElementById('leaveTrendsEndDate').value;
+
+            if (!startDate || !endDate) {
+                showError('Please select both start and end dates');
+                return;
+            }
+
+            if (new Date(endDate) < new Date(startDate)) {
+                showError('End date must be after start date');
+                return;
+            }
+
+            showLoading();
+            showInfo('Generating Employee Leave Trends Report... This may take a moment.');
+
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    hideLoading();
+                    if (result.success) {
+                        const empText = employeeName ? 'Employee: ' + employeeName : 'All Employees';
+                        showReportResult(
+                            'Employee Leave Trends Report',
+                            result.data.url,
+                            `${empText} | Period: ${formatDate(startDate)} to ${formatDate(endDate)} | Employees Analyzed: ${result.data.totalEmployees} | Leave Records: ${result.data.totalLeaveRecords}`
+                        );
+                    } else {
+                        showError('Failed to generate report: ' + result.error);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    hideLoading();
+                    showError('Error: ' + error.message);
+                })
+                .generateLeaveTrendsReport(startDate, endDate, employeeName || null);
         }
 
         function showReportResult(reportName, url, details) {

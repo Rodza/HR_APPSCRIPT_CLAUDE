@@ -6,6 +6,8 @@
  * 1. Outstanding Loans Report - All employees with loan balances > 0
  * 2. Individual Statement - Complete loan history for one employee
  * 3. Weekly Payroll Summary - Detailed breakdown for a specific week
+ * 4. Monthly Payroll Summary - Monthly totals from first to last Friday
+ * 5. Employee Leave Trends - Analyzes leave patterns to identify potential abuse
  *
  * All reports are saved to "Payroll Reports" folder in Google Drive
  * with sharing set to "Anyone with link can view"
@@ -972,6 +974,498 @@ function generateMonthlyPayrollSummaryReport(monthDate) {
     Logger.log('❌ ERROR in generateMonthlyPayrollSummaryReport: ' + error.message);
     Logger.log('Stack: ' + error.stack);
     Logger.log('========== GENERATE MONTHLY PAYROLL SUMMARY REPORT FAILED ==========\n');
+    return { success: false, error: error.message };
+  }
+}
+
+// ==================== EMPLOYEE LEAVE TRENDS REPORT ====================
+
+/**
+ * Generates Employee Leave Trends Report to identify leave patterns
+ *
+ * @param {Date|string} [startDate] - Report start date (default: 1 year ago)
+ * @param {Date|string} [endDate] - Report end date (default: today)
+ * @param {string} [employeeName] - Optional: filter by employee name (default: all employees)
+ * @returns {Object} Result with success flag and report URL
+ *
+ * @example
+ * const result = generateLeaveTrendsReport('2024-01-01', '2024-12-31', 'John Doe');
+ * // Returns report analyzing leave patterns for John Doe in 2024
+ */
+function generateLeaveTrendsReport(startDate, endDate, employeeName) {
+  try {
+    Logger.log('\n========== GENERATE EMPLOYEE LEAVE TRENDS REPORT ==========');
+
+    // Default to past year if no dates provided
+    const end = endDate ? parseDate(endDate) : new Date();
+    const start = startDate ? parseDate(startDate) : new Date(end.getFullYear() - 1, end.getMonth(), end.getDate());
+
+    Logger.log('Period: ' + formatDate(start) + ' to ' + formatDate(end));
+    if (employeeName) {
+      Logger.log('Employee filter: ' + employeeName);
+    } else {
+      Logger.log('Analyzing all employees');
+    }
+
+    // Get leave data
+    const filters = {
+      startDate: start,
+      endDate: end
+    };
+    if (employeeName) {
+      filters.employeeName = employeeName;
+    }
+
+    const leaveResult = listLeave(filters);
+    if (!leaveResult.success) {
+      throw new Error('Failed to get leave data: ' + leaveResult.error);
+    }
+
+    const leaveRecords = leaveResult.data;
+    Logger.log('📊 Processing ' + leaveRecords.length + ' leave records');
+
+    if (leaveRecords.length === 0) {
+      throw new Error('No leave records found for the specified period');
+    }
+
+    // Initialize analysis structures
+    const employeeAnalysis = {};
+
+    // Process each leave record
+    for (let i = 0; i < leaveRecords.length; i++) {
+      const record = leaveRecords[i];
+      const empName = record['EMPLOYEE NAME'];
+      const startLeave = parseDate(record['STARTDATE.LEAVE']);
+      const returnLeave = parseDate(record['RETURNDATE.LEAVE']);
+      const totalDays = record['TOTALDAYS.LEAVE'] || 1;
+      const reason = record['REASON'] || 'Unknown';
+      const weekDay = record['WEEK.DAY'] || getDayOfWeek(startLeave);
+
+      // Initialize employee data if not exists
+      if (!employeeAnalysis[empName]) {
+        employeeAnalysis[empName] = {
+          employeeName: empName,
+          totalLeaves: 0,
+          totalDays: 0,
+          byDayOfWeek: { Monday: 0, Tuesday: 0, Wednesday: 0, Thursday: 0, Friday: 0, Saturday: 0, Sunday: 0 },
+          byReason: {},
+          singleDayLeaves: 0,
+          multiDayLeaves: 0,
+          lastWeekOfMonth: 0,
+          restOfMonth: 0,
+          firstMondayOfMonth: 0,
+          mondayAfter25th: 0,
+          fridayLeaves: 0,
+          mondayLeaves: 0,
+          adjacentToWeekend: 0
+        };
+      }
+
+      const empData = employeeAnalysis[empName];
+
+      // Total counts
+      empData.totalLeaves++;
+      empData.totalDays += totalDays;
+
+      // Day of week analysis
+      if (empData.byDayOfWeek[weekDay] !== undefined) {
+        empData.byDayOfWeek[weekDay]++;
+      }
+
+      // Leave reason
+      if (!empData.byReason[reason]) {
+        empData.byReason[reason] = 0;
+      }
+      empData.byReason[reason]++;
+
+      // Single vs Multi-day
+      if (totalDays === 1) {
+        empData.singleDayLeaves++;
+      } else {
+        empData.multiDayLeaves++;
+      }
+
+      // Month-end proximity (last 7 days of month)
+      const daysInMonth = new Date(startLeave.getFullYear(), startLeave.getMonth() + 1, 0).getDate();
+      const dayOfMonth = startLeave.getDate();
+      if (dayOfMonth > daysInMonth - 7) {
+        empData.lastWeekOfMonth++;
+      } else {
+        empData.restOfMonth++;
+      }
+
+      // First Monday of month pattern
+      if (weekDay === 'Monday' && dayOfMonth <= 7) {
+        empData.firstMondayOfMonth++;
+      }
+
+      // Monday after 25th pattern
+      if (weekDay === 'Monday' && dayOfMonth > 25) {
+        empData.mondayAfter25th++;
+      }
+
+      // Friday leaves (potential weekend extension)
+      if (weekDay === 'Friday') {
+        empData.fridayLeaves++;
+      }
+
+      // Monday leaves (potential weekend extension)
+      if (weekDay === 'Monday') {
+        empData.mondayLeaves++;
+      }
+
+      // Adjacent to weekend (Friday or Monday)
+      if (weekDay === 'Friday' || weekDay === 'Monday') {
+        empData.adjacentToWeekend++;
+      }
+    }
+
+    // Convert to array and sort by total leaves (descending)
+    const employeeArray = Object.values(employeeAnalysis);
+    employeeArray.sort((a, b) => b.totalLeaves - a.totalLeaves);
+
+    Logger.log('👥 Analyzed ' + employeeArray.length + ' employees');
+
+    // Create Google Sheet
+    const fileName = 'Employee Leave Trends Report - ' + formatDate(start) + ' to ' + formatDate(end) +
+                    (employeeName ? ' - ' + employeeName : '');
+    const spreadsheet = SpreadsheetApp.create(fileName);
+
+    // ===== TAB 1: Leave Summary =====
+    const summarySheet = spreadsheet.getActiveSheet();
+    summarySheet.setName('Leave Summary');
+
+    // Header
+    summarySheet.getRange('A1').setValue('EMPLOYEE LEAVE TRENDS REPORT');
+    summarySheet.setRowHeight(1, 30);
+
+    // Period info
+    summarySheet.getRange('A2').setValue('Period: ' + formatDate(start) + ' to ' + formatDate(end));
+    if (employeeName) {
+      summarySheet.getRange('A3').setValue('Employee: ' + employeeName);
+    }
+    summarySheet.getRange('A2:A3').setFontStyle('italic');
+
+    // Column headers
+    const summaryHeaders = [
+      'Employee',
+      'Total Leaves',
+      'Total Days',
+      'Single-Day',
+      'Multi-Day',
+      'Mon',
+      'Tue',
+      'Wed',
+      'Thu',
+      'Fri',
+      'Sat',
+      'Sun',
+      'Last Week of Month',
+      'Rest of Month',
+      'First Mon of Month',
+      'Mon after 25th'
+    ];
+
+    const headerRow = employeeName ? 4 : 5;
+    summarySheet.getRange(headerRow, 1, 1, summaryHeaders.length).setValues([summaryHeaders]);
+    summarySheet.getRange(headerRow, 1, 1, summaryHeaders.length)
+      .setFontWeight('bold')
+      .setBackground('#4CAF50')
+      .setFontColor('#FFFFFF')
+      .setHorizontalAlignment('center')
+      .setWrap(true);
+    summarySheet.setRowHeight(headerRow, 35);
+
+    // Data rows
+    let rowNum = headerRow + 1;
+    for (let i = 0; i < employeeArray.length; i++) {
+      const emp = employeeArray[i];
+
+      summarySheet.getRange(rowNum, 1, 1, summaryHeaders.length).setValues([[
+        emp.employeeName,
+        emp.totalLeaves,
+        emp.totalDays,
+        emp.singleDayLeaves,
+        emp.multiDayLeaves,
+        emp.byDayOfWeek.Monday,
+        emp.byDayOfWeek.Tuesday,
+        emp.byDayOfWeek.Wednesday,
+        emp.byDayOfWeek.Thursday,
+        emp.byDayOfWeek.Friday,
+        emp.byDayOfWeek.Saturday,
+        emp.byDayOfWeek.Sunday,
+        emp.lastWeekOfMonth,
+        emp.restOfMonth,
+        emp.firstMondayOfMonth,
+        emp.mondayAfter25th
+      ]]);
+      rowNum++;
+    }
+
+    // Set column widths
+    summarySheet.setColumnWidth(1, 220);  // Employee name
+    for (let col = 2; col <= summaryHeaders.length; col++) {
+      summarySheet.setColumnWidth(col, 90);
+    }
+
+    // Merge and format header
+    summarySheet.getRange('A1:P1').merge();
+    summarySheet.getRange('A1')
+      .setFontWeight('bold')
+      .setFontSize(14)
+      .setHorizontalAlignment('center');
+
+    // Add borders
+    const lastSummaryRow = rowNum - 1;
+    summarySheet.getRange(headerRow, 1, lastSummaryRow - headerRow + 1, summaryHeaders.length)
+      .setBorder(true, true, true, true, true, true, 'black', SpreadsheetApp.BorderStyle.SOLID);
+
+    // ===== TAB 2: Pattern Analysis =====
+    const patternSheet = spreadsheet.insertSheet('Pattern Analysis');
+
+    // Header
+    patternSheet.getRange('A1').setValue('LEAVE PATTERN INDICATORS');
+    patternSheet.getRange('A1')
+      .setFontWeight('bold')
+      .setFontSize(14)
+      .setHorizontalAlignment('center');
+    patternSheet.setRowHeight(1, 30);
+
+    // Period info
+    patternSheet.getRange('A2').setValue('Period: ' + formatDate(start) + ' to ' + formatDate(end));
+    patternSheet.getRange('A2').setFontStyle('italic');
+
+    // Column headers
+    const patternHeaders = [
+      'Employee',
+      'Total Leaves',
+      'Weekend Extension %',
+      'Mon/Fri Leaves',
+      'First Mon Pattern',
+      'Mon after 25th',
+      'Single-Day %',
+      'Month-End %',
+      'Top Leave Day',
+      'Risk Score'
+    ];
+
+    patternSheet.getRange('A4:J4').setValues([patternHeaders]);
+    patternSheet.getRange('A4:J4')
+      .setFontWeight('bold')
+      .setBackground('#FF9800')
+      .setFontColor('#FFFFFF')
+      .setHorizontalAlignment('center')
+      .setWrap(true);
+    patternSheet.setRowHeight(4, 35);
+
+    // Calculate pattern indicators
+    rowNum = 5;
+    for (let i = 0; i < employeeArray.length; i++) {
+      const emp = employeeArray[i];
+
+      // Percentages
+      const weekendExtensionPct = emp.totalLeaves > 0 ? (emp.adjacentToWeekend / emp.totalLeaves * 100).toFixed(1) : 0;
+      const singleDayPct = emp.totalLeaves > 0 ? (emp.singleDayLeaves / emp.totalLeaves * 100).toFixed(1) : 0;
+      const monthEndPct = emp.totalLeaves > 0 ? (emp.lastWeekOfMonth / emp.totalLeaves * 100).toFixed(1) : 0;
+
+      // Find top leave day
+      let topDay = '';
+      let maxCount = 0;
+      for (const day in emp.byDayOfWeek) {
+        if (emp.byDayOfWeek[day] > maxCount) {
+          maxCount = emp.byDayOfWeek[day];
+          topDay = day;
+        }
+      }
+
+      // Calculate risk score (0-100)
+      let riskScore = 0;
+      if (emp.totalLeaves > 0) {
+        riskScore += (emp.adjacentToWeekend / emp.totalLeaves) * 40;  // 40 points for weekend extension
+        riskScore += (emp.singleDayLeaves / emp.totalLeaves) * 30;    // 30 points for single-day pattern
+        riskScore += (emp.lastWeekOfMonth / emp.totalLeaves) * 20;    // 20 points for month-end
+        riskScore += (emp.firstMondayOfMonth / emp.totalLeaves) * 10; // 10 points for first Monday
+      }
+      riskScore = Math.round(riskScore);
+
+      patternSheet.getRange(rowNum, 1, 1, 10).setValues([[
+        emp.employeeName,
+        emp.totalLeaves,
+        weekendExtensionPct + '%',
+        emp.adjacentToWeekend + ' (' + emp.mondayLeaves + 'M/' + emp.fridayLeaves + 'F)',
+        emp.firstMondayOfMonth,
+        emp.mondayAfter25th,
+        singleDayPct + '%',
+        monthEndPct + '%',
+        topDay + ' (' + maxCount + ')',
+        riskScore
+      ]]);
+
+      // Color-code risk score
+      const riskCell = patternSheet.getRange(rowNum, 10);
+      if (riskScore >= 70) {
+        riskCell.setBackground('#FF5252').setFontColor('#FFFFFF'); // High risk - Red
+      } else if (riskScore >= 40) {
+        riskCell.setBackground('#FFC107'); // Medium risk - Orange
+      } else {
+        riskCell.setBackground('#4CAF50').setFontColor('#FFFFFF'); // Low risk - Green
+      }
+
+      rowNum++;
+    }
+
+    // Set column widths
+    patternSheet.setColumnWidth(1, 220);  // Employee name
+    for (let col = 2; col <= 10; col++) {
+      patternSheet.setColumnWidth(col, 110);
+    }
+
+    // Merge header
+    patternSheet.getRange('A1:J1').merge();
+
+    // Add borders
+    const lastPatternRow = rowNum - 1;
+    patternSheet.getRange('A4:J' + lastPatternRow)
+      .setBorder(true, true, true, true, true, true, 'black', SpreadsheetApp.BorderStyle.SOLID);
+
+    // ===== TAB 3: Leave by Reason =====
+    const reasonSheet = spreadsheet.insertSheet('Leave by Reason');
+
+    // Header
+    reasonSheet.getRange('A1').setValue('LEAVE ANALYSIS BY REASON');
+    reasonSheet.getRange('A1')
+      .setFontWeight('bold')
+      .setFontSize(14)
+      .setHorizontalAlignment('center');
+    reasonSheet.setRowHeight(1, 30);
+
+    // Get all unique reasons
+    const allReasons = new Set();
+    for (let i = 0; i < employeeArray.length; i++) {
+      for (const reason in employeeArray[i].byReason) {
+        allReasons.add(reason);
+      }
+    }
+    const reasonArray = Array.from(allReasons).sort();
+
+    // Column headers
+    const reasonHeaders = ['Employee', 'Total Leaves'].concat(reasonArray);
+    reasonSheet.getRange('A3:' + String.fromCharCode(65 + reasonHeaders.length - 1) + '3').setValues([reasonHeaders]);
+    reasonSheet.getRange('A3:' + String.fromCharCode(65 + reasonHeaders.length - 1) + '3')
+      .setFontWeight('bold')
+      .setBackground('#2196F3')
+      .setFontColor('#FFFFFF')
+      .setHorizontalAlignment('center');
+    reasonSheet.setRowHeight(3, 25);
+
+    // Data rows
+    rowNum = 4;
+    for (let i = 0; i < employeeArray.length; i++) {
+      const emp = employeeArray[i];
+      const rowData = [emp.employeeName, emp.totalLeaves];
+
+      for (let j = 0; j < reasonArray.length; j++) {
+        const reason = reasonArray[j];
+        rowData.push(emp.byReason[reason] || 0);
+      }
+
+      reasonSheet.getRange(rowNum, 1, 1, rowData.length).setValues([rowData]);
+      rowNum++;
+    }
+
+    // Set column widths
+    reasonSheet.setColumnWidth(1, 220);
+    for (let col = 2; col <= reasonHeaders.length; col++) {
+      reasonSheet.setColumnWidth(col, 110);
+    }
+
+    // Merge header
+    reasonSheet.getRange('A1:' + String.fromCharCode(65 + reasonHeaders.length - 1) + '1').merge();
+
+    // Add borders
+    const lastReasonRow = rowNum - 1;
+    reasonSheet.getRange('A3:' + String.fromCharCode(65 + reasonHeaders.length - 1) + lastReasonRow)
+      .setBorder(true, true, true, true, true, true, 'black', SpreadsheetApp.BorderStyle.SOLID);
+
+    // ===== TAB 4: Help & Interpretation =====
+    const helpSheet = spreadsheet.insertSheet('How to Use');
+
+    helpSheet.getRange('A1').setValue('HOW TO INTERPRET THIS REPORT');
+    helpSheet.getRange('A1')
+      .setFontWeight('bold')
+      .setFontSize(14)
+      .setHorizontalAlignment('center');
+
+    helpSheet.getRange('A3').setValue('Risk Score Interpretation:');
+    helpSheet.getRange('A3').setFontWeight('bold').setFontSize(12);
+
+    helpSheet.getRange('A4:B7').setValues([
+      ['Score Range', 'Interpretation'],
+      ['0-39 (Green)', 'Low risk - Normal leave patterns'],
+      ['40-69 (Orange)', 'Medium risk - Some patterns detected, worth monitoring'],
+      ['70-100 (Red)', 'High risk - Strong patterns suggesting potential leave abuse']
+    ]);
+    helpSheet.getRange('A4:B4').setFontWeight('bold').setBackground('#E0E0E0');
+
+    helpSheet.getRange('A9').setValue('Pattern Indicators:');
+    helpSheet.getRange('A9').setFontWeight('bold').setFontSize(12);
+
+    helpSheet.getRange('A10:B16').setValues([
+      ['Indicator', 'What to Look For'],
+      ['Weekend Extension %', 'High percentage of Monday/Friday leaves may indicate weekend extensions'],
+      ['Single-Day %', 'High percentage of single-day leaves may indicate pattern abuse'],
+      ['Month-End %', 'Leaves concentrated in last week of month'],
+      ['First Mon of Month', 'Pattern of taking leave on first Monday of new month'],
+      ['Mon after 25th', 'Pattern of taking Monday leaves after 25th of month'],
+      ['Top Leave Day', 'Most frequent day for taking leave']
+    ]);
+    helpSheet.getRange('A10:B10').setFontWeight('bold').setBackground('#E0E0E0');
+
+    helpSheet.getRange('A18').setValue('Tips:');
+    helpSheet.getRange('A18').setFontWeight('bold').setFontSize(12);
+
+    helpSheet.getRange('A19:A23').setValues([
+      ['• Look for employees with high risk scores (70+) and investigate further'],
+      ['• Check if weekend extension patterns correlate with single-day leaves'],
+      ['• Compare leave patterns across different leave types (Annual vs Sick vs AWOL)'],
+      ['• Consider total number of leaves - patterns are more concerning with frequent leaves'],
+      ['• Use this as an initial screening tool, not definitive proof of abuse']
+    ]);
+
+    // Set column widths
+    helpSheet.setColumnWidth(1, 200);
+    helpSheet.setColumnWidth(2, 500);
+
+    // Merge header
+    helpSheet.getRange('A1:B1').merge();
+
+    // Add borders to tables
+    helpSheet.getRange('A4:B7').setBorder(true, true, true, true, true, true, 'black', SpreadsheetApp.BorderStyle.SOLID);
+    helpSheet.getRange('A10:B16').setBorder(true, true, true, true, true, true, 'black', SpreadsheetApp.BorderStyle.SOLID);
+
+    // Move to reports folder and set sharing
+    const reportUrl = moveToReportsFolder(spreadsheet);
+
+    Logger.log('✅ Report generated: ' + fileName);
+    Logger.log('📎 URL: ' + reportUrl);
+    Logger.log('========== GENERATE EMPLOYEE LEAVE TRENDS REPORT COMPLETE ==========\n');
+
+    return {
+      success: true,
+      data: {
+        url: reportUrl,
+        fileName: fileName,
+        periodStart: formatDate(start),
+        periodEnd: formatDate(end),
+        totalEmployees: employeeArray.length,
+        totalLeaveRecords: leaveRecords.length
+      }
+    };
+
+  } catch (error) {
+    Logger.log('❌ ERROR in generateLeaveTrendsReport: ' + error.message);
+    Logger.log('Stack: ' + error.stack);
+    Logger.log('========== GENERATE EMPLOYEE LEAVE TRENDS REPORT FAILED ==========\n');
     return { success: false, error: error.message };
   }
 }
