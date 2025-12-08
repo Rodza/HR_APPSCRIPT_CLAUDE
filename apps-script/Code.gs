@@ -431,10 +431,14 @@ function createLoginPage() {
   try {
     logInfo('Creating login page...');
 
-    var loginHtml = HtmlService.createHtmlOutputFromFile('Login')
+    var template = HtmlService.createTemplateFromFile('Login');
+    template.deploymentUrl = ScriptApp.getService().getUrl();
+
+    var loginHtml = template.evaluate()
       .setTitle('Login - SA HR Payroll System');
 
     logInfo('Login page created successfully');
+    logInfo('Deployment URL passed to login page: ' + template.deploymentUrl);
     return loginHtml;
   } catch (error) {
     logError('createLoginPage error', error);
