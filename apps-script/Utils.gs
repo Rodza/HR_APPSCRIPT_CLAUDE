@@ -1594,10 +1594,17 @@ function resetPasswordWithToken(token, newPassword) {
  */
 function sendPasswordResetEmail(email, resetUrl) {
   try {
+    logInfo('=== sendPasswordResetEmail START ===');
+    logInfo('Email: ' + email);
+    logInfo('Reset URL: ' + resetUrl);
+
     // Generate token
+    logInfo('Generating token...');
     var tokenResult = generatePasswordResetToken(email);
+    logInfo('Token result: ' + JSON.stringify(tokenResult));
 
     if (!tokenResult.success) {
+      logWarning('Token generation failed or user not found');
       // If user doesn't exist, still return success to not reveal user existence
       if (!tokenResult.token) {
         return { success: true, message: 'If this email exists, a reset link has been sent' };
@@ -1606,7 +1613,7 @@ function sendPasswordResetEmail(email, resetUrl) {
     }
 
     // Build reset link
-    // Check if URL already has query parameters
+    logInfo('Building reset link...');
     var separator = resetUrl.indexOf('?') > -1 ? '&' : '?';
     var resetLink = resetUrl + separator + 'page=reset&token=' + tokenResult.token;
 
@@ -1614,11 +1621,16 @@ function sendPasswordResetEmail(email, resetUrl) {
     logInfo('Reset link generated: ' + resetLink);
 
     // Get email template
+    logInfo('Getting email template...');
     var template = EMAIL_TEMPLATES.passwordReset;
     var subject = template.subject;
     var body = template.getBody(resetLink, tokenResult.userName);
 
+    logInfo('Email subject: ' + subject);
+    logInfo('Email to: ' + tokenResult.userEmail);
+
     // Send email
+    logInfo('Sending email via MailApp...');
     MailApp.sendEmail({
       to: tokenResult.userEmail,
       subject: subject,
@@ -1626,6 +1638,7 @@ function sendPasswordResetEmail(email, resetUrl) {
     });
 
     logSuccess('Password reset email sent to: ' + email);
+    logInfo('=== sendPasswordResetEmail END ===');
 
     return {
       success: true,
@@ -1634,6 +1647,8 @@ function sendPasswordResetEmail(email, resetUrl) {
 
   } catch (error) {
     logError('Failed to send password reset email', error);
+    logError('Error details: ' + error.toString());
+    logError('Error stack: ' + error.stack);
     return { success: false, error: 'Failed to send reset email: ' + error.toString() };
   }
 }
