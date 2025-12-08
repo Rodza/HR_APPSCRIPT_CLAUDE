@@ -115,9 +115,9 @@
       <p>Your account is now secured with your new password.</p>
     </div>
 
-    <a href="<?= webAppUrl ?>" class="btn" id="loginBtn">
+    <button onclick="goToLogin()" class="btn" id="loginBtn">
       Go to Login Page
-    </a>
+    </button>
 
     <p class="countdown">
       Redirecting to login in <span id="countdown">5</span> seconds...
@@ -130,6 +130,15 @@
   </div>
 
   <script>
+    // Get base URL once
+    var baseUrl = window.location.href.split('?')[0].split('#')[0];
+
+    // Function to go to login
+    function goToLogin() {
+      clearInterval(countdownInterval);
+      window.location.href = baseUrl;
+    }
+
     // Auto-redirect to login after 5 seconds
     var countdownElement = document.getElementById('countdown');
     var secondsLeft = 5;
@@ -140,16 +149,9 @@
 
       if (secondsLeft <= 0) {
         clearInterval(countdownInterval);
-        window.location.href = '<?= webAppUrl ?>';
+        window.location.href = baseUrl;
       }
     }, 1000);
-
-    // Allow user to click button to go immediately
-    document.getElementById('loginBtn').addEventListener('click', function(e) {
-      e.preventDefault();
-      clearInterval(countdownInterval);
-      window.location.href = '<?= webAppUrl ?>';
-    });
   </script>
 </body>
 </html>
