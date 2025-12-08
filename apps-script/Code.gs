@@ -572,10 +572,14 @@ function createForgotPasswordPage() {
   try {
     logInfo('Creating forgot password page...');
 
-    var forgotHtml = HtmlService.createHtmlOutputFromFile('ForgotPassword')
+    var template = HtmlService.createTemplateFromFile('ForgotPassword');
+    template.deploymentUrl = ScriptApp.getService().getUrl();
+
+    var forgotHtml = template.evaluate()
       .setTitle('Forgot Password - SA HR Payroll System');
 
     logInfo('Forgot password page created successfully');
+    logInfo('Deployment URL passed to forgot password page: ' + template.deploymentUrl);
     return forgotHtml;
   } catch (error) {
     logError('createForgotPasswordPage error', error);
