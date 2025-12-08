@@ -254,8 +254,17 @@
     function goToForgotPassword() {
       console.log('🔑 Navigating to forgot password...');
 
-      // Get the deployment URL (need to use the exec URL, not iframe URL)
-      var deploymentUrl = 'https://script.google.com/macros/s/AKfycbzBLkAmlYLi23YwW-973jF1XQ_HFJPYFwCxj5wmQ_Jn29R4zj0WzRja9fa_yZO1LR4AsQ/exec';
+      // Get the current URL and extract the base deployment URL
+      var currentUrl = window.location.href;
+      console.log('Current URL:', currentUrl);
+
+      // Extract base URL (everything before the query string or hash)
+      var baseUrl = currentUrl.split('?')[0].split('#')[0];
+
+      // If we're in an iframe, the URL might be different, try to get parent URL
+      var deploymentUrl = baseUrl;
+
+      // Build the forgot password URL
       var newUrl = deploymentUrl + '?page=forgot';
 
       console.log('Target URL:', newUrl);
