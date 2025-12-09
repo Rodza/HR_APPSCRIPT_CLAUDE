@@ -370,17 +370,25 @@ function handlePasswordResetRequest(email) {
  */
 function handlePasswordReset(token, newPassword) {
   try {
+    logInfo('=== handlePasswordReset CALLED ===');
+    logInfo('Token received: ' + token);
+    logInfo('Password length received: ' + (newPassword ? newPassword.length : 0));
+
     if (!token || !newPassword) {
+      logError('Missing token or password in handlePasswordReset');
       return { success: false, error: 'Token and new password are required' };
     }
 
     // Validate password strength (optional but recommended)
     if (newPassword.length < 6) {
+      logError('Password too short: ' + newPassword.length);
       return { success: false, error: 'Password must be at least 6 characters long' };
     }
 
+    logInfo('Calling resetPasswordWithToken...');
     // Reset password
     var result = resetPasswordWithToken(token, newPassword);
+    logInfo('resetPasswordWithToken returned: ' + JSON.stringify(result));
 
     return result;
 
