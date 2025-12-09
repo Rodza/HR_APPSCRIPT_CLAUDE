@@ -1514,64 +1514,92 @@ function validatePasswordResetToken(token) {
  */
 function resetPasswordWithToken(token, newPassword) {
   try {
+    logInfo('=== resetPasswordWithToken START ===');
+    logInfo('Token: ' + token);
+    logInfo('New password length: ' + (newPassword ? newPassword.length : 0));
+
     if (!token || !newPassword) {
+      logError('Missing token or password');
       return { success: false, error: 'Token and new password are required' };
     }
 
     // Validate token first
+    logInfo('Validating token...');
     var validation = validatePasswordResetToken(token);
+    logInfo('Token validation result: ' + JSON.stringify(validation));
+
     if (!validation.success) {
+      logError('Token validation failed');
       return validation;
     }
 
     var email = validation.email;
+    logInfo('Email from token: ' + email);
 
     // Update password in UserConfig sheet
+    logInfo('Getting sheets...');
     var sheets = getSheets();
     if (!sheets.userConfig) {
+      logError('UserConfig sheet not found');
       return { success: false, error: 'UserConfig sheet not found' };
     }
+    logInfo('UserConfig sheet found');
 
     var sheet = sheets.userConfig;
     var data = sheet.getDataRange().getValues();
     var headers = data[0];
+    logInfo('Headers: ' + JSON.stringify(headers));
+
     var emailIndex = indexOf(headers, 'Email');
     var hashIndex = indexOf(headers, 'PasswordHash');
     var saltIndex = indexOf(headers, 'PasswordSalt');
+    logInfo('Column indices - Email: ' + emailIndex + ', Hash: ' + hashIndex + ', Salt: ' + saltIndex);
 
     // Find user row
     var userRowIndex = -1;
     for (var i = 1; i < data.length; i++) {
       if (data[i][emailIndex].toLowerCase() === email.toLowerCase()) {
         userRowIndex = i;
+        logInfo('User found at row: ' + userRowIndex);
         break;
       }
     }
 
     if (userRowIndex === -1) {
+      logError('User not found in UserConfig: ' + email);
       return { success: false, error: 'User not found' };
     }
 
     // Generate new salt and hash
+    logInfo('Generating new salt and hash...');
     var newSalt = generateSalt();
     var newHash = hashPassword(newPassword, newSalt);
+    logInfo('New salt length: ' + (newSalt ? newSalt.length : 0));
+    logInfo('New hash length: ' + (newHash ? newHash.length : 0));
 
     // Update the sheet
+    logInfo('Updating sheet at row ' + (userRowIndex + 1) + ', hash col ' + (hashIndex + 1) + ', salt col ' + (saltIndex + 1));
     sheet.getRange(userRowIndex + 1, hashIndex + 1).setValue(newHash);
     sheet.getRange(userRowIndex + 1, saltIndex + 1).setValue(newSalt);
+    logInfo('Sheet updated successfully');
 
     // Mark token as used
+    logInfo('Marking token as used...');
     var scriptProperties = PropertiesService.getScriptProperties();
     var tokenKey = 'reset_token_' + token;
     var tokenDataJson = scriptProperties.getProperty(tokenKey);
     var tokenData = JSON.parse(tokenDataJson);
     tokenData.used = true;
     scriptProperties.setProperty(tokenKey, JSON.stringify(tokenData));
+    logInfo('Token marked as used');
 
     // Sync to Script Properties
+    logInfo('Syncing to properties...');
     syncUserConfigToProperties();
+    logInfo('Sync complete');
 
     logSuccess('Password reset successful for: ' + email);
+    logInfo('=== resetPasswordWithToken END ===');
 
     return {
       success: true,
@@ -1580,6 +1608,7 @@ function resetPasswordWithToken(token, newPassword) {
 
   } catch (error) {
     logError('Failed to reset password', error);
+    logError('Error stack: ' + error.stack);
     return { success: false, error: 'Failed to reset password: ' + error.toString() };
   }
 }
