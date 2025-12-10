@@ -221,6 +221,58 @@
         </div>
     </div>
 
+    <!-- Incomplete Week Modal -->
+    <div class="modal fade" id="incompleteWeekModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-warning">
+                    <h5 class="modal-title"><i class="fas fa-exclamation-triangle"></i> Incomplete Week Detected</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="incompleteTimesheetId">
+
+                    <div class="alert alert-warning mb-3">
+                        <strong><span id="incompleteEmployeeName"></span></strong> did not work a full week.
+                        <br>Week ending: <strong><span id="incompleteWeekEnding"></span></strong>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label"><strong>Missing Clock-In Days:</strong></label>
+                        <div id="missingDaysList" class="list-group">
+                            <!-- Missing days will be populated here -->
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label"><strong>Add these days to leave system?</strong></label>
+                        <select class="form-select" id="leaveReason">
+                            <option value="">-- Select Leave Reason --</option>
+                            <option value="AWOL">AWOL (Absent Without Leave)</option>
+                            <option value="Sick Leave">Sick Leave</option>
+                            <option value="Annual Leave">Annual Leave</option>
+                            <option value="Unpaid Leave">Unpaid Leave</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Notes (optional)</label>
+                        <textarea class="form-control" id="leaveNotes" rows="2" placeholder="Additional notes for leave records..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-warning" onclick="approveWithoutLeave()">
+                        Approve Without Adding Leave
+                    </button>
+                    <button type="button" class="btn btn-primary" onclick="approveWithLeave()">
+                        Add to Leave & Approve
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         var allTimesheets = [];
         var editModal;
@@ -440,7 +492,124 @@
                 .updatePendingTimesheet(timesheetId, data);
         }
 
+        var incompleteWeekModal;
+        var currentIncompleteCheck = null; // Store incomplete week check data
+
         function approveTimesheet(timesheetId) {
+            showLoading();
+
+            // First, check if the week is incomplete
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    hideLoading();
+                    if (!result) {
+                        showError('Authorization required or server returned no response. Please try again.');
+                        return;
+                    }
+                    if (result.success) {
+                        if (result.data.isIncomplete) {
+                            // Week is incomplete - show modal
+                            showIncompleteWeekModal(result.data);
+                        } else {
+                            // Week is complete - proceed with normal approval
+                            proceedWithApproval(timesheetId);
+                        }
+                    } else {
+                        showError(result.error);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    hideLoading();
+                    showError('Error checking timesheet: ' + error.message);
+                })
+                .checkTimesheetBeforeApproval(timesheetId);
+        }
+
+        function showIncompleteWeekModal(incompleteData) {
+            currentIncompleteCheck = incompleteData;
+
+            // Populate modal fields
+            document.getElementById('incompleteTimesheetId').value = incompleteData.timesheetId;
+            document.getElementById('incompleteEmployeeName').textContent = incompleteData.employeeName;
+            document.getElementById('incompleteWeekEnding').textContent = formatDate(incompleteData.weekEnding);
+
+            // Build missing days list
+            const missingDaysList = document.getElementById('missingDaysList');
+            missingDaysList.innerHTML = incompleteData.missingDays.map(day => {
+                return `
+                    <div class="list-group-item">
+                        <i class="fas fa-calendar-times text-danger"></i>
+                        <strong>${day.dayName}</strong> - ${formatDate(day.dateString)}
+                    </div>
+                `;
+            }).join('');
+
+            // Reset form fields
+            document.getElementById('leaveReason').value = '';
+            document.getElementById('leaveNotes').value = '';
+
+            // Show modal
+            if (!incompleteWeekModal) {
+                incompleteWeekModal = new bootstrap.Modal(document.getElementById('incompleteWeekModal'));
+            }
+            incompleteWeekModal.show();
+        }
+
+        function approveWithLeave() {
+            const timesheetId = document.getElementById('incompleteTimesheetId').value;
+            const leaveReason = document.getElementById('leaveReason').value;
+            const leaveNotes = document.getElementById('leaveNotes').value;
+
+            if (!leaveReason) {
+                showError('Please select a leave reason');
+                return;
+            }
+
+            if (!currentIncompleteCheck || !currentIncompleteCheck.missingDays) {
+                showError('Missing days data not found');
+                return;
+            }
+
+            incompleteWeekModal.hide();
+            showLoading();
+
+            // Call backend to approve and create leave records
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    hideLoading();
+                    if (!result) {
+                        showError('Authorization required or server returned no response. Please try again.');
+                        return;
+                    }
+                    if (result.success) {
+                        const msg = `Timesheet approved! Payslip #${result.data.payslipRecordNumber} created. ` +
+                                    `${result.data.leaveRecordsCreated} leave record(s) added.`;
+                        showSuccess(msg);
+                        loadTimesheets();
+                        currentIncompleteCheck = null;
+                    } else {
+                        showError(result.error);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    hideLoading();
+                    showError('Error: ' + error.message);
+                })
+                .approveTimesheetWithLeave(timesheetId, currentIncompleteCheck.missingDays, leaveReason, leaveNotes);
+        }
+
+        function approveWithoutLeave() {
+            const timesheetId = document.getElementById('incompleteTimesheetId').value;
+
+            if (!confirm('Approve without adding missing days to leave system?')) {
+                return;
+            }
+
+            incompleteWeekModal.hide();
+            proceedWithApproval(timesheetId);
+        }
+
+        function proceedWithApproval(timesheetId) {
             if (!confirm('Approve this timesheet? This will create a payslip.')) return;
 
             showLoading();
