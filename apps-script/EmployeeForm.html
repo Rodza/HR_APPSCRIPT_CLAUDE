@@ -301,13 +301,13 @@
                 google.script.run
                     .withSuccessHandler(handleSaveSuccess)
                     .withFailureHandler(handleSaveError)
-                    .updateEmployee(employeeId, data);
+                    .updateEmployee(employeeId, data, SESSION_TOKEN);
             } else {
                 // Create new employee
                 google.script.run
                     .withSuccessHandler(handleSaveSuccess)
                     .withFailureHandler(handleSaveError)
-                    .createEmployee(data);
+                    .createEmployee(data, SESSION_TOKEN);
             }
         }
 

@@ -140,7 +140,7 @@
         console.error('Failed to load employees:', error);
         displayError('Error loading employees: ' + (error.message || error));
       })
-      .listEmployees(filters);
+      .listEmployees(filters, SESSION_TOKEN);
   }
 
   /**

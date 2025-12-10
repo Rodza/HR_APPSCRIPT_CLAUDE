@@ -175,7 +175,7 @@
                         showError('Error loading employees: ' + error.message);
                     }
                 })
-                .listEmployees({});
+                .listEmployees({}, SESSION_TOKEN);
         }
 
         function loadLoans() {
