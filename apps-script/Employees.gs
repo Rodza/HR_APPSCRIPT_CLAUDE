@@ -131,7 +131,7 @@ function sanitizeEmployeeForWeb(emp) {
  */
 function listEmployees(filters, sessionToken) {
   try {
-    if (!isAuthorizedUser(getCurrentUser(sessionToken))) {
+    if (!isAuthorizedUser(sessionToken)) {
       throw new Error('Unauthorized');
     }
     // Default pagination settings

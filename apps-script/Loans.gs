@@ -822,7 +822,7 @@ function validateLoan(data) {
  */
 function getTotalOutstandingLoans(sessionToken) {
   try {
-    if (!isAuthorizedUser(getCurrentUser(sessionToken))) {
+    if (!isAuthorizedUser(sessionToken)) {
       throw new Error('Unauthorized');
     }
     Logger.log('\n========== GET TOTAL OUTSTANDING LOANS ==========');
