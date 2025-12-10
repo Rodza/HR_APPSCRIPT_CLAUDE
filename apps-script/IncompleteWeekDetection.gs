@@ -343,14 +343,21 @@ function checkTimesheetBeforeApproval(id) {
 
     Logger.log('========== CHECK TIMESHEET BEFORE APPROVAL COMPLETE ==========\n');
 
+    // Format missing days for frontend (remove Date objects, keep only serializable data)
+    const formattedMissingDays = incompleteCheck.data.missingDays.map(day => ({
+      dateString: day.dateString,
+      dayName: day.dayName,
+      dayOfWeek: day.dayOfWeek
+    }));
+
     return {
       success: true,
       data: {
         timesheetId: id,
         employeeName: employeeName,
-        weekEnding: weekEndingDate,
+        weekEnding: formatDateForSheet(weekEndingDate), // Convert to string
         isIncomplete: incompleteCheck.data.isIncomplete,
-        missingDays: incompleteCheck.data.missingDays
+        missingDays: formattedMissingDays
       }
     };
 

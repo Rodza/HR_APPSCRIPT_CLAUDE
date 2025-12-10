@@ -496,17 +496,21 @@
         var currentIncompleteCheck = null; // Store incomplete week check data
 
         function approveTimesheet(timesheetId) {
+            console.log('Approving timesheet:', timesheetId);
             showLoading();
 
             // First, check if the week is incomplete
             google.script.run
                 .withSuccessHandler(function(result) {
+                    console.log('Check result:', result);
                     hideLoading();
                     if (!result) {
                         showError('Authorization required or server returned no response. Please try again.');
                         return;
                     }
                     if (result.success) {
+                        console.log('Is incomplete:', result.data.isIncomplete);
+                        console.log('Missing days:', result.data.missingDays);
                         if (result.data.isIncomplete) {
                             // Week is incomplete - show modal
                             showIncompleteWeekModal(result.data);
@@ -519,6 +523,7 @@
                     }
                 })
                 .withFailureHandler(function(error) {
+                    console.error('Error checking timesheet:', error);
                     hideLoading();
                     showError('Error checking timesheet: ' + error.message);
                 })
