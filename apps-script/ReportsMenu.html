@@ -271,7 +271,7 @@
                 .withFailureHandler(function(error) {
                     showError('Error: ' + error.message);
                 })
-                .listEmployees({});
+                .listEmployees({}, SESSION_TOKEN);
         }
 
         function generateLoansReport() {

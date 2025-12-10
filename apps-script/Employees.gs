@@ -503,12 +503,13 @@ function transformEmployeeFieldNames(data) {
 /**
  * Create a new employee
  * @param {Object} employeeData - Employee data object
+ * @param {string} sessionToken - Session token for authorization
  * @returns {Object} Response with created employee
  */
-function createEmployee(employeeData) {
+function createEmployee(employeeData, sessionToken) {
   try {
     // Check authorization
-    if (!isAuthorizedUser()) {
+    if (!isAuthorizedUser(sessionToken)) {
       throw new Error('Unauthorized: You do not have permission to create employees');
     }
 
@@ -551,7 +552,7 @@ function createEmployee(employeeData) {
 
     employeeData.id = generateId();
     employeeData.REFNAME = employeeData['EMPLOYEE NAME'] + ' ' + employeeData['SURNAME'];
-    employeeData.USER = getCurrentUser();
+    employeeData.USER = getCurrentUser(sessionToken);
     employeeData.TIMESTAMP = getCurrentTimestamp();
 
     var newRow = [];
@@ -578,12 +579,13 @@ function createEmployee(employeeData) {
  * Update an existing employee
  * @param {string} id - Employee ID
  * @param {Object} employeeData - Updated employee data
+ * @param {string} sessionToken - Session token for authorization
  * @returns {Object} Response with updated employee
  */
-function updateEmployee(id, employeeData) {
+function updateEmployee(id, employeeData, sessionToken) {
   try {
     // Check authorization
-    if (!isAuthorizedUser()) {
+    if (!isAuthorizedUser(sessionToken)) {
       throw new Error('Unauthorized: You do not have permission to update employees');
     }
 
@@ -616,7 +618,7 @@ function updateEmployee(id, employeeData) {
       throw new Error('Employee not found: ' + id);
     }
 
-    employeeData.MODIFIED_BY = getCurrentUser();
+    employeeData.MODIFIED_BY = getCurrentUser(sessionToken);
     employeeData.LAST_MODIFIED = getCurrentTimestamp();
 
     if (employeeData['EMPLOYEE NAME'] || employeeData['SURNAME']) {

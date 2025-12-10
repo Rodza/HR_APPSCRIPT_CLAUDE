@@ -329,7 +329,7 @@
                 .withFailureHandler(function(error) {
                     showError('Error: ' + error.message);
                 })
-                .listEmployees({ activeOnly: true });
+                .listEmployees({ activeOnly: true }, SESSION_TOKEN);
         }
 
         function calculateTotalDays() {
