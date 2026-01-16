@@ -1,0 +1,17 @@
+{
+  "name": "hr-payroll-migration-scripts",
+  "version": "1.0.0",
+  "description": "Data migration scripts for HR Payroll System (Google Sheets → MySQL)",
+  "main": "migrate-data.js",
+  "scripts": {
+    "migrate": "node migrate-data.js"
+  },
+  "keywords": ["migration", "google-sheets", "mysql", "hr", "payroll"],
+  "author": "SA Grinding Wheels",
+  "license": "ISC",
+  "dependencies": {
+    "googleapis": "^128.0.0",
+    "mysql2": "^3.6.5",
+    "dotenv": "^16.3.1"
+  }
+}
