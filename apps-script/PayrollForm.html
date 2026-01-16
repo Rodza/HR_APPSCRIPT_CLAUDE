@@ -50,7 +50,7 @@
     <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
             <h5><i class="fas fa-file-invoice-dollar"></i> <span id="formTitle">Create Payslip</span></h5>
-            <button class="btn btn-secondary btn-sm" onclick="loadModule('payroll')">
+            <button class="btn btn-secondary btn-sm" onclick="navigateToPayrollList()">
                 <i class="fas fa-arrow-left"></i> Back to List
             </button>
         </div>
@@ -68,7 +68,7 @@
                                 <div class="col-md-6">
                                     <div class="mb-3">
                                         <label for="employeeName" class="form-label required-field">Employee</label>
-                                        <select class="form-select" id="employeeName" required onchange="onEmployeeChange()">
+                                        <select class="form-select" id="employeeName" required onchange="onEmployeeChange(); markFormAsModified();">
                                             <option value="">Select Employee</option>
                                         </select>
                                     </div>
@@ -76,7 +76,7 @@
                                 <div class="col-md-6">
                                     <div class="mb-3">
                                         <label for="weekEnding" class="form-label required-field">Week Ending</label>
-                                        <input type="date" class="form-control" id="weekEnding" required onchange="calculatePreview()">
+                                        <input type="date" class="form-control" id="weekEnding" required onchange="calculatePreview(); markFormAsModified();">
                                     </div>
                                 </div>
                             </div>
@@ -109,25 +109,25 @@
                                 <div class="col-md-3">
                                     <div class="mb-3">
                                         <label for="hours" class="form-label required-field">Hours</label>
-                                        <input type="number" class="form-control" id="hours" min="0" value="0" required onchange="calculatePreview()">
+                                        <input type="number" class="form-control" id="hours" min="0" value="0" required onchange="calculatePreview(); markFormAsModified();">
                                     </div>
                                 </div>
                                 <div class="col-md-3">
                                     <div class="mb-3">
                                         <label for="minutes" class="form-label required-field">Minutes</label>
-                                        <input type="number" class="form-control" id="minutes" min="0" max="59" value="0" required onchange="calculatePreview()">
+                                        <input type="number" class="form-control" id="minutes" min="0" max="59" value="0" required onchange="calculatePreview(); markFormAsModified();">
                                     </div>
                                 </div>
                                 <div class="col-md-3">
                                     <div class="mb-3">
                                         <label for="overtimeHours" class="form-label required-field">OT Hours</label>
-                                        <input type="number" class="form-control" id="overtimeHours" min="0" value="0" required onchange="calculatePreview()">
+                                        <input type="number" class="form-control" id="overtimeHours" min="0" value="0" required onchange="calculatePreview(); markFormAsModified();">
                                     </div>
                                 </div>
                                 <div class="col-md-3">
                                     <div class="mb-3">
                                         <label for="overtimeMinutes" class="form-label required-field">OT Minutes</label>
-                                        <input type="number" class="form-control" id="overtimeMinutes" min="0" max="59" value="0" required onchange="calculatePreview()">
+                                        <input type="number" class="form-control" id="overtimeMinutes" min="0" max="59" value="0" required onchange="calculatePreview(); markFormAsModified();">
                                     </div>
                                 </div>
                             </div>
@@ -140,13 +140,13 @@
                                 <div class="col-md-6">
                                     <div class="mb-3">
                                         <label for="leavePay" class="form-label">Leave Pay (R)</label>
-                                        <input type="number" class="form-control" id="leavePay" step="0.01" min="0" value="0" onchange="calculatePreview()">
+                                        <input type="number" class="form-control" id="leavePay" step="0.01" min="0" value="0" onchange="calculatePreview(); markFormAsModified();">
                                     </div>
                                 </div>
                                 <div class="col-md-6">
                                     <div class="mb-3">
                                         <label for="bonusPay" class="form-label">Bonus Pay (R)</label>
-                                        <input type="number" class="form-control" id="bonusPay" step="0.01" min="0" value="0" onchange="calculatePreview()">
+                                        <input type="number" class="form-control" id="bonusPay" step="0.01" min="0" value="0" onchange="calculatePreview(); markFormAsModified();">
                                     </div>
                                 </div>
                             </div>
@@ -154,13 +154,13 @@
                                 <div class="col-md-6">
                                     <div class="mb-3">
                                         <label for="otherIncome" class="form-label">Other Income (R)</label>
-                                        <input type="number" class="form-control" id="otherIncome" step="0.01" min="0" value="0" onchange="calculatePreview()">
+                                        <input type="number" class="form-control" id="otherIncome" step="0.01" min="0" value="0" onchange="calculatePreview(); markFormAsModified();">
                                     </div>
                                 </div>
                                 <div class="col-md-6">
                                     <div class="mb-3">
                                         <label for="otherIncomeText" class="form-label">Description</label>
-                                        <input type="text" class="form-control" id="otherIncomeText" placeholder="e.g., Commission">
+                                        <input type="text" class="form-control" id="otherIncomeText" placeholder="e.g., Commission" onchange="markFormAsModified();">
                                     </div>
                                 </div>
                             </div>
@@ -173,13 +173,13 @@
                                 <div class="col-md-6">
                                     <div class="mb-3">
                                         <label for="otherDeductions" class="form-label">Other Deductions (R)</label>
-                                        <input type="number" class="form-control" id="otherDeductions" step="0.01" min="0" value="0" onchange="calculatePreview()">
+                                        <input type="number" class="form-control" id="otherDeductions" step="0.01" min="0" value="0" onchange="calculatePreview(); markFormAsModified();">
                                     </div>
                                 </div>
                                 <div class="col-md-6">
                                     <div class="mb-3">
                                         <label for="otherDeductionsText" class="form-label">Description</label>
-                                        <input type="text" class="form-control" id="otherDeductionsText" placeholder="e.g., Uniform">
+                                        <input type="text" class="form-control" id="otherDeductionsText" placeholder="e.g., Uniform" onchange="markFormAsModified();">
                                     </div>
                                 </div>
                             </div>
@@ -205,20 +205,20 @@
                                 <div class="col-md-6">
                                     <div class="mb-3">
                                         <label for="loanDeductionThisWeek" class="form-label">Loan Repayment This Week (R)</label>
-                                        <input type="number" class="form-control" id="loanDeductionThisWeek" step="0.01" min="0" value="0" oninput="calculatePreview(); handleLoanLogic();">
+                                        <input type="number" class="form-control" id="loanDeductionThisWeek" step="0.01" min="0" value="0" oninput="calculatePreview(); handleLoanLogic(); markFormAsModified();">
                                     </div>
                                 </div>
                                 <div class="col-md-6">
                                     <div class="mb-3">
                                         <label for="newLoanThisWeek" class="form-label">New Loan This Week (R)</label>
-                                        <input type="number" class="form-control" id="newLoanThisWeek" step="0.01" min="0" value="0" oninput="calculatePreview(); handleLoanLogic();">
+                                        <input type="number" class="form-control" id="newLoanThisWeek" step="0.01" min="0" value="0" oninput="calculatePreview(); handleLoanLogic(); markFormAsModified();">
                                     </div>
                                 </div>
                             </div>
 
                             <div class="mb-3">
                                 <label for="loanDisbursementType" class="form-label">Loan Disbursement Type</label>
-                                <select class="form-select" id="loanDisbursementType" onchange="calculatePreview()">
+                                <select class="form-select" id="loanDisbursementType" onchange="calculatePreview(); handleLoanLogic(); markFormAsModified();">
                                     <option value="Separate">Separate (Not with Salary)</option>
                                     <option value="With Salary">With Salary</option>
                                     <option value="Repayment">Repayment</option>
@@ -233,7 +233,7 @@
                         <div class="form-section">
                             <h6><i class="fas fa-sticky-note"></i> Notes</h6>
                             <div class="mb-3">
-                                <textarea class="form-control" id="notes" rows="3" placeholder="Enter any additional notes..."></textarea>
+                                <textarea class="form-control" id="notes" rows="3" placeholder="Enter any additional notes..." onchange="markFormAsModified();"></textarea>
                             </div>
                         </div>
 
@@ -242,7 +242,7 @@
                             <button type="submit" class="btn btn-primary btn-lg">
                                 <i class="fas fa-save"></i> Save Payslip
                             </button>
-                            <button type="button" class="btn btn-secondary" onclick="loadModule('payroll')">
+                            <button type="button" class="btn btn-secondary" onclick="navigateToPayrollList()">
                                 <i class="fas fa-times"></i> Cancel
                             </button>
                         </div>
@@ -409,6 +409,7 @@
 
             const loanRepaymentValue = parseFloat(loanRepaymentInput.value) || 0;
             const newLoanValue = parseFloat(newLoanInput.value) || 0;
+            const selectedType = disbursementTypeSelect.value;
 
             // First, reset fields to their default enabled state
             loanRepaymentInput.disabled = false;
@@ -418,11 +419,20 @@
                 repaymentOption.disabled = false;
             }
 
-            if (loanRepaymentValue > 0) {
-                // A repayment is entered: lock new loan field and set type to Repayment
+            // Priority 1: If "Repayment" is selected (either manually or automatically)
+            if (selectedType === 'Repayment') {
+                // Lock new loan field (repayment and new loan are mutually exclusive)
+                newLoanInput.disabled = true;
+                newLoanInput.value = 0; // Clear new loan field
+                // If there's a repayment amount, lock the dropdown
+                if (loanRepaymentValue > 0) {
+                    disbursementTypeSelect.disabled = true;
+                }
+            } else if (loanRepaymentValue > 0) {
+                // If repayment amount is entered but type is NOT "Repayment", auto-set it
                 newLoanInput.disabled = true;
                 disbursementTypeSelect.value = 'Repayment';
-                disbursementTypeSelect.disabled = true; // Lock the dropdown
+                disbursementTypeSelect.disabled = true;
             } else if (newLoanValue > 0) {
                 // A new loan is entered: lock repayment field and disable Repayment option
                 loanRepaymentInput.disabled = true;
@@ -434,11 +444,10 @@
                     disbursementTypeSelect.value = 'Separate';
                 }
             } else {
-                // Both fields are empty/zero: ensure everything is usable
-                // The reset at the top handles enabling fields.
-                // We just need to make sure 'Repayment' isn't selected by default.
+                // Both fields are empty/zero
+                // If Repayment is selected but no amount, allow entry (don't auto-switch)
                 if (disbursementTypeSelect.value === 'Repayment') {
-                    disbursementTypeSelect.value = 'Separate';
+                    newLoanInput.disabled = true; // Keep new loan locked when Repayment is selected
                 }
             }
         }
@@ -448,6 +457,56 @@
         var selectedEmployee = null;
         var currentCalculation = null;
         var isPopulatingForm = false; // Flag to prevent multiple calculatePreview calls during form population
+        var formModified = false; // Track if form has been modified
+        var initialFormData = {}; // Store initial form state
+
+        // ===== UNSAVED CHANGES TRACKING =====
+
+        function markFormAsModified() {
+            if (!isPopulatingForm) {
+                formModified = true;
+            }
+        }
+
+        function captureInitialFormData() {
+            initialFormData = {
+                employeeName: document.getElementById('employeeName').value,
+                weekEnding: document.getElementById('weekEnding').value,
+                hours: document.getElementById('hours').value,
+                minutes: document.getElementById('minutes').value,
+                overtimeHours: document.getElementById('overtimeHours').value,
+                overtimeMinutes: document.getElementById('overtimeMinutes').value,
+                leavePay: document.getElementById('leavePay').value,
+                bonusPay: document.getElementById('bonusPay').value,
+                otherIncome: document.getElementById('otherIncome').value,
+                otherIncomeText: document.getElementById('otherIncomeText').value,
+                otherDeductions: document.getElementById('otherDeductions').value,
+                otherDeductionsText: document.getElementById('otherDeductionsText').value,
+                loanDeductionThisWeek: document.getElementById('loanDeductionThisWeek').value,
+                newLoanThisWeek: document.getElementById('newLoanThisWeek').value,
+                loanDisbursementType: document.getElementById('loanDisbursementType').value,
+                notes: document.getElementById('notes').value
+            };
+            formModified = false;
+        }
+
+        function checkUnsavedChanges(callback) {
+            if (formModified) {
+                if (confirm('You have unsaved changes. Do you want to leave without saving?')) {
+                    formModified = false;
+                    callback();
+                }
+                // If user clicks "Cancel", do nothing (stay on form)
+            } else {
+                callback();
+            }
+        }
+
+        function navigateToPayrollList() {
+            checkUnsavedChanges(function() {
+                loadModule('payroll');
+            });
+        }
 
         // ===== EMPLOYEE FUNCTIONS (GLOBAL FOR INLINE HANDLERS) =====
 
@@ -702,6 +761,7 @@
             if (result.success) {
                 showSuccess('Payslip saved successfully! Auto-sync will update loan balance within 5 minutes.');
                 sessionStorage.removeItem('editPayslipRecordNumber');
+                formModified = false; // Reset flag after successful save
                 setTimeout(function() {
                     if (typeof loadModule !== 'undefined') {
                         loadModule('payroll');
@@ -790,6 +850,8 @@
                 isPopulatingForm = false;
                 console.log('Form populated, calling calculatePreview');
                 calculatePreview();
+                // Capture initial form state after populating
+                captureInitialFormData();
             }
         }
 
@@ -821,6 +883,10 @@
             } else {
                 // For new payslips, default the week ending date to the next Friday
                 document.getElementById('weekEnding').value = getDefaultWeekEndingDate();
+                // Capture initial form state for new payslip (after default date is set)
+                setTimeout(function() {
+                    captureInitialFormData();
+                }, 100);
             }
 
             // Load employees on page load
