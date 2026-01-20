@@ -403,13 +403,16 @@
 
         function updateStats(data) {
             let totalEmployees = data.length;
-            let totalHours = 0;
+            let totalMinutes = 0;
+            let totalLunchMinutes = 0;
             let totalWarnings = 0;
             let daysWithNoLunch = 0;
 
             data.forEach(emp => {
-                totalHours += emp.totalMinutes / 60;
+                // Calculate totals from the filtered dailyBreakdown array, not from emp.totalMinutes
                 emp.dailyBreakdown.forEach(day => {
+                    totalMinutes += day.totalMinutes || 0;
+                    totalLunchMinutes += day.lunchMinutes || 0;
                     totalWarnings += (day.warnings || []).length;
                     if (!day.lunchTaken && !isFriday(day.date)) {
                         daysWithNoLunch++;
@@ -424,7 +427,11 @@
                 </div>
                 <div class="stat-card">
                     <div class="label">Total Hours</div>
-                    <div class="value">${formatHours(totalHours * 60)}</div>
+                    <div class="value">${formatHours(totalMinutes)}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">Lunch Deducted</div>
+                    <div class="value">${formatHours(totalLunchMinutes)}</div>
                 </div>
                 <div class="stat-card ${totalWarnings > 0 ? 'warning' : ''}">
                     <div class="label">Warnings</div>
