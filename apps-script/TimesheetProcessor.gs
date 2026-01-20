@@ -146,42 +146,72 @@ function applyEndBuffer(clockOut, standardEnd, bufferMinutes) {
 }
 
 /**
+ * Apply lunch out buffer to clock-out time for lunch (Clock 2)
+ * Rounds to standard lunch out time if within buffer
+ *
+ * @param {Date} clockOut - Clock-out time for lunch
+ * @param {Date} standardLunchOut - Standard lunch out time (e.g., 12:00)
+ * @param {number} bufferMinutes - Buffer in minutes (applies before and after)
+ * @returns {Object} Adjusted time and applied flag
+ */
+function applyLunchOutBuffer(clockOut, standardLunchOut, bufferMinutes) {
+  var clockOutMs = clockOut.getTime();
+  var standardMs = standardLunchOut.getTime();
+  var bufferMs = bufferMinutes * 60 * 1000;
+
+  // Check if within buffer window (before or after standard time)
+  var diffMs = Math.abs(clockOutMs - standardMs);
+
+  if (diffMs <= bufferMs) {
+    return {
+      adjustedTime: new Date(standardMs),
+      bufferApplied: true,
+      reason: 'Within lunch out buffer, adjusted to standard time'
+    };
+  }
+
+  // Outside buffer → use actual time
+  return {
+    adjustedTime: clockOut,
+    bufferApplied: false,
+    reason: 'Outside lunch out buffer, using actual time'
+  };
+}
+
+/**
  * Apply lunch return buffer to clock-in time after lunch (Clock 3)
- * If employee clocks in early or within grace period, adjust to standard lunch return
+ * - If clock in <= standard + buffer: round to standard (grace period)
+ * - If clock in > standard + buffer: round to standard BUT apply penalty
  *
  * @param {Date} clockIn - Clock-in time after lunch
- * @param {Date} standardLunchReturn - Standard lunch return time
- * @param {number} bufferMinutes - Buffer in minutes
- * @returns {Object} Adjusted time and applied flag
+ * @param {Date} standardLunchReturn - Standard lunch return time (e.g., 12:30)
+ * @param {number} bufferMinutes - Grace period buffer in minutes (e.g., 5)
+ * @returns {Object} Adjusted time, penalty minutes, and flags
  */
 function applyLunchReturnBuffer(clockIn, standardLunchReturn, bufferMinutes) {
   var clockInMs = clockIn.getTime();
   var standardMs = standardLunchReturn.getTime();
   var bufferMs = bufferMinutes * 60 * 1000;
+  var graceDeadline = standardMs + bufferMs;
 
-  // Employee clocked in early → use standard lunch return
-  if (clockInMs < standardMs) {
+  // Within grace period (including early returns) → use standard time, no penalty
+  if (clockInMs <= graceDeadline) {
     return {
       adjustedTime: new Date(standardMs),
+      penaltyMinutes: 0,
       bufferApplied: true,
-      reason: 'Early return from lunch adjusted to standard time'
+      reason: 'Within lunch return grace period'
     };
   }
 
-  // Employee clocked in within buffer period → use standard lunch return
-  if (clockInMs <= standardMs + bufferMs) {
-    return {
-      adjustedTime: new Date(standardMs),
-      bufferApplied: true,
-      reason: 'Within lunch return buffer, adjusted to standard time'
-    };
-  }
+  // Late return (beyond grace period) → use standard time BUT apply penalty
+  var penaltyMinutes = (clockInMs - standardMs) / (60 * 1000);
 
-  // Late return from lunch → use actual time
   return {
-    adjustedTime: clockIn,
+    adjustedTime: new Date(standardMs),
+    penaltyMinutes: penaltyMinutes,
     bufferApplied: false,
-    reason: 'Late return from lunch, no buffer applied'
+    reason: 'Late return from lunch - penalty applied (' + Math.round(penaltyMinutes) + ' min)'
   };
 }
 
@@ -1068,16 +1098,32 @@ function processDayData(dayData, config) {
       appliedRules.push('graceBufferApplied');
     }
 
+    // Apply lunch out buffer to Clock 2
+    var standardLunchOut = parseTimeString(config.standardLunchOut || '12:00');
+    standardLunchOut.setFullYear(date.getFullYear());
+    standardLunchOut.setMonth(date.getMonth());
+    standardLunchOut.setDate(date.getDate());
+
+    var clock2Result = applyLunchOutBuffer(clock2, standardLunchOut, config.lunchBufferMinutes);
+    var adjustedClock2 = clock2Result.adjustedTime;
+    if (clock2Result.bufferApplied) {
+      appliedRules.push('lunchOutBufferApplied');
+    }
+
     // Apply lunch return buffer to Clock 3
-    var standardLunchReturn = parseTimeString(config.standardLunchReturn || '13:00');
+    var standardLunchReturn = parseTimeString(config.standardLunchReturn || '12:30');
     standardLunchReturn.setFullYear(date.getFullYear());
     standardLunchReturn.setMonth(date.getMonth());
     standardLunchReturn.setDate(date.getDate());
 
     var clock3Result = applyLunchReturnBuffer(clock3, standardLunchReturn, config.lunchBufferMinutes);
     var adjustedClock3 = clock3Result.adjustedTime;
+    var lunchReturnPenalty = clock3Result.penaltyMinutes || 0;
     if (clock3Result.bufferApplied) {
       appliedRules.push('lunchReturnBufferApplied');
+    }
+    if (lunchReturnPenalty > 0) {
+      appliedRules.push('lunchReturnPenaltyApplied');
     }
 
     // Apply end buffer to Clock 4
@@ -1093,17 +1139,22 @@ function processDayData(dayData, config) {
     }
 
     Logger.log('    Clock 1 (Morning IN): ' + formatTime(clock1) + ' → ' + formatTime(adjustedClock1));
-    Logger.log('    Clock 2 (Lunch OUT): ' + formatTime(clock2));
-    Logger.log('    Clock 3 (Lunch IN): ' + formatTime(clock3) + ' → ' + formatTime(adjustedClock3));
+    Logger.log('    Clock 2 (Lunch OUT): ' + formatTime(clock2) + ' → ' + formatTime(adjustedClock2));
+    Logger.log('    Clock 3 (Lunch IN): ' + formatTime(clock3) + ' → ' + formatTime(adjustedClock3) +
+               (lunchReturnPenalty > 0 ? ' (penalty: ' + Math.round(lunchReturnPenalty) + ' min)' : ''));
     Logger.log('    Clock 4 (Afternoon OUT): ' + formatTime(clock4) + ' → ' + formatTime(adjustedClock4));
 
-    // Calculate worked time as Morning + Afternoon
-    var morningMs = clock2.getTime() - adjustedClock1.getTime();
+    // Calculate worked time as Morning + Afternoon - Penalty
+    var morningMs = adjustedClock2.getTime() - adjustedClock1.getTime();
     var afternoonMs = adjustedClock4.getTime() - adjustedClock3.getTime();
-    workedMinutes = (morningMs + afternoonMs) / (60 * 1000);
+    var penaltyMs = lunchReturnPenalty * 60 * 1000;
+    workedMinutes = (morningMs + afternoonMs - penaltyMs) / (60 * 1000);
 
     Logger.log('    Morning time: ' + Math.round(morningMs / 60000) + ' min');
     Logger.log('    Afternoon time: ' + Math.round(afternoonMs / 60000) + ' min');
+    if (lunchReturnPenalty > 0) {
+      Logger.log('    Lunch return penalty: -' + Math.round(lunchReturnPenalty) + ' min');
+    }
     Logger.log('    Total worked: ' + Math.round(workedMinutes) + ' min');
 
     // For display purposes, use first and last times
