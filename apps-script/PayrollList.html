@@ -454,6 +454,17 @@
                     return matchesSearch && matchesEmployer && matchesDateRange;
                 });
 
+                // Sort by WEEKENDING date descending (newest first), then by RECORDNUMBER descending
+                filtered.sort((a, b) => {
+                    const dateA = new Date(a.WEEKENDING);
+                    const dateB = new Date(b.WEEKENDING);
+                    if (dateB.getTime() !== dateA.getTime()) {
+                        return dateB.getTime() - dateA.getTime(); // Newest date first
+                    }
+                    // If dates are equal, sort by record number descending
+                    return (b.RECORDNUMBER || 0) - (a.RECORDNUMBER || 0);
+                });
+
                 displayPayslips(filtered);
             };
 
