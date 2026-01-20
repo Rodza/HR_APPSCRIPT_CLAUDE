@@ -147,7 +147,8 @@ function applyEndBuffer(clockOut, standardEnd, bufferMinutes) {
 
 /**
  * Apply lunch return buffer to clock-in time after lunch (Clock 3)
- * If employee clocks in early or within grace period, adjust to standard lunch return
+ * If employee clocks in late but within grace period, adjust to standard lunch return
+ * If employee clocks in early, use their actual time (reward early return)
  *
  * @param {Date} clockIn - Clock-in time after lunch
  * @param {Date} standardLunchReturn - Standard lunch return time
@@ -159,16 +160,16 @@ function applyLunchReturnBuffer(clockIn, standardLunchReturn, bufferMinutes) {
   var standardMs = standardLunchReturn.getTime();
   var bufferMs = bufferMinutes * 60 * 1000;
 
-  // Employee clocked in early → use standard lunch return
+  // Employee clocked in early → use ACTUAL time (reward early return)
   if (clockInMs < standardMs) {
     return {
-      adjustedTime: new Date(standardMs),
-      bufferApplied: true,
-      reason: 'Early return from lunch adjusted to standard time'
+      adjustedTime: clockIn,
+      bufferApplied: false,
+      reason: 'Early return from lunch - using actual time'
     };
   }
 
-  // Employee clocked in within buffer period → use standard lunch return
+  // Employee clocked in within buffer period AFTER standard → use standard lunch return (grace period)
   if (clockInMs <= standardMs + bufferMs) {
     return {
       adjustedTime: new Date(standardMs),
