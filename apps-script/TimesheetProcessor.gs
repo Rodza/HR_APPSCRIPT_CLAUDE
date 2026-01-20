@@ -147,34 +147,39 @@ function applyEndBuffer(clockOut, standardEnd, bufferMinutes) {
 
 /**
  * Apply lunch out buffer to clock-out time for lunch (Clock 2)
- * Rounds to standard lunch out time if within buffer
+ * Rounds to standard lunch out time if within the lunch window
+ *
+ * Lunch out window: 11:55 to 12:30 (all round to 12:00)
+ * This ensures employees can leave for lunch anytime in this window
+ * and it's always treated as 12:00
  *
  * @param {Date} clockOut - Clock-out time for lunch
  * @param {Date} standardLunchOut - Standard lunch out time (e.g., 12:00)
- * @param {number} bufferMinutes - Buffer in minutes (applies before and after)
+ * @param {number} bufferMinutes - Buffer before standard time (e.g., 5 = 11:55)
  * @returns {Object} Adjusted time and applied flag
  */
 function applyLunchOutBuffer(clockOut, standardLunchOut, bufferMinutes) {
   var clockOutMs = clockOut.getTime();
   var standardMs = standardLunchOut.getTime();
-  var bufferMs = bufferMinutes * 60 * 1000;
 
-  // Check if within buffer window (before or after standard time)
-  var diffMs = Math.abs(clockOutMs - standardMs);
+  // Calculate lunch window: bufferMinutes BEFORE to 30 minutes AFTER standard time
+  var windowStartMs = standardMs - (bufferMinutes * 60 * 1000);  // e.g., 12:00 - 5min = 11:55
+  var windowEndMs = standardMs + (30 * 60 * 1000);               // e.g., 12:00 + 30min = 12:30
 
-  if (diffMs <= bufferMs) {
+  // Check if clock out falls within lunch window (11:55 to 12:30)
+  if (clockOutMs >= windowStartMs && clockOutMs <= windowEndMs) {
     return {
       adjustedTime: new Date(standardMs),
       bufferApplied: true,
-      reason: 'Within lunch out buffer, adjusted to standard time'
+      reason: 'Within lunch out window (11:55-12:30), adjusted to 12:00'
     };
   }
 
-  // Outside buffer → use actual time
+  // Outside window → use actual time
   return {
     adjustedTime: clockOut,
     bufferApplied: false,
-    reason: 'Outside lunch out buffer, using actual time'
+    reason: 'Outside lunch out window, using actual time'
   };
 }
 
