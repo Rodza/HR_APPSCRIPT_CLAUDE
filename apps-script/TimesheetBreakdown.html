@@ -467,10 +467,20 @@
                             return dayDate >= weekStartDate && dayDate <= weekEndDate;
                         });
 
-                        // Return a copy of the employee object with filtered breakdown
+                        // Recalculate totals from filtered breakdown
+                        let recalculatedTotalMinutes = 0;
+                        let recalculatedLunchMinutes = 0;
+                        filteredBreakdown.forEach(day => {
+                            recalculatedTotalMinutes += day.totalMinutes || 0;
+                            recalculatedLunchMinutes += day.lunchMinutes || 0;
+                        });
+
+                        // Return a copy of the employee object with filtered breakdown and recalculated totals
                         return {
                             ...e,
-                            dailyBreakdown: filteredBreakdown
+                            dailyBreakdown: filteredBreakdown,
+                            totalMinutes: recalculatedTotalMinutes,
+                            lunchDeductionMinutes: recalculatedLunchMinutes
                         };
                     });
             }
