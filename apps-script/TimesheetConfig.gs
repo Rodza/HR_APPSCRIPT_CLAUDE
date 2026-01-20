@@ -17,12 +17,13 @@ var DEFAULT_TIME_CONFIG = {
   standardStartTime: '07:30',
   standardEndTime: '16:30',
   fridayEndTime: '13:00',
-  standardLunchReturn: '13:00',
+  standardLunchOut: '12:00',    // Standard lunch out time (Clock 2)
+  standardLunchReturn: '12:30', // Standard lunch return time (Clock 3)
 
   // Buffers & Grace periods
   graceMinutes: 5,
   endBufferMinutes: 5,
-  lunchBufferMinutes: 2,
+  lunchBufferMinutes: 5,        // Applies to both lunch out and lunch return (±5 minutes)
 
   // Lunch rules
   minLunchMinutes: 20,
