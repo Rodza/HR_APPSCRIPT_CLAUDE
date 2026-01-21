@@ -524,18 +524,22 @@ function generateWeeklyPayrollSummaryReport(weekEnding) {
     summarySheet.getRange('A4:B4').setValues([['OVERALL SUMMARY', '']]);
     summarySheet.getRange('A4:B4').setFontWeight('bold').setBackground('#4CAF50').setFontColor('#FFFFFF');
 
-    summarySheet.getRange('A5:B11').setValues([
+    summarySheet.getRange('A5:B12').setValues([
       ['Total Employees:', totals.employees],
       ['Total Standard Hours:', totals.standardHours],
       ['Total Overtime Hours:', totals.overtimeHours],
       ['Total Gross Pay:', totals.grossPay],
       ['Total UIF:', totals.uif],
       ['Total Deductions:', totals.otherDeductions + totals.loanDeductions],
+      ['Total Net Pay:', totals.netPay],
       ['Total Paid to Accounts:', totals.paidToAccounts]
     ]);
 
-    summarySheet.getRange('A5:A11').setFontWeight('bold');
-    summarySheet.getRange('B6:B11').setNumberFormat('"R"#,##0.00');
+    summarySheet.getRange('A5:A12').setFontWeight('bold');
+    // Format hours as numbers (not currency)
+    summarySheet.getRange('B6:B7').setNumberFormat('0.00');
+    // Format currency values
+    summarySheet.getRange('B8:B12').setNumberFormat('"R"#,##0.00');
 
     // By employer
     summarySheet.getRange('A13:B13').setValues([['BY EMPLOYER', '']]);
@@ -555,7 +559,8 @@ function generateWeeklyPayrollSummaryReport(weekEnding) {
         ['  Paid to Accounts:', data.paidToAccounts]
       ]);
 
-      summarySheet.getRange(summaryRow, 2, 3, 1).setNumberFormat('"R"#,##0.00');
+      // Format only currency values (Gross Pay, Net Pay, Paid to Accounts), skip Employees count
+      summarySheet.getRange(summaryRow + 1, 2, 3, 1).setNumberFormat('"R"#,##0.00');
       summaryRow += 5;
     }
 
