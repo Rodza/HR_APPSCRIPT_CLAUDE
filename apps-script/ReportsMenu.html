@@ -98,7 +98,39 @@
                     </div>
                 </div>
 
-                <!-- Report 3: Weekly Payroll Summary -->
+                <!-- Report 3: Loan Transaction Matrix -->
+                <div class="col-md-4 mb-4">
+                    <div class="report-card">
+                        <div class="report-icon">
+                            <i class="fas fa-table text-warning"></i>
+                        </div>
+                        <h5>Loan Transaction Matrix</h5>
+                        <p class="text-muted">
+                            All loan transactions in a date range (employees × transaction dates)
+                        </p>
+
+                        <div class="mb-3">
+                            <label class="form-label">Start Date:</label>
+                            <input type="date" class="form-control" id="matrixStartDate">
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">End Date:</label>
+                            <input type="date" class="form-control" id="matrixEndDate">
+                        </div>
+
+                        <div class="mb-3" style="visibility: hidden;">
+                            <label class="form-label">&nbsp;</label>
+                            <input type="text" class="form-control">
+                        </div>
+
+                        <button class="btn btn-primary w-100" onclick="generateMatrixReport()">
+                            <i class="fas fa-file-excel"></i> Generate Report
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Report 4: Weekly Payroll Summary -->
                 <div class="col-md-4 mb-4">
                     <div class="report-card">
                         <div class="report-icon">
@@ -130,7 +162,7 @@
                     </div>
                 </div>
 
-                <!-- Report 4: Monthly Payroll Summary -->
+                <!-- Report 5: Monthly Payroll Summary -->
                 <div class="col-md-4 mb-4">
                     <div class="report-card">
                         <div class="report-icon">
@@ -162,7 +194,7 @@
                     </div>
                 </div>
 
-                <!-- Report 5: Employee Leave Trends -->
+                <!-- Report 6: Employee Leave Trends -->
                 <div class="col-md-4 mb-4">
                     <div class="report-card">
                         <div class="report-icon">
@@ -220,6 +252,7 @@
                 <ul class="mb-0">
                     <li><strong>Outstanding Loans:</strong> Lists all employees with loan balances as of the specified date</li>
                     <li><strong>Individual Statement:</strong> Shows opening balance, all transactions, and closing balance for one employee</li>
+                    <li><strong>Loan Transaction Matrix:</strong> Matrix-style report showing all loan transactions in a date range with employees as rows and transaction dates as columns. Shows +/- amounts and current outstanding balance per employee</li>
                     <li><strong>Weekly Payroll Summary:</strong> Complete payroll register with summary totals by employer</li>
                     <li><strong>Monthly Payroll Summary:</strong> Monthly salary totals per employee from first Friday to last Friday of the month</li>
                     <li><strong>Employee Leave Trends:</strong> Analyzes leave patterns including day of week, single vs multi-day, month-end proximity, and calculates risk scores to identify potential leave abuse</li>
@@ -240,6 +273,11 @@
         // Set current month as default for monthly report
         const currentMonth = new Date().toISOString().substring(0, 7);
         document.getElementById('monthlyReportMonth').value = currentMonth;
+
+        // Set default dates for matrix report (current year)
+        const yearStart = new Date(new Date().getFullYear(), 0, 1);
+        document.getElementById('matrixStartDate').value = yearStart.toISOString().split('T')[0];
+        document.getElementById('matrixEndDate').value = today;
 
         // Set default dates for leave trends report (past year)
         const oneYearAgo = new Date();
@@ -346,6 +384,43 @@
                     showError('Error: ' + error.message);
                 })
                 .generateIndividualStatementReport(employeeId, startDate, endDate);
+        }
+
+        function generateMatrixReport() {
+            const startDate = document.getElementById('matrixStartDate').value;
+            const endDate = document.getElementById('matrixEndDate').value;
+
+            if (!startDate || !endDate) {
+                showError('Please select both start and end dates');
+                return;
+            }
+
+            if (new Date(endDate) < new Date(startDate)) {
+                showError('End date must be after start date');
+                return;
+            }
+
+            showLoading();
+            showInfo('Generating Loan Transaction Matrix Report... This may take a moment.');
+
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    hideLoading();
+                    if (result.success) {
+                        showReportResult(
+                            'Loan Transaction Matrix Report',
+                            result.data.url,
+                            `Period: ${formatDate(startDate)} to ${formatDate(endDate)} | Employees with transactions: ${result.data.employeeCount} | Transaction dates: ${result.data.transactionDateCount}`
+                        );
+                    } else {
+                        showError('Failed to generate report: ' + result.error);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    hideLoading();
+                    showError('Error: ' + error.message);
+                })
+                .generateLoanTransactionMatrixReport(startDate, endDate);
         }
 
         function generateWeeklyReport() {
