@@ -5,9 +5,10 @@
  * Generates formatted Google Sheets reports:
  * 1. Outstanding Loans Report - All employees with loan balances > 0
  * 2. Individual Statement - Complete loan history for one employee
- * 3. Weekly Payroll Summary - Detailed breakdown for a specific week
- * 4. Monthly Payroll Summary - Monthly totals from first to last Friday
- * 5. Employee Leave Trends - Analyzes leave patterns to identify potential abuse
+ * 3. Loan Transaction Matrix - All loan transactions in a period (employees × dates)
+ * 4. Weekly Payroll Summary - Detailed breakdown for a specific week
+ * 5. Monthly Payroll Summary - Monthly totals from first to last Friday
+ * 6. Employee Leave Trends - Analyzes leave patterns to identify potential abuse
  *
  * All reports are saved to "Payroll Reports" folder in Google Drive
  * with sharing set to "Anyone with link can view"
@@ -312,6 +313,249 @@ function generateIndividualStatementReport(employeeId, startDate, endDate) {
     Logger.log('❌ ERROR in generateIndividualStatementReport: ' + error.message);
     Logger.log('Stack: ' + error.stack);
     Logger.log('========== GENERATE INDIVIDUAL STATEMENT REPORT FAILED ==========\n');
+    return { success: false, error: error.message };
+  }
+}
+
+// ==================== LOAN TRANSACTION MATRIX REPORT ====================
+
+/**
+ * Generates Loan Transaction Matrix Report showing all transactions in a date range
+ * Rows: Employee names
+ * Columns: Transaction dates
+ * Values: Transaction amounts (+/- for each transaction)
+ * Last Column: Total outstanding balance
+ *
+ * @param {Date|string} startDate - Report start date
+ * @param {Date|string} endDate - Report end date
+ * @returns {Object} Result with success flag and report URL
+ *
+ * @example
+ * const result = generateLoanTransactionMatrixReport('2025-01-01', '2025-12-31');
+ */
+function generateLoanTransactionMatrixReport(startDate, endDate) {
+  try {
+    Logger.log('\n========== GENERATE LOAN TRANSACTION MATRIX REPORT ==========');
+
+    const start = parseDate(startDate);
+    const end = parseDate(endDate);
+
+    Logger.log('Period: ' + formatDate(start) + ' to ' + formatDate(end));
+
+    // Get all employees
+    const empResult = listEmployees({ activeOnly: false }); // Include inactive to show historical data
+    if (!empResult.success) {
+      throw new Error('Failed to get employees: ' + empResult.error);
+    }
+
+    const employees = empResult.data.employees;
+    Logger.log('📊 Processing ' + employees.length + ' employees');
+
+    // Data structure: { employeeId: { name, employer, transactions: { date: amount }, currentBalance } }
+    const employeeData = {};
+    const allTransactionDates = new Set();
+    let employeesWithData = 0;
+
+    // Collect transaction data for each employee
+    for (let i = 0; i < employees.length; i++) {
+      const emp = employees[i];
+
+      // Get loan history for this employee within the date range
+      const historyResult = getLoanHistory(emp.id, start, end);
+
+      if (historyResult.success && historyResult.data.length > 0) {
+        const transactions = historyResult.data;
+
+        employeeData[emp.id] = {
+          name: emp.REFNAME,
+          employer: emp.EMPLOYER,
+          transactions: {},
+          currentBalance: 0
+        };
+
+        // Process each transaction
+        for (let j = 0; j < transactions.length; j++) {
+          const txn = transactions[j];
+          const txnDate = formatDate(parseDate(txn['TransactionDate']));
+          const amount = txn['LoanAmount'] || 0;
+
+          // Store transaction amount for this date
+          if (!employeeData[emp.id].transactions[txnDate]) {
+            employeeData[emp.id].transactions[txnDate] = 0;
+          }
+          employeeData[emp.id].transactions[txnDate] += amount;
+
+          // Add date to set of all dates
+          allTransactionDates.add(txnDate);
+
+          // Update current balance (from last transaction's BalanceAfter)
+          if (j === transactions.length - 1) {
+            employeeData[emp.id].currentBalance = txn['BalanceAfter'] || 0;
+          }
+        }
+
+        employeesWithData++;
+      }
+    }
+
+    Logger.log('👥 Employees with transactions: ' + employeesWithData);
+    Logger.log('📅 Unique transaction dates: ' + allTransactionDates.size);
+
+    if (employeesWithData === 0) {
+      throw new Error('No loan transactions found for the specified period');
+    }
+
+    // Convert dates set to sorted array
+    const dateColumns = Array.from(allTransactionDates).sort(function(a, b) {
+      return parseDate(a) - parseDate(b);
+    });
+
+    // Convert employee data to sorted array
+    const employeeArray = Object.values(employeeData);
+    employeeArray.sort(function(a, b) {
+      return a.name.localeCompare(b.name);
+    });
+
+    // Create Google Sheet
+    const fileName = 'Loan Transaction Matrix Report - ' + formatDate(start) + ' to ' + formatDate(end);
+    const spreadsheet = SpreadsheetApp.create(fileName);
+    const sheet = spreadsheet.getActiveSheet();
+    sheet.setName('Loan Transactions');
+
+    // Header
+    sheet.getRange('A1').setValue('LOAN TRANSACTION MATRIX REPORT');
+    sheet.setRowHeight(1, 30);
+
+    // Period row
+    sheet.getRange('A2').setValue('Period: ' + formatDate(start) + ' to ' + formatDate(end));
+    sheet.getRange('A2').setFontStyle('italic');
+
+    // Build column headers
+    const headers = ['Employee', 'Employer'];
+    headers.push.apply(headers, dateColumns);
+    headers.push('Current Balance');
+
+    const numColumns = headers.length;
+    const headerRange = sheet.getRange(4, 1, 1, numColumns);
+    headerRange.setValues([headers]);
+    headerRange.setFontWeight('bold')
+              .setBackground('#4CAF50')
+              .setFontColor('#FFFFFF')
+              .setHorizontalAlignment('center')
+              .setWrap(true);
+    sheet.setRowHeight(4, 35);
+
+    // Data rows
+    let rowNum = 5;
+    for (let i = 0; i < employeeArray.length; i++) {
+      const emp = employeeArray[i];
+      const rowData = [emp.name, emp.employer];
+
+      // Add transaction amounts for each date column
+      for (let j = 0; j < dateColumns.length; j++) {
+        const date = dateColumns[j];
+        const amount = emp.transactions[date] || 0;
+        rowData.push(amount === 0 ? '' : amount); // Show blank for zero values
+      }
+
+      // Add current balance as last column
+      rowData.push(emp.currentBalance);
+
+      sheet.getRange(rowNum, 1, 1, numColumns).setValues([rowData]);
+      rowNum++;
+    }
+
+    // Format columns
+    // Employee name column
+    sheet.setColumnWidth(1, 220);
+    // Employer column
+    sheet.setColumnWidth(2, 135);
+
+    // Transaction date columns - set width and format as currency
+    for (let col = 3; col <= numColumns - 1; col++) {
+      sheet.setColumnWidth(col, 110);
+    }
+
+    // Current Balance column
+    sheet.setColumnWidth(numColumns, 130);
+
+    // Format all transaction and balance columns as currency
+    if (employeeArray.length > 0) {
+      const dataStartRow = 5;
+      const dataEndRow = rowNum - 1;
+      const currencyStartCol = 3; // First transaction column
+      const currencyEndCol = numColumns; // Including current balance
+
+      sheet.getRange(dataStartRow, currencyStartCol, dataEndRow - dataStartRow + 1, currencyEndCol - currencyStartCol + 1)
+           .setNumberFormat('"R"#,##0.00;[Red]"R"-#,##0.00'); // Red for negative values
+    }
+
+    // Merge header cells
+    const headerEndCol = String.fromCharCode(64 + numColumns);
+    sheet.getRange('A1:' + headerEndCol + '1').merge();
+    sheet.getRange('A1')
+         .setFontWeight('bold')
+         .setFontSize(14)
+         .setHorizontalAlignment('center');
+
+    // Add borders to the entire table
+    const lastRow = rowNum - 1;
+    sheet.getRange(4, 1, lastRow - 3, numColumns)
+         .setBorder(true, true, true, true, true, true, 'black', SpreadsheetApp.BorderStyle.SOLID);
+
+    // Freeze header rows and first two columns
+    sheet.setFrozenRows(4);
+    sheet.setFrozenColumns(2);
+
+    // Add totals row
+    const totalsRow = rowNum;
+    sheet.getRange(totalsRow, 1).setValue('TOTALS');
+    sheet.getRange(totalsRow, 2).setValue(employeeArray.length + ' employees');
+
+    // Calculate totals for each date column
+    for (let col = 3; col <= numColumns - 1; col++) {
+      const colLetter = String.fromCharCode(64 + col);
+      const formula = '=SUM(' + colLetter + '5:' + colLetter + (totalsRow - 1) + ')';
+      sheet.getRange(totalsRow, col).setFormula(formula);
+    }
+
+    // Calculate total outstanding balance
+    const balanceColLetter = String.fromCharCode(64 + numColumns);
+    const balanceFormula = '=SUM(' + balanceColLetter + '5:' + balanceColLetter + (totalsRow - 1) + ')';
+    sheet.getRange(totalsRow, numColumns).setFormula(balanceFormula);
+
+    // Format totals row
+    sheet.getRange(totalsRow, 1, 1, numColumns)
+         .setFontWeight('bold')
+         .setBackground('#FFD700');
+
+    // Format totals row currency columns
+    sheet.getRange(totalsRow, 3, 1, numColumns - 2)
+         .setNumberFormat('"R"#,##0.00;[Red]"R"-#,##0.00');
+
+    // Move to reports folder and set sharing
+    const reportUrl = moveToReportsFolder(spreadsheet);
+
+    Logger.log('✅ Report generated: ' + fileName);
+    Logger.log('📎 URL: ' + reportUrl);
+    Logger.log('========== GENERATE LOAN TRANSACTION MATRIX REPORT COMPLETE ==========\n');
+
+    return {
+      success: true,
+      data: {
+        url: reportUrl,
+        fileName: fileName,
+        periodStart: formatDate(start),
+        periodEnd: formatDate(end),
+        employeeCount: employeesWithData,
+        transactionDateCount: dateColumns.length
+      }
+    };
+
+  } catch (error) {
+    Logger.log('❌ ERROR in generateLoanTransactionMatrixReport: ' + error.message);
+    Logger.log('Stack: ' + error.stack);
+    Logger.log('========== GENERATE LOAN TRANSACTION MATRIX REPORT FAILED ==========\n');
     return { success: false, error: error.message };
   }
 }
@@ -1628,6 +1872,31 @@ function test_monthlyPayrollReport() {
     Logger.log('Period: ' + result.data.periodStart + ' to ' + result.data.periodEnd);
     Logger.log('Total Employees: ' + result.data.totalEmployees);
     Logger.log('Total Net Pay: R' + result.data.totalNetPay.toFixed(2));
+  } else {
+    Logger.log('❌ TEST FAILED: ' + result.error);
+  }
+
+  Logger.log('========== TEST COMPLETE ==========\n');
+}
+
+/**
+ * Test function for Loan Transaction Matrix Report
+ */
+function test_loanTransactionMatrixReport() {
+  Logger.log('\n========== TEST: LOAN TRANSACTION MATRIX REPORT ==========');
+
+  // Use a date range (update with actual dates that have loan data)
+  const startDate = new Date('2025-01-01');
+  const endDate = new Date('2025-12-31');
+
+  const result = generateLoanTransactionMatrixReport(startDate, endDate);
+
+  if (result.success) {
+    Logger.log('✅ TEST PASSED');
+    Logger.log('URL: ' + result.data.url);
+    Logger.log('Period: ' + result.data.periodStart + ' to ' + result.data.periodEnd);
+    Logger.log('Employees with transactions: ' + result.data.employeeCount);
+    Logger.log('Transaction dates: ' + result.data.transactionDateCount);
   } else {
     Logger.log('❌ TEST FAILED: ' + result.error);
   }
