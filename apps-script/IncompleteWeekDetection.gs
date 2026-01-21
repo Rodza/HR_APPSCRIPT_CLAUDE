@@ -224,7 +224,7 @@ function addMissingDaysToLeave(employeeName, missingDays, reason, notes) {
     }
 
     // Validate reason
-    const validReasons = ['AWOL', 'Sick Leave', 'Annual Leave', 'Unpaid Leave'];
+    const validReasons = ['SICK LEAVE - UNPAID', 'SICK LEAVE - PAID', 'AWOL', 'PAIDLEAVE', 'UNPAID LEAVE', 'FAMILY RESPONSIBILITY'];
     if (!validReasons.includes(reason)) {
       throw new Error('Invalid leave reason. Must be one of: ' + validReasons.join(', '));
     }

@@ -9,10 +9,12 @@
             border-radius: 5px;
             margin-bottom: 20px;
         }
+        .badge-sick-unpaid { background-color: #ffc107; color: #000; }
+        .badge-sick-paid { background-color: #17a2b8; color: #fff; }
         .badge-awol { background-color: #dc3545; }
-        .badge-sick { background-color: #ffc107; color: #000; }
-        .badge-annual { background-color: #28a745; }
-        .badge-unpaid { background-color: #6c757d; }
+        .badge-paidleave { background-color: #28a745; }
+        .badge-unpaid-leave { background-color: #6c757d; }
+        .badge-family { background-color: #6f42c1; }
     </style>
 </head>
 <body>
@@ -34,10 +36,12 @@
                     <div class="col-md-3">
                         <select class="form-select" id="filterReason" onchange="filterLeave()">
                             <option value="">All Reasons</option>
+                            <option value="SICK LEAVE - UNPAID">SICK LEAVE - UNPAID</option>
+                            <option value="SICK LEAVE - PAID">SICK LEAVE - PAID</option>
                             <option value="AWOL">AWOL</option>
-                            <option value="Sick Leave">Sick Leave</option>
-                            <option value="Annual Leave">Annual Leave</option>
-                            <option value="Unpaid Leave">Unpaid Leave</option>
+                            <option value="PAIDLEAVE">PAIDLEAVE</option>
+                            <option value="UNPAID LEAVE">UNPAID LEAVE</option>
+                            <option value="FAMILY RESPONSIBILITY">FAMILY RESPONSIBILITY</option>
                         </select>
                     </div>
                     <div class="col-md-2">
@@ -120,9 +124,12 @@
             }
 
             tbody.innerHTML = records.map((leave, index) => {
-                const reasonClass = leave.REASON === 'AWOL' ? 'badge-awol' :
-                                   leave.REASON === 'Sick Leave' ? 'badge-sick' :
-                                   leave.REASON === 'Annual Leave' ? 'badge-annual' : 'badge-unpaid';
+                const reasonClass = leave.REASON === 'SICK LEAVE - UNPAID' ? 'badge-sick-unpaid' :
+                                   leave.REASON === 'SICK LEAVE - PAID' ? 'badge-sick-paid' :
+                                   leave.REASON === 'AWOL' ? 'badge-awol' :
+                                   leave.REASON === 'PAIDLEAVE' ? 'badge-paidleave' :
+                                   leave.REASON === 'UNPAID LEAVE' ? 'badge-unpaid-leave' :
+                                   leave.REASON === 'FAMILY RESPONSIBILITY' ? 'badge-family' : 'badge-unpaid-leave';
 
                 // Row number is index + 1 (1-based)
                 const rowNumber = index + 1;

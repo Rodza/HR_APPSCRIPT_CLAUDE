@@ -57,10 +57,12 @@ var OVERTIME_MULTIPLIER = 1.5;
  * Valid leave reasons
  */
 var LEAVE_REASONS = [
+  'SICK LEAVE - UNPAID',
+  'SICK LEAVE - PAID',
   'AWOL',
-  'Sick Leave',
-  'Annual Leave',
-  'Unpaid Leave'
+  'PAIDLEAVE',
+  'UNPAID LEAVE',
+  'FAMILY RESPONSIBILITY'
 ];
 
 // ==================== LOAN CONFIGURATION ====================
