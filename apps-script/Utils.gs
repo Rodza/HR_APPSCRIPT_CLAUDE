@@ -501,6 +501,42 @@ function calculateDaysBetween(startDate, endDate) {
 }
 
 /**
+ * Calculate working days between two dates (Monday to Friday only)
+ * Excludes weekends (Saturday and Sunday)
+ *
+ * @param {Date|string} startDate - Start date (inclusive)
+ * @param {Date|string} endDate - End date (inclusive)
+ * @returns {number} Number of working days between dates (inclusive)
+ */
+function calculateWorkingDaysBetween(startDate, endDate) {
+  var start = parseDate(startDate);
+  var end = parseDate(endDate);
+
+  // Ensure start is before end
+  if (start > end) {
+    return 0;
+  }
+
+  var workingDays = 0;
+  var currentDate = new Date(start);
+
+  // Loop through each day from start to end (inclusive)
+  while (currentDate <= end) {
+    var dayOfWeek = currentDate.getDay(); // 0 = Sunday, 6 = Saturday
+
+    // Count only Monday (1) to Friday (5)
+    if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+      workingDays++;
+    }
+
+    // Move to next day
+    currentDate.setDate(currentDate.getDate() + 1);
+  }
+
+  return workingDays;
+}
+
+/**
  * Round number to specified decimal places
  *
  * @param {number} value - Number to round
