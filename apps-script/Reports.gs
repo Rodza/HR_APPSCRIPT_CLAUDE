@@ -710,6 +710,8 @@ function generateMonthlyPayrollSummaryReport(monthDate) {
         employeeData[empName] = {
           employeeName: empName,
           employer: p['EMPLOYER'],
+          employmentStatus: p['EMPLOYMENT STATUS'] || '',
+          hourlyRate: p['HOURLYRATE'] || 0,
           standardHours: 0,
           overtimeHours: 0,
           grossPay: 0,
@@ -814,9 +816,11 @@ function generateMonthlyPayrollSummaryReport(monthDate) {
     registerSheet.getRange('A2').setFontStyle('italic');
 
     // Column headers
-    registerSheet.getRange('A4:L4').setValues([[
+    registerSheet.getRange('A4:N4').setValues([[
       'Employee',
       'Employer',
+      'Employment Status',
+      'Hourly Rate',
       'Std Hours',
       'OT Hours',
       'Gross Pay',
@@ -828,7 +832,7 @@ function generateMonthlyPayrollSummaryReport(monthDate) {
       'Other Ded.',
       'Net Pay'
     ]]);
-    registerSheet.getRange('A4:L4').setFontWeight('bold').setBackground('#4CAF50').setFontColor('#FFFFFF').setHorizontalAlignment('center');
+    registerSheet.getRange('A4:N4').setFontWeight('bold').setBackground('#4CAF50').setFontColor('#FFFFFF').setHorizontalAlignment('center');
     registerSheet.setRowHeight(4, 25);
 
     // Data rows
@@ -839,11 +843,17 @@ function generateMonthlyPayrollSummaryReport(monthDate) {
       // Join other income notes with commas
       const otherIncomeNotesText = emp.otherIncomeNotes.join(', ');
 
-      registerSheet.getRange(rowNum, 1, 1, 12).setValues([[
+      // Convert hours to HH:MM format
+      const stdHoursFormatted = decimalHoursToTime(emp.standardHours);
+      const otHoursFormatted = decimalHoursToTime(emp.overtimeHours);
+
+      registerSheet.getRange(rowNum, 1, 1, 14).setValues([[
         emp.employeeName,
         emp.employer,
-        emp.standardHours,
-        emp.overtimeHours,
+        emp.employmentStatus,
+        emp.hourlyRate,
+        stdHoursFormatted,
+        otHoursFormatted,
         emp.grossPay,
         emp.leavePay,
         emp.bonusPay,
@@ -857,11 +867,16 @@ function generateMonthlyPayrollSummaryReport(monthDate) {
     }
 
     // Totals row
-    registerSheet.getRange(rowNum, 1, 1, 12).setValues([[
+    const totalStdHoursFormatted = decimalHoursToTime(totals.standardHours);
+    const totalOtHoursFormatted = decimalHoursToTime(totals.overtimeHours);
+
+    registerSheet.getRange(rowNum, 1, 1, 14).setValues([[
       'TOTALS',
       totals.employees + ' employees',
-      totals.standardHours,
-      totals.overtimeHours,
+      '',  // No total for employment status
+      '',  // No total for hourly rate
+      totalStdHoursFormatted,
+      totalOtHoursFormatted,
       totals.grossPay,
       totals.leavePay,
       totals.bonusPay,
@@ -871,35 +886,37 @@ function generateMonthlyPayrollSummaryReport(monthDate) {
       totals.otherDeductions,
       totals.netPay
     ]]);
-    registerSheet.getRange(rowNum, 1, 1, 12).setFontWeight('bold').setBackground('#FFD700');
+    registerSheet.getRange(rowNum, 1, 1, 14).setFontWeight('bold').setBackground('#FFD700');
 
     // Format currency and number columns
-    registerSheet.getRange(5, 3, employeeArray.length + 1, 1).setNumberFormat('0.00');  // Std Hours
-    registerSheet.getRange(5, 4, employeeArray.length + 1, 1).setNumberFormat('0.00');  // OT Hours
-    registerSheet.getRange(5, 5, employeeArray.length + 1, 4).setNumberFormat('"R"#,##0.00');  // Currency columns E-H (Gross to Other Income)
-    registerSheet.getRange(5, 10, employeeArray.length + 1, 3).setNumberFormat('"R"#,##0.00');  // Currency columns J-L (UIF to Net Pay)
+    registerSheet.getRange(5, 4, employeeArray.length, 1).setNumberFormat('"R"#,##0.00');  // Column D - Hourly Rate (not including totals row)
+    // Columns E and F (Std Hours and OT Hours) are now text format (HH:MM), no number formatting needed
+    registerSheet.getRange(5, 7, employeeArray.length + 1, 4).setNumberFormat('"R"#,##0.00');  // Currency columns G-J (Gross to Other Income)
+    registerSheet.getRange(5, 12, employeeArray.length + 1, 3).setNumberFormat('"R"#,##0.00');  // Currency columns L-N (UIF to Net Pay)
 
     // Set hardcoded column widths for optimal layout
     registerSheet.setColumnWidth(1, 220);  // Column A - Employee
     registerSheet.setColumnWidth(2, 135);  // Column B - Employer
-    registerSheet.setColumnWidth(3, 80);   // Column C - Std Hours
-    registerSheet.setColumnWidth(4, 80);   // Column D - OT Hours
-    registerSheet.setColumnWidth(5, 90);   // Column E - Gross Pay
-    registerSheet.setColumnWidth(6, 90);   // Column F - Leave Pay
-    registerSheet.setColumnWidth(7, 90);   // Column G - Bonus Pay
-    registerSheet.setColumnWidth(8, 100);  // Column H - Other Income
-    registerSheet.setColumnWidth(9, 150);  // Column I - Other Income Notes
-    registerSheet.setColumnWidth(10, 80);  // Column J - UIF
-    registerSheet.setColumnWidth(11, 110); // Column K - Other Ded.
-    registerSheet.setColumnWidth(12, 110); // Column L - Net Pay
+    registerSheet.setColumnWidth(3, 110);  // Column C - Employment Status
+    registerSheet.setColumnWidth(4, 90);   // Column D - Hourly Rate
+    registerSheet.setColumnWidth(5, 80);   // Column E - Std Hours
+    registerSheet.setColumnWidth(6, 80);   // Column F - OT Hours
+    registerSheet.setColumnWidth(7, 90);   // Column G - Gross Pay
+    registerSheet.setColumnWidth(8, 90);   // Column H - Leave Pay
+    registerSheet.setColumnWidth(9, 90);   // Column I - Bonus Pay
+    registerSheet.setColumnWidth(10, 100); // Column J - Other Income
+    registerSheet.setColumnWidth(11, 150); // Column K - Other Income Notes
+    registerSheet.setColumnWidth(12, 80);  // Column L - UIF
+    registerSheet.setColumnWidth(13, 110); // Column M - Other Ded.
+    registerSheet.setColumnWidth(14, 110); // Column N - Net Pay
 
-    // Merge header cells A1:L1 and apply formatting
-    registerSheet.getRange('A1:L1').merge();
+    // Merge header cells A1:N1 and apply formatting
+    registerSheet.getRange('A1:N1').merge();
     registerSheet.getRange('A1').setFontWeight('bold').setFontSize(14).setHorizontalAlignment('center');
 
     // Add borders to the entire table (from column headers through last data row)
     const lastRegisterRow = rowNum;
-    const registerTableRange = registerSheet.getRange('A4:L' + lastRegisterRow);
+    const registerTableRange = registerSheet.getRange('A4:N' + lastRegisterRow);
     registerTableRange.setBorder(true, true, true, true, true, true, 'black', SpreadsheetApp.BorderStyle.SOLID);
 
     // ===== TAB 2: Summary =====
@@ -1480,6 +1497,26 @@ function generateLeaveTrendsReport(startDate, endDate, employeeName) {
 }
 
 // ==================== HELPER FUNCTIONS ====================
+
+/**
+ * Converts decimal hours to HH:MM format
+ *
+ * @param {number} decimalHours - Hours in decimal format (e.g., 47.75)
+ * @returns {string} Time in HH:MM format (e.g., "47:45")
+ */
+function decimalHoursToTime(decimalHours) {
+  if (decimalHours === 0 || decimalHours === null || decimalHours === undefined) {
+    return '0:00';
+  }
+
+  const hours = Math.floor(decimalHours);
+  const minutes = Math.round((decimalHours - hours) * 60);
+
+  // Pad minutes with leading zero if needed
+  const minutesStr = minutes < 10 ? '0' + minutes : '' + minutes;
+
+  return hours + ':' + minutesStr;
+}
 
 /**
  * Moves spreadsheet to "Payroll Reports" folder and sets sharing
