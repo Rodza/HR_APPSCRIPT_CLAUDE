@@ -58,7 +58,7 @@
                     <label class="form-label">Total Days</label>
                     <input type="text" class="form-control" id="totalDays" readonly
                            style="background-color: #e9ecef; font-weight: bold;">
-                    <div class="form-text">Auto-calculated (inclusive of start and return dates)</div>
+                    <div class="form-text">Auto-calculated (working days only: Monday-Friday, excluding weekends)</div>
                 </div>
 
                 <div class="mb-3">
@@ -348,11 +348,23 @@
                     return;
                 }
 
-                // Calculate days (inclusive)
-                const diffTime = Math.abs(end - start);
-                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+                // Calculate working days only (Monday to Friday, inclusive)
+                let workingDays = 0;
+                const currentDate = new Date(start);
 
-                document.getElementById('totalDays').value = diffDays + ' days';
+                while (currentDate <= end) {
+                    const dayOfWeek = currentDate.getDay(); // 0 = Sunday, 6 = Saturday
+
+                    // Count only Monday (1) to Friday (5)
+                    if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+                        workingDays++;
+                    }
+
+                    // Move to next day
+                    currentDate.setDate(currentDate.getDate() + 1);
+                }
+
+                document.getElementById('totalDays').value = workingDays + ' days';
                 document.getElementById('totalDays').style.color = '#28a745';
             } else {
                 document.getElementById('totalDays').value = '';

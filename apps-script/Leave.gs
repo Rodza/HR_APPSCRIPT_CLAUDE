@@ -169,8 +169,8 @@ function addLeave(data) {
     const startDate = parseDate(data.startDate);
     const returnDate = parseDate(data.returnDate);
 
-    // Calculate total days (inclusive)
-    const totalDays = calculateDaysBetween(startDate, returnDate) + 1;
+    // Calculate total working days (Monday to Friday only, inclusive)
+    const totalDays = calculateWorkingDaysBetween(startDate, returnDate);
 
     // Calculate day of week from start date
     const weekDay = getDayOfWeek(startDate);
@@ -480,8 +480,8 @@ function editLeave(rowNumber, data) {
     const startDate = parseDate(updatedRecord.startDate);
     const returnDate = parseDate(updatedRecord.returnDate);
 
-    // Recalculate total days and week day
-    const totalDays = calculateDaysBetween(startDate, returnDate) + 1;
+    // Recalculate total working days (Monday to Friday only, inclusive) and week day
+    const totalDays = calculateWorkingDaysBetween(startDate, returnDate);
     const weekDay = getDayOfWeek(startDate);
 
     Logger.log('📅 Updated leave period: ' + formatDate(startDate) + ' to ' + formatDate(returnDate));
