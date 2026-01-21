@@ -929,7 +929,10 @@ function generateMonthlyPayrollSummaryReport(monthDate) {
     ]);
 
     summarySheet.getRange('A6:A14').setFontWeight('bold');
-    summarySheet.getRange('B7:B14').setNumberFormat('"R"#,##0.00');
+    // Format hours as numbers (not currency)
+    summarySheet.getRange('B7:B8').setNumberFormat('0.00');
+    // Format currency values
+    summarySheet.getRange('B9:B14').setNumberFormat('"R"#,##0.00');
 
     // By employer
     summarySheet.getRange('A16:B16').setValues([['BY EMPLOYER', '']]);
@@ -948,7 +951,8 @@ function generateMonthlyPayrollSummaryReport(monthDate) {
         ['  Net Pay:', data.netPay]
       ]);
 
-      summarySheet.getRange(summaryRow, 2, 2, 1).setNumberFormat('"R"#,##0.00');
+      // Format only currency values (Gross Pay and Net Pay), skip Employees count
+      summarySheet.getRange(summaryRow + 1, 2, 2, 1).setNumberFormat('"R"#,##0.00');
       summaryRow += 4;
     }
 
