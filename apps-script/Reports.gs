@@ -422,6 +422,11 @@ function generateLoanTransactionMatrixReport(startDate, endDate) {
     const sheet = spreadsheet.getActiveSheet();
     sheet.setName('Loan Transactions');
 
+    // Freeze header rows and first two columns BEFORE setting any content
+    // This prevents conflicts with merged cells
+    sheet.setFrozenRows(4);
+    sheet.setFrozenColumns(2);
+
     // Header
     sheet.getRange('A1').setValue('LOAN TRANSACTION MATRIX REPORT');
     sheet.setRowHeight(1, 30);
@@ -490,9 +495,9 @@ function generateLoanTransactionMatrixReport(startDate, endDate) {
            .setNumberFormat('"R"#,##0.00;[Red]"R"-#,##0.00'); // Red for negative values
     }
 
-    // Merge header cells
-    const headerEndCol = String.fromCharCode(64 + numColumns);
-    sheet.getRange('A1:' + headerEndCol + '1').merge();
+    // Merge only the first two columns in the header (matching frozen columns)
+    // This prevents conflict with frozen columns
+    sheet.getRange('A1:B1').merge();
     sheet.getRange('A1')
          .setFontWeight('bold')
          .setFontSize(14)
@@ -502,10 +507,6 @@ function generateLoanTransactionMatrixReport(startDate, endDate) {
     const lastRow = rowNum - 1;
     sheet.getRange(4, 1, lastRow - 3, numColumns)
          .setBorder(true, true, true, true, true, true, 'black', SpreadsheetApp.BorderStyle.SOLID);
-
-    // Freeze header rows and first two columns
-    sheet.setFrozenRows(4);
-    sheet.setFrozenColumns(2);
 
     // Add totals row
     const totalsRow = rowNum;
