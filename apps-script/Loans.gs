@@ -213,11 +213,13 @@ function getCurrentLoanBalance(employeeId, asOfDate) {
       throw new Error('Required columns not found in EmployeeLoans sheet');
     }
 
-    // Parse asOfDate if provided
-    const filterDate = asOfDate ? parseDate(asOfDate) : null;
-    if (filterDate) {
-      // Set to end of day for inclusive comparison
-      filterDate.setHours(23, 59, 59, 999);
+    // Parse asOfDate if provided - normalize to start of day for comparison
+    let filterDate = null;
+    if (asOfDate) {
+      filterDate = parseDate(asOfDate);
+      // Normalize to end of day for inclusive comparison
+      filterDate = new Date(filterDate.getFullYear(), filterDate.getMonth(), filterDate.getDate(), 23, 59, 59, 999);
+      Logger.log('Filter date (end of day): ' + filterDate.toISOString());
     }
 
     // Filter records for this employee
@@ -239,11 +241,16 @@ function getCurrentLoanBalance(employeeId, asOfDate) {
           }
 
           const transactionDate = parseDate(row[transDateCol]);
+          // Normalize transaction date to compare dates only (ignore time)
+          const transactionDateOnly = new Date(transactionDate.getFullYear(), transactionDate.getMonth(), transactionDate.getDate());
 
           // Filter by asOfDate if provided
-          if (filterDate && transactionDate > filterDate) {
-            Logger.log('⚠️ Skipping row ' + (i + 1) + ' - transaction date after as-of date');
-            continue;
+          if (filterDate) {
+            const filterDateOnly = new Date(filterDate.getFullYear(), filterDate.getMonth(), filterDate.getDate());
+            if (transactionDateOnly > filterDateOnly) {
+              Logger.log('⚠️ Skipping row ' + (i + 1) + ' - transaction date ' + formatDate(transactionDate) + ' after as-of date ' + formatDate(filterDate));
+              continue;
+            }
           }
 
           employeeRecords.push({
