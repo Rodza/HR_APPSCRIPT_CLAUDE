@@ -48,13 +48,13 @@ function generateOutstandingLoansReport(asOfDate) {
 
     for (let i = 0; i < employees.length; i++) {
       const emp = employees[i];
-      const balanceResult = getCurrentLoanBalance(emp.id);
+      const balanceResult = getCurrentLoanBalance(emp.id, reportDate);
 
       if (balanceResult.success && balanceResult.data > 0) {
         const balance = balanceResult.data;
 
-        // Get last transaction date
-        const historyResult = getLoanHistory(emp.id);
+        // Get last transaction date (up to reportDate)
+        const historyResult = getLoanHistory(emp.id, null, reportDate);
         let lastTransactionDate = '';
 
         if (historyResult.success && historyResult.data.length > 0) {
