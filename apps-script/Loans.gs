@@ -185,10 +185,13 @@ function addLoanTransaction(data) {
  * @param {string} employeeId - Employee ID
  * @returns {Object} Result with success flag and current balance
  */
-function getCurrentLoanBalance(employeeId) {
+function getCurrentLoanBalance(employeeId, asOfDate) {
   try {
     Logger.log('\n========== GET CURRENT LOAN BALANCE ==========');
     Logger.log('Employee ID: ' + employeeId);
+    if (asOfDate) {
+      Logger.log('As of date: ' + formatDate(asOfDate));
+    }
 
     const sheets = getSheets();
     const loanSheet = sheets.loans;
@@ -210,6 +213,13 @@ function getCurrentLoanBalance(employeeId) {
       throw new Error('Required columns not found in EmployeeLoans sheet');
     }
 
+    // Parse asOfDate if provided
+    const filterDate = asOfDate ? parseDate(asOfDate) : null;
+    if (filterDate) {
+      // Set to end of day for inclusive comparison
+      filterDate.setHours(23, 59, 59, 999);
+    }
+
     // Filter records for this employee
     const employeeRecords = [];
     for (let i = 1; i < data.length; i++) {
@@ -228,8 +238,16 @@ function getCurrentLoanBalance(employeeId) {
             continue;
           }
 
+          const transactionDate = parseDate(row[transDateCol]);
+
+          // Filter by asOfDate if provided
+          if (filterDate && transactionDate > filterDate) {
+            Logger.log('⚠️ Skipping row ' + (i + 1) + ' - transaction date after as-of date');
+            continue;
+          }
+
           employeeRecords.push({
-            transactionDate: parseDate(row[transDateCol]),
+            transactionDate: transactionDate,
             timestamp: parseDate(row[timestampCol]),
             balanceAfter: parseFloat(balanceAfter)
           });
