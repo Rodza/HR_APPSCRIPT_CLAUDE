@@ -180,7 +180,7 @@ function addLeave(data) {
     Logger.log('📅 Start day: ' + weekDay);
 
     // Prepare row data
-    const timestamp = new Date();
+    const timestamp = normalizeToDateOnly(new Date());
     const user = getCurrentUser();
 
     const rowData = [

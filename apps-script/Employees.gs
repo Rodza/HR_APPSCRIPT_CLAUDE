@@ -102,9 +102,9 @@ function sanitizeEmployeeForWeb(emp) {
     if (emp.hasOwnProperty(key)) {
       var value = emp[key];
 
-      // Convert Date objects to ISO strings
+      // Convert Date objects to DD-MM-YYYY format (date only, no time)
       if (value instanceof Date) {
-        sanitized[key] = value.toISOString();
+        sanitized[key] = formatDateDDMMYYYY(value);
       }
       // Convert null/undefined to empty string
       else if (value === null || value === undefined) {
@@ -515,6 +515,17 @@ function createEmployee(employeeData, sessionToken) {
 
     employeeData = transformEmployeeFieldNames(employeeData);
 
+    // Normalize date fields to strip time components
+    if (employeeData['DATE OF BIRTH']) {
+      employeeData['DATE OF BIRTH'] = normalizeToDateOnly(parseDate(employeeData['DATE OF BIRTH']));
+    }
+    if (employeeData['EMPLOYMENT DATE']) {
+      employeeData['EMPLOYMENT DATE'] = normalizeToDateOnly(parseDate(employeeData['EMPLOYMENT DATE']));
+    }
+    if (employeeData['TERMINATION DATE']) {
+      employeeData['TERMINATION DATE'] = normalizeToDateOnly(parseDate(employeeData['TERMINATION DATE']));
+    }
+
     var requiredFields = getConfig('EMPLOYEE_REQUIRED_FIELDS');
     var missingFields = [];
 
@@ -595,6 +606,17 @@ function updateEmployee(id, employeeData, sessionToken) {
 
     employeeData = transformEmployeeFieldNames(employeeData);
 
+    // Normalize date fields to strip time components
+    if (employeeData['DATE OF BIRTH']) {
+      employeeData['DATE OF BIRTH'] = normalizeToDateOnly(parseDate(employeeData['DATE OF BIRTH']));
+    }
+    if (employeeData['EMPLOYMENT DATE']) {
+      employeeData['EMPLOYMENT DATE'] = normalizeToDateOnly(parseDate(employeeData['EMPLOYMENT DATE']));
+    }
+    if (employeeData['TERMINATION DATE']) {
+      employeeData['TERMINATION DATE'] = normalizeToDateOnly(parseDate(employeeData['TERMINATION DATE']));
+    }
+
     var sheets = getSheets();
     var empSheet = sheets.empdetails;
 
@@ -658,9 +680,14 @@ function updateEmployee(id, employeeData, sessionToken) {
  */
 function terminateEmployee(id, terminationDate) {
   try {
+    // Normalize termination date to strip time components
+    var normalizedDate = terminationDate
+      ? normalizeToDateOnly(parseDate(terminationDate))
+      : normalizeToDateOnly(new Date());
+
     var updateData = {
       'EMPLOYMENT STATUS': 'Terminated',
-      'TERMINATION DATE': terminationDate || new Date()
+      'TERMINATION DATE': normalizedDate
     };
 
     return updateEmployee(id, updateData);

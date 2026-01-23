@@ -152,7 +152,7 @@ function addLoanTransaction(data) {
       loanId: loanId,
       employeeId: data.employeeId,
       employeeName: employeeName,
-      timestamp: timestamp.toISOString(),
+      timestamp: formatDateDDMMYYYY(timestamp),
       transactionDate: formatDate(transactionDate),
       loanAmount: data.loanAmount,
       loanType: data.loanType,
