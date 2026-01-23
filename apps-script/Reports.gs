@@ -33,22 +33,31 @@ function generateOutstandingLoansReport(asOfDate) {
     const reportDate = asOfDate ? parseDate(asOfDate) : new Date();
     Logger.log('Report as of: ' + formatDate(reportDate));
 
-    // Get ALL employees (not just active) - even resigned employees can have outstanding loans
-    // Don't use activeOnly filter as it excludes employees based on EMPLOYMENT STATUS
-    // Request large page size to get all employees in one call
-    const empResult = listEmployees({ pageSize: 10000 });
-    if (!empResult.success) {
-      Logger.log('❌ Failed to get employees: ' + empResult.error);
-      throw new Error('Failed to get employees: ' + empResult.error);
+    // Get ALL employees directly from sheet (don't use listEmployees API - it's for web calls)
+    const sheets = getSheets();
+    const empSheet = sheets.empdetails;
+
+    if (!empSheet) {
+      throw new Error('Employee Details sheet not found');
     }
 
-    Logger.log('📋 Employee result: ' + JSON.stringify({
-      success: empResult.success,
-      employeeCount: empResult.data.employees.length,
-      pagination: empResult.data.pagination
-    }));
+    const empData = empSheet.getDataRange().getValues();
+    const empHeaders = empData[0];
+    const employees = [];
 
-    const employees = empResult.data.employees;
+    // Build employee objects from sheet rows
+    for (let i = 1; i < empData.length; i++) {
+      if (empData[i][0]) {  // Skip empty rows
+        try {
+          const employee = buildObjectFromRow(empData[i], empHeaders);
+          employees.push(employee);
+        } catch (error) {
+          // Skip invalid rows
+          Logger.log('⚠️ Skipping invalid employee row ' + (i + 1));
+        }
+      }
+    }
+
     Logger.log('📊 Processing ' + employees.length + ' employees');
 
     // Get loan balances for each employee
