@@ -14,6 +14,71 @@
  * with sharing set to "Anyone with link can view"
  */
 
+// ==================== UTILITY FUNCTIONS ====================
+
+/**
+ * Gets list of employees for populating dropdown menus
+ * Reads directly from Employee Details sheet (not web API)
+ *
+ * @returns {Object} Result with success flag and employees array
+ *
+ * @example
+ * const result = getEmployeesForDropdown();
+ * // Returns: { success: true, data: { employees: [{id, REFNAME}] } }
+ */
+function getEmployeesForDropdown() {
+  try {
+    Logger.log('\n========== GET EMPLOYEES FOR DROPDOWN ==========');
+
+    const sheets = getSheets();
+    const empSheet = sheets.empdetails;
+
+    if (!empSheet) {
+      throw new Error('Employee Details sheet not found');
+    }
+
+    const empData = empSheet.getDataRange().getValues();
+    const empHeaders = empData[0];
+
+    // Find column indices
+    const idCol = empHeaders.indexOf('id');
+    const refnameCol = empHeaders.indexOf('REFNAME');
+
+    if (idCol === -1 || refnameCol === -1) {
+      throw new Error('Required columns not found (id, REFNAME)');
+    }
+
+    const employees = [];
+
+    // Build simple employee objects for dropdown
+    for (let i = 1; i < empData.length; i++) {
+      const row = empData[i];
+      if (row[idCol]) {  // Skip empty rows
+        employees.push({
+          id: row[idCol],
+          REFNAME: row[refnameCol] || 'Unknown'
+        });
+      }
+    }
+
+    // Sort by name
+    employees.sort((a, b) => a.REFNAME.localeCompare(b.REFNAME));
+
+    Logger.log('📊 Found ' + employees.length + ' employees for dropdown');
+
+    return {
+      success: true,
+      data: {
+        employees: employees
+      }
+    };
+
+  } catch (error) {
+    Logger.log('❌ ERROR in getEmployeesForDropdown: ' + error.message);
+    return { success: false, error: error.message };
+  }
+}
+
 // ==================== OUTSTANDING LOANS REPORT ====================
 
 /**
