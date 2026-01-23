@@ -449,10 +449,28 @@ function filterBySearch(array, field, search) {
 // ============================================================================
 
 /**
+ * Normalize a date to midnight (00:00:00) to strip time components
+ * This ensures consistent date-only comparisons and storage
+ *
+ * @param {Date} date - Date object to normalize
+ * @returns {Date} Date object set to midnight
+ */
+function normalizeToDateOnly(date) {
+  if (!date || !(date instanceof Date)) {
+    return date;
+  }
+
+  var normalized = new Date(date);
+  normalized.setHours(0, 0, 0, 0);
+  return normalized;
+}
+
+/**
  * Parse date from various input formats
+ * Returns date normalized to midnight (00:00:00) for consistent date-only handling
  *
  * @param {Date|string|number} dateValue - Date in various formats
- * @returns {Date} Parsed Date object
+ * @returns {Date} Parsed Date object normalized to midnight
  * @throws {Error} If date format is invalid
  */
 function parseDate(dateValue) {
@@ -460,24 +478,27 @@ function parseDate(dateValue) {
     throw new Error('Date value is required');
   }
 
+  var parsedDate;
+
   // Already a Date object
   if (dateValue instanceof Date) {
-    return dateValue;
+    parsedDate = dateValue;
   }
-
   // String or number - convert to Date
-  if (typeof dateValue === 'string' || typeof dateValue === 'number') {
-    var parsed = new Date(dateValue);
+  else if (typeof dateValue === 'string' || typeof dateValue === 'number') {
+    parsedDate = new Date(dateValue);
 
     // Check if valid date
-    if (isNaN(parsed.getTime())) {
+    if (isNaN(parsedDate.getTime())) {
       throw new Error('Invalid date format: ' + dateValue);
     }
-
-    return parsed;
+  }
+  else {
+    throw new Error('Invalid date format: ' + typeof dateValue);
   }
 
-  throw new Error('Invalid date format: ' + typeof dateValue);
+  // Normalize to midnight to strip time components
+  return normalizeToDateOnly(parsedDate);
 }
 
 /**
@@ -620,6 +641,26 @@ function formatDate(date) {
 }
 
 /**
+ * Format date to DD-MM-YYYY (European/South African format)
+ *
+ * @param {Date} date - Date to format
+ * @returns {string} Formatted date string
+ */
+function formatDateDDMMYYYY(date) {
+  if (!date) return '';
+
+  if (!(date instanceof Date)) {
+    date = new Date(date);
+  }
+
+  var year = date.getFullYear();
+  var month = ('0' + (date.getMonth() + 1)).slice(-2);
+  var day = ('0' + date.getDate()).slice(-2);
+
+  return day + '-' + month + '-' + year;
+}
+
+/**
  * Get current timestamp
  *
  * @returns {string} Current timestamp in readable format
@@ -688,9 +729,9 @@ function sanitizeForWeb(obj) {
     if (obj.hasOwnProperty(key)) {
       var value = obj[key];
 
-      // Convert Date objects to ISO strings
+      // Convert Date objects to DD-MM-YYYY format (date only, no time)
       if (value instanceof Date) {
-        sanitized[key] = value.toISOString();
+        sanitized[key] = formatDateDDMMYYYY(value);
       }
       // Convert null/undefined to empty string
       else if (value === null || value === undefined) {
