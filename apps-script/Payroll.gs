@@ -421,10 +421,9 @@ function listPayslips(filters) {
       filters = {};
     }
 
-    // Pagination settings - if no pageSize specified, return all payslips
+    // Pagination settings - default to 50 most recent payslips
     var page = filters.page ? parseInt(filters.page) : 1;
-    var pageSize = filters.pageSize ? parseInt(filters.pageSize) : null;
-    var usePagination = pageSize !== null;
+    var pageSize = filters.pageSize ? parseInt(filters.pageSize) : 50;
 
     const sheets = getSheets();
     const salarySheet = sheets.salary;
@@ -470,25 +469,21 @@ function listPayslips(filters) {
       });
     }
 
-    // Apply pagination only if pageSize is specified
+    // Sort by week ending date in descending order (newest first)
+    payslips.sort(function(a, b) {
+      const dateA = parseDate(a.WEEKENDING);
+      const dateB = parseDate(b.WEEKENDING);
+      return dateB - dateA; // Descending order (newest first)
+    });
+
+    // Calculate pagination
     var totalPayslips = payslips.length;
-    var pagePayslips;
-    var totalPages;
+    var totalPages = Math.ceil(totalPayslips / pageSize);
+    var startIndex = (page - 1) * pageSize;
+    var endIndex = Math.min(startIndex + pageSize, totalPayslips);
 
-    if (usePagination) {
-      // Calculate pagination
-      totalPages = Math.ceil(totalPayslips / pageSize);
-      var startIndex = (page - 1) * pageSize;
-      var endIndex = Math.min(startIndex + pageSize, totalPayslips);
-
-      // Get page slice
-      pagePayslips = payslips.slice(startIndex, endIndex);
-    } else {
-      // No pagination - return all payslips
-      pagePayslips = payslips;
-      totalPages = 1;
-      pageSize = totalPayslips;
-    }
+    // Get page slice (first 50 will be the most recent 50 after sorting)
+    var pagePayslips = payslips.slice(startIndex, endIndex);
 
     const sanitizedPayslips = pagePayslips.map(function(payslip) {
       return sanitizeForWeb(payslip);
