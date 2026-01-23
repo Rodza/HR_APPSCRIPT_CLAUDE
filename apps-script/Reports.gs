@@ -264,13 +264,34 @@ function generateIndividualStatementReport(employeeId, startDate, endDate) {
 
     Logger.log('Period: ' + formatDate(start) + ' to ' + formatDate(end));
 
-    // Get employee details
-    const empResult = getEmployeeById(employeeId);
-    if (!empResult.success) {
+    // Get employee details directly from sheet (don't use getEmployeeById API - it's for web calls)
+    const sheets = getSheets();
+    const empSheet = sheets.empdetails;
+
+    if (!empSheet) {
+      throw new Error('Employee Details sheet not found');
+    }
+
+    const empData = empSheet.getDataRange().getValues();
+    const empHeaders = empData[0];
+    const idCol = empHeaders.indexOf('id');
+
+    if (idCol === -1) {
+      throw new Error('ID column not found in Employee Details sheet');
+    }
+
+    let employee = null;
+    for (let i = 1; i < empData.length; i++) {
+      if (empData[i][idCol] === employeeId) {
+        employee = buildObjectFromRow(empData[i], empHeaders);
+        break;
+      }
+    }
+
+    if (!employee) {
       throw new Error('Employee not found: ' + employeeId);
     }
 
-    const employee = empResult.data;
     Logger.log('Employee: ' + employee.REFNAME);
 
     // Get opening balance (as of day before start date)
@@ -425,13 +446,31 @@ function generateLoanTransactionMatrixReport(startDate, endDate) {
 
     Logger.log('Period: ' + formatDate(start) + ' to ' + formatDate(end));
 
-    // Get all employees
-    const empResult = listEmployees({ activeOnly: false }); // Include inactive to show historical data
-    if (!empResult.success) {
-      throw new Error('Failed to get employees: ' + empResult.error);
+    // Get all employees directly from sheet (don't use listEmployees API - it's for web calls)
+    const sheets = getSheets();
+    const empSheet = sheets.empdetails;
+
+    if (!empSheet) {
+      throw new Error('Employee Details sheet not found');
     }
 
-    const employees = empResult.data.employees;
+    const empData = empSheet.getDataRange().getValues();
+    const empHeaders = empData[0];
+    const employees = [];
+
+    // Build employee objects from sheet rows
+    for (let i = 1; i < empData.length; i++) {
+      if (empData[i][0]) {  // Skip empty rows
+        try {
+          const employee = buildObjectFromRow(empData[i], empHeaders);
+          employees.push(employee);
+        } catch (error) {
+          // Skip invalid rows
+          Logger.log('⚠️ Skipping invalid employee row ' + (i + 1));
+        }
+      }
+    }
+
     Logger.log('📊 Processing ' + employees.length + ' employees');
 
     // Data structure: { employeeId: { name, employer, transactions: { date: amount }, currentBalance } }
