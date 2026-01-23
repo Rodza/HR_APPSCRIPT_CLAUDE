@@ -58,7 +58,7 @@
                             <input type="text" class="form-control">
                         </div>
 
-                        <button class="btn btn-primary w-100" onclick="generateLoansReport()">
+                        <button class="btn btn-primary w-100" id="generateLoansBtn">
                             <i class="fas fa-file-excel"></i> Generate Report
                         </button>
                     </div>
@@ -92,7 +92,7 @@
                             <input type="date" class="form-control" id="statementEndDate">
                         </div>
 
-                        <button class="btn btn-primary w-100" onclick="generateStatementReport()">
+                        <button class="btn btn-primary w-100" id="generateStatementBtn">
                             <i class="fas fa-file-excel"></i> Generate Report
                         </button>
                     </div>
@@ -124,7 +124,7 @@
                             <input type="text" class="form-control">
                         </div>
 
-                        <button class="btn btn-primary w-100" onclick="generateMatrixReport()">
+                        <button class="btn btn-primary w-100" id="generateMatrixBtn">
                             <i class="fas fa-file-excel"></i> Generate Report
                         </button>
                     </div>
@@ -156,7 +156,7 @@
                             <input type="text" class="form-control">
                         </div>
 
-                        <button class="btn btn-primary w-100" onclick="generateWeeklyReport()">
+                        <button class="btn btn-primary w-100" id="generateWeeklyBtn">
                             <i class="fas fa-file-excel"></i> Generate Report
                         </button>
                     </div>
@@ -188,7 +188,7 @@
                             <input type="text" class="form-control">
                         </div>
 
-                        <button class="btn btn-primary w-100" onclick="generateMonthlyReport()">
+                        <button class="btn btn-primary w-100" id="generateMonthlyBtn">
                             <i class="fas fa-file-excel"></i> Generate Report
                         </button>
                     </div>
@@ -222,7 +222,7 @@
                             <input type="date" class="form-control" id="leaveTrendsEndDate">
                         </div>
 
-                        <button class="btn btn-primary w-100" onclick="generateLeaveTrendsReport()">
+                        <button class="btn btn-primary w-100" id="generateLeaveTrendsBtn">
                             <i class="fas fa-file-excel"></i> Generate Report
                         </button>
                     </div>
@@ -542,6 +542,14 @@
                 // Scroll to results
                 document.getElementById('reportResults').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             }
+
+            // Attach event listeners to buttons
+            document.getElementById('generateLoansBtn').addEventListener('click', generateLoansReport);
+            document.getElementById('generateStatementBtn').addEventListener('click', generateStatementReport);
+            document.getElementById('generateMatrixBtn').addEventListener('click', generateMatrixReport);
+            document.getElementById('generateWeeklyBtn').addEventListener('click', generateWeeklyReport);
+            document.getElementById('generateMonthlyBtn').addEventListener('click', generateMonthlyReport);
+            document.getElementById('generateLeaveTrendsBtn').addEventListener('click', generateLeaveTrendsReport);
 
             // Load employees on page load
             loadEmployees();
