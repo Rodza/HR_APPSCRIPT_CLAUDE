@@ -842,7 +842,7 @@ function addPendingTimesheet(data) {
     // Generate ID
     const id = generateFullUUID();
     const importedBy = getCurrentUser();
-    const importedDate = new Date();
+    const importedDate = normalizeToDateOnly(new Date());
     const weekEnding = parseDate(data.weekEnding);
 
     // Prepare row data
@@ -1063,7 +1063,7 @@ function approveTimesheet(id) {
 
     pendingSheet.getRange(rowIndex, statusCol + 1).setValue('Approved');
     pendingSheet.getRange(rowIndex, reviewedByCol + 1).setValue(getCurrentUser());
-    pendingSheet.getRange(rowIndex, reviewedDateCol + 1).setValue(new Date());
+    pendingSheet.getRange(rowIndex, reviewedDateCol + 1).setValue(normalizeToDateOnly(new Date()));
 
     SpreadsheetApp.flush();
 
@@ -1133,7 +1133,7 @@ function rejectTimesheet(id, reason) {
     // Update status
     pendingSheet.getRange(rowIndex, statusCol + 1).setValue('Rejected');
     pendingSheet.getRange(rowIndex, reviewedByCol + 1).setValue(getCurrentUser());
-    pendingSheet.getRange(rowIndex, reviewedDateCol + 1).setValue(new Date());
+    pendingSheet.getRange(rowIndex, reviewedDateCol + 1).setValue(normalizeToDateOnly(new Date()));
 
     if (reason) {
       const currentNotes = sheetData[rowIndex - 1][notesCol] || '';
@@ -1257,22 +1257,12 @@ function listPendingTimesheets(filters) {
     Logger.log('✅ Found ' + records.length + ' pending timesheets');
     Logger.log('========== LIST PENDING TIMESHEETS COMPLETE ==========\n');
 
-    // Serialize date fields to prevent "no response" error
-    const serializedRecords = records.map(record => {
-      const serialized = {};
-      for (const key in record) {
-        const value = record[key];
-        // Convert Date objects to ISO strings
-        if (value instanceof Date) {
-          serialized[key] = value.toISOString();
-        } else {
-          serialized[key] = value;
-        }
-      }
-      return serialized;
+    // Sanitize records for web serialization (dates to DD-MM-YYYY format)
+    const sanitizedRecords = records.map(function(record) {
+      return sanitizeForWeb(record);
     });
 
-    return { success: true, data: serializedRecords };
+    return { success: true, data: sanitizedRecords };
 
   } catch (error) {
     Logger.log('❌ ERROR in listPendingTimesheets: ' + error.message);
@@ -2356,7 +2346,7 @@ function createEnhancedPendingTimesheet(data) {
       data.notes || '',                // 17. NOTES ✅ Fixed position
       'Pending',                       // 18. STATUS ✅ Fixed position
       getCurrentUser(),                // 19. IMPORTED_BY ✅ Fixed position
-      new Date(),                      // 20. IMPORTED_DATE ✅ Fixed position
+      normalizeToDateOnly(new Date()), // 20. IMPORTED_DATE ✅ Fixed position
       '',                              // 21. REVIEWED_BY ✅ Fixed position
       '',                              // 22. REVIEWED_DATE ✅ Fixed position
       '',                              // 23. PAYSLIP_ID ✅ Fixed position
