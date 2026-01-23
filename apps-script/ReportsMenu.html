@@ -309,7 +309,7 @@
                 .withFailureHandler(function(error) {
                     showError('Error: ' + error.message);
                 })
-                .listEmployees({}, SESSION_TOKEN);
+                .getEmployeesForDropdown();
         }
 
         function generateLoansReport() {
