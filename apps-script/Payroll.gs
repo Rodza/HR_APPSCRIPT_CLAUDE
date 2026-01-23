@@ -421,9 +421,10 @@ function listPayslips(filters) {
       filters = {};
     }
 
-    // Default pagination settings
+    // Pagination settings - if no pageSize specified, return all payslips
     var page = filters.page ? parseInt(filters.page) : 1;
-    var pageSize = filters.pageSize ? parseInt(filters.pageSize) : 50;
+    var pageSize = filters.pageSize ? parseInt(filters.pageSize) : null;
+    var usePagination = pageSize !== null;
 
     const sheets = getSheets();
     const salarySheet = sheets.salary;
@@ -469,14 +470,25 @@ function listPayslips(filters) {
       });
     }
 
-    // Calculate pagination
+    // Apply pagination only if pageSize is specified
     var totalPayslips = payslips.length;
-    var totalPages = Math.ceil(totalPayslips / pageSize);
-    var startIndex = (page - 1) * pageSize;
-    var endIndex = Math.min(startIndex + pageSize, totalPayslips);
+    var pagePayslips;
+    var totalPages;
 
-    // Get page slice
-    var pagePayslips = payslips.slice(startIndex, endIndex);
+    if (usePagination) {
+      // Calculate pagination
+      totalPages = Math.ceil(totalPayslips / pageSize);
+      var startIndex = (page - 1) * pageSize;
+      var endIndex = Math.min(startIndex + pageSize, totalPayslips);
+
+      // Get page slice
+      pagePayslips = payslips.slice(startIndex, endIndex);
+    } else {
+      // No pagination - return all payslips
+      pagePayslips = payslips;
+      totalPages = 1;
+      pageSize = totalPayslips;
+    }
 
     const sanitizedPayslips = pagePayslips.map(function(payslip) {
       return sanitizeForWeb(payslip);
