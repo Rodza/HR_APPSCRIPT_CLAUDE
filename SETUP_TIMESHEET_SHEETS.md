@@ -4,7 +4,7 @@
 
 The Timesheet Import system requires 3 sheets with specific column headers:
 
-1. **RAW_CLOCK_DATA** (14 columns)
+1. **RAW_CLOCK_DATA** (21 columns)
 2. **CLOCK_IN_IMPORTS** (14 columns)
 3. **PENDING_TIMESHEETS** (25 columns)
 
@@ -39,7 +39,7 @@ Run these functions separately if you only need specific sheets:
 
 ## Sheet Specifications
 
-### 1. RAW_CLOCK_DATA (14 columns)
+### 1. RAW_CLOCK_DATA (21 columns)
 
 Stores permanent record of all clock-in transactions.
 
@@ -55,10 +55,17 @@ Stores permanent record of all clock-in transactions.
 8.  DEVICE_NAME - Clock In/Bathroom/Exit
 9.  PUNCH_TIME - Actual punch timestamp
 10. DEPARTMENT - From clock-in data
-11. STATUS - Draft/Reviewed/Approved/Locked
-12. CREATED_DATE - When record was imported
-13. LOCKED_DATE - When record was locked
-14. LOCKED_BY - User who locked record
+11. DEVICE_SN - Device serial number
+12. TYPE - Transaction type (Normal, etc.)
+13. SOURCE - Transaction source (Access Device, etc.)
+14. TIME_ZONE - Timezone from device
+15. VERIFICATION_MODE - Verification method (Face, Fingerprint, etc.)
+16. MOBILE_PUNCHCARD - Mobile punchcard number if applicable
+17. UPLOAD_TIME - When data was uploaded from device
+18. STATUS - Draft/Reviewed/Approved/Locked
+19. CREATED_DATE - When record was imported
+20. LOCKED_DATE - When record was locked
+21. LOCKED_BY - User who locked record
 ```
 
 **Purpose:**
