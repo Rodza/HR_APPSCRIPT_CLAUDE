@@ -1018,7 +1018,8 @@ function approveTimesheet(id) {
     const weekEndingDate = new Date(importDate);
     weekEndingDate.setDate(importDate.getDate() + daysToFriday);
 
-    const weekEnding = weekEndingDate;
+    // Normalize to date-only format (strip time components)
+    const weekEnding = normalizeToDateOnly(weekEndingDate);
     const duplicatePayslip = checkDuplicatePayslip(timesheetRecord['EMPLOYEE NAME'], weekEnding);
 
     if (duplicatePayslip) {
