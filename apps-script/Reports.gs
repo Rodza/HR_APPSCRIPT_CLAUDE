@@ -33,11 +33,20 @@ function generateOutstandingLoansReport(asOfDate) {
     const reportDate = asOfDate ? parseDate(asOfDate) : new Date();
     Logger.log('Report as of: ' + formatDate(reportDate));
 
-    // Get all employees
-    const empResult = listEmployees({ activeOnly: true });
+    // Get ALL employees (not just active) - even resigned employees can have outstanding loans
+    // Don't use activeOnly filter as it excludes employees based on EMPLOYMENT STATUS
+    // Request large page size to get all employees in one call
+    const empResult = listEmployees({ pageSize: 10000 });
     if (!empResult.success) {
+      Logger.log('❌ Failed to get employees: ' + empResult.error);
       throw new Error('Failed to get employees: ' + empResult.error);
     }
+
+    Logger.log('📋 Employee result: ' + JSON.stringify({
+      success: empResult.success,
+      employeeCount: empResult.data.employees.length,
+      pagination: empResult.data.pagination
+    }));
 
     const employees = empResult.data.employees;
     Logger.log('📊 Processing ' + employees.length + ' employees');
