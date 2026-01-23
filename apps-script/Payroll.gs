@@ -421,7 +421,7 @@ function listPayslips(filters) {
       filters = {};
     }
 
-    // Default pagination settings
+    // Pagination settings - default to 50 most recent payslips
     var page = filters.page ? parseInt(filters.page) : 1;
     var pageSize = filters.pageSize ? parseInt(filters.pageSize) : 50;
 
@@ -469,13 +469,20 @@ function listPayslips(filters) {
       });
     }
 
+    // Sort by week ending date in descending order (newest first)
+    payslips.sort(function(a, b) {
+      const dateA = parseDate(a.WEEKENDING);
+      const dateB = parseDate(b.WEEKENDING);
+      return dateB - dateA; // Descending order (newest first)
+    });
+
     // Calculate pagination
     var totalPayslips = payslips.length;
     var totalPages = Math.ceil(totalPayslips / pageSize);
     var startIndex = (page - 1) * pageSize;
     var endIndex = Math.min(startIndex + pageSize, totalPayslips);
 
-    // Get page slice
+    // Get page slice (first 50 will be the most recent 50 after sorting)
     var pagePayslips = payslips.slice(startIndex, endIndex);
 
     const sanitizedPayslips = pagePayslips.map(function(payslip) {
