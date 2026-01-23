@@ -265,284 +265,287 @@
     </div>
 
     <script>
-        // Set today's date as default for all date fields
-        const today = new Date().toISOString().split('T')[0];
-        document.getElementById('loansReportDate').value = today;
-        document.getElementById('weeklyReportDate').value = today;
+        // Wrap in IIFE to prevent variable redeclaration errors when module is reloaded
+        (function() {
+            // Set today's date as default for all date fields
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('loansReportDate').value = today;
+            document.getElementById('weeklyReportDate').value = today;
 
-        // Set current month as default for monthly report
-        const currentMonth = new Date().toISOString().substring(0, 7);
-        document.getElementById('monthlyReportMonth').value = currentMonth;
+            // Set current month as default for monthly report
+            const currentMonth = new Date().toISOString().substring(0, 7);
+            document.getElementById('monthlyReportMonth').value = currentMonth;
 
-        // Set default dates for matrix report (current year)
-        const yearStart = new Date(new Date().getFullYear(), 0, 1);
-        document.getElementById('matrixStartDate').value = yearStart.toISOString().split('T')[0];
-        document.getElementById('matrixEndDate').value = today;
+            // Set default dates for matrix report (current year)
+            const yearStart = new Date(new Date().getFullYear(), 0, 1);
+            document.getElementById('matrixStartDate').value = yearStart.toISOString().split('T')[0];
+            document.getElementById('matrixEndDate').value = today;
 
-        // Set default dates for leave trends report (past year)
-        const oneYearAgo = new Date();
-        oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-        document.getElementById('leaveTrendsStartDate').value = oneYearAgo.toISOString().split('T')[0];
-        document.getElementById('leaveTrendsEndDate').value = today;
+            // Set default dates for leave trends report (past year)
+            const oneYearAgo = new Date();
+            oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+            document.getElementById('leaveTrendsStartDate').value = oneYearAgo.toISOString().split('T')[0];
+            document.getElementById('leaveTrendsEndDate').value = today;
 
-        // Load employees for Individual Statement dropdown
-        function loadEmployees() {
-            google.script.run
-                .withSuccessHandler(function(result) {
-                    if (result.success) {
-                        const select = document.getElementById('statementEmployee');
-                        select.innerHTML = '<option value="">Select Employee</option>' +
-                            result.data.employees.map(emp =>
-                                `<option value="${emp.id}">${emp.REFNAME}</option>`
-                            ).join('');
+            // Load employees for Individual Statement dropdown
+            function loadEmployees() {
+                google.script.run
+                    .withSuccessHandler(function(result) {
+                        if (result.success) {
+                            const select = document.getElementById('statementEmployee');
+                            select.innerHTML = '<option value="">Select Employee</option>' +
+                                result.data.employees.map(emp =>
+                                    `<option value="${emp.id}">${emp.REFNAME}</option>`
+                                ).join('');
 
-                        // Also populate leave trends employee dropdown
-                        const leaveTrendsSelect = document.getElementById('leaveTrendsEmployee');
-                        leaveTrendsSelect.innerHTML = '<option value="">All Employees</option>' +
-                            result.data.employees.map(emp =>
-                                `<option value="${emp.REFNAME}">${emp.REFNAME}</option>`
-                            ).join('');
-                    } else {
-                        showError('Failed to load employees: ' + result.error);
-                    }
-                })
-                .withFailureHandler(function(error) {
-                    showError('Error: ' + error.message);
-                })
-                .getEmployeesForDropdown();
-        }
-
-        function generateLoansReport() {
-            const asOfDate = document.getElementById('loansReportDate').value;
-
-            if (!asOfDate) {
-                showError('Please select an as-of date');
-                return;
+                            // Also populate leave trends employee dropdown
+                            const leaveTrendsSelect = document.getElementById('leaveTrendsEmployee');
+                            leaveTrendsSelect.innerHTML = '<option value="">All Employees</option>' +
+                                result.data.employees.map(emp =>
+                                    `<option value="${emp.REFNAME}">${emp.REFNAME}</option>`
+                                ).join('');
+                        } else {
+                            showError('Failed to load employees: ' + result.error);
+                        }
+                    })
+                    .withFailureHandler(function(error) {
+                        showError('Error: ' + error.message);
+                    })
+                    .getEmployeesForDropdown();
             }
 
-            showLoading();
-            showInfo('Generating Outstanding Loans Report... This may take a moment.');
+            function generateLoansReport() {
+                const asOfDate = document.getElementById('loansReportDate').value;
 
-            google.script.run
-                .withSuccessHandler(function(result) {
-                    hideLoading();
-                    if (result.success) {
-                        showReportResult(
-                            'Outstanding Loans Report',
-                            result.data.url,
-                            `As of: ${formatDate(asOfDate)} | Employees with loans: ${result.data.employeeCount} | Total Outstanding: ${formatCurrency(result.data.totalOutstanding)}`
-                        );
-                    } else {
-                        showError('Failed to generate report: ' + result.error);
-                    }
-                })
-                .withFailureHandler(function(error) {
-                    hideLoading();
-                    showError('Error: ' + error.message);
-                })
-                .generateOutstandingLoansReport(asOfDate);
-        }
+                if (!asOfDate) {
+                    showError('Please select an as-of date');
+                    return;
+                }
 
-        function generateStatementReport() {
-            const employeeId = document.getElementById('statementEmployee').value;
-            const startDate = document.getElementById('statementStartDate').value;
-            const endDate = document.getElementById('statementEndDate').value;
+                showLoading();
+                showInfo('Generating Outstanding Loans Report... This may take a moment.');
 
-            if (!employeeId) {
-                showError('Please select an employee');
-                return;
+                google.script.run
+                    .withSuccessHandler(function(result) {
+                        hideLoading();
+                        if (result.success) {
+                            showReportResult(
+                                'Outstanding Loans Report',
+                                result.data.url,
+                                `As of: ${formatDate(asOfDate)} | Employees with loans: ${result.data.employeeCount} | Total Outstanding: ${formatCurrency(result.data.totalOutstanding)}`
+                            );
+                        } else {
+                            showError('Failed to generate report: ' + result.error);
+                        }
+                    })
+                    .withFailureHandler(function(error) {
+                        hideLoading();
+                        showError('Error: ' + error.message);
+                    })
+                    .generateOutstandingLoansReport(asOfDate);
             }
 
-            if (!startDate || !endDate) {
-                showError('Please select both start and end dates');
-                return;
+            function generateStatementReport() {
+                const employeeId = document.getElementById('statementEmployee').value;
+                const startDate = document.getElementById('statementStartDate').value;
+                const endDate = document.getElementById('statementEndDate').value;
+
+                if (!employeeId) {
+                    showError('Please select an employee');
+                    return;
+                }
+
+                if (!startDate || !endDate) {
+                    showError('Please select both start and end dates');
+                    return;
+                }
+
+                if (new Date(endDate) < new Date(startDate)) {
+                    showError('End date must be after start date');
+                    return;
+                }
+
+                showLoading();
+                showInfo('Generating Individual Statement... This may take a moment.');
+
+                google.script.run
+                    .withSuccessHandler(function(result) {
+                        hideLoading();
+                        if (result.success) {
+                            showReportResult(
+                                'Individual Statement',
+                                result.data.url,
+                                `Employee: ${result.data.employeeName} | Period: ${formatDate(startDate)} to ${formatDate(endDate)} | Transactions: ${result.data.transactionCount} | Closing Balance: ${formatCurrency(result.data.closingBalance)}`
+                            );
+                        } else {
+                            showError('Failed to generate report: ' + result.error);
+                        }
+                    })
+                    .withFailureHandler(function(error) {
+                        hideLoading();
+                        showError('Error: ' + error.message);
+                    })
+                    .generateIndividualStatementReport(employeeId, startDate, endDate);
             }
 
-            if (new Date(endDate) < new Date(startDate)) {
-                showError('End date must be after start date');
-                return;
+            function generateMatrixReport() {
+                const startDate = document.getElementById('matrixStartDate').value;
+                const endDate = document.getElementById('matrixEndDate').value;
+
+                if (!startDate || !endDate) {
+                    showError('Please select both start and end dates');
+                    return;
+                }
+
+                if (new Date(endDate) < new Date(startDate)) {
+                    showError('End date must be after start date');
+                    return;
+                }
+
+                showLoading();
+                showInfo('Generating Loan Transaction Matrix Report... This may take a moment.');
+
+                google.script.run
+                    .withSuccessHandler(function(result) {
+                        hideLoading();
+                        if (result.success) {
+                            showReportResult(
+                                'Loan Transaction Matrix Report',
+                                result.data.url,
+                                `Period: ${formatDate(startDate)} to ${formatDate(endDate)} | Employees with transactions: ${result.data.employeeCount} | Transaction dates: ${result.data.transactionDateCount}`
+                            );
+                        } else {
+                            showError('Failed to generate report: ' + result.error);
+                        }
+                    })
+                    .withFailureHandler(function(error) {
+                        hideLoading();
+                        showError('Error: ' + error.message);
+                    })
+                    .generateLoanTransactionMatrixReport(startDate, endDate);
             }
 
-            showLoading();
-            showInfo('Generating Individual Statement... This may take a moment.');
+            function generateWeeklyReport() {
+                const weekEnding = document.getElementById('weeklyReportDate').value;
 
-            google.script.run
-                .withSuccessHandler(function(result) {
-                    hideLoading();
-                    if (result.success) {
-                        showReportResult(
-                            'Individual Statement',
-                            result.data.url,
-                            `Employee: ${result.data.employeeName} | Period: ${formatDate(startDate)} to ${formatDate(endDate)} | Transactions: ${result.data.transactionCount} | Closing Balance: ${formatCurrency(result.data.closingBalance)}`
-                        );
-                    } else {
-                        showError('Failed to generate report: ' + result.error);
-                    }
-                })
-                .withFailureHandler(function(error) {
-                    hideLoading();
-                    showError('Error: ' + error.message);
-                })
-                .generateIndividualStatementReport(employeeId, startDate, endDate);
-        }
+                if (!weekEnding) {
+                    showError('Please select week ending date');
+                    return;
+                }
 
-        function generateMatrixReport() {
-            const startDate = document.getElementById('matrixStartDate').value;
-            const endDate = document.getElementById('matrixEndDate').value;
+                showLoading();
+                showInfo('Generating Weekly Payroll Summary... This may take a moment.');
 
-            if (!startDate || !endDate) {
-                showError('Please select both start and end dates');
-                return;
+                google.script.run
+                    .withSuccessHandler(function(result) {
+                        hideLoading();
+                        if (result.success) {
+                            showReportResult(
+                                'Weekly Payroll Summary',
+                                result.data.url,
+                                `Week Ending: ${formatDate(weekEnding)} | Employees: ${result.data.totalEmployees} | Total Paid to Accounts: ${formatCurrency(result.data.totalPaidToAccounts)}`
+                            );
+                        } else {
+                            showError('Failed to generate report: ' + result.error);
+                        }
+                    })
+                    .withFailureHandler(function(error) {
+                        hideLoading();
+                        showError('Error: ' + error.message);
+                    })
+                    .generateWeeklyPayrollSummaryReport(weekEnding);
             }
 
-            if (new Date(endDate) < new Date(startDate)) {
-                showError('End date must be after start date');
-                return;
+            function generateMonthlyReport() {
+                const monthInput = document.getElementById('monthlyReportMonth').value;
+
+                if (!monthInput) {
+                    showError('Please select a month');
+                    return;
+                }
+
+                // Convert YYYY-MM to a date (use 15th of month as mid-point)
+                const monthDate = monthInput + '-15';
+
+                showLoading();
+                showInfo('Generating Monthly Payroll Summary... This may take a moment.');
+
+                google.script.run
+                    .withSuccessHandler(function(result) {
+                        hideLoading();
+                        if (result.success) {
+                            showReportResult(
+                                'Monthly Payroll Summary',
+                                result.data.url,
+                                `Month: ${result.data.month} | Period: ${formatDate(result.data.periodStart)} to ${formatDate(result.data.periodEnd)} | Employees: ${result.data.totalEmployees} | Total Net Pay: ${formatCurrency(result.data.totalNetPay)}`
+                            );
+                        } else {
+                            showError('Failed to generate report: ' + result.error);
+                        }
+                    })
+                    .withFailureHandler(function(error) {
+                        hideLoading();
+                        showError('Error: ' + error.message);
+                    })
+                    .generateMonthlyPayrollSummaryReport(monthDate);
             }
 
-            showLoading();
-            showInfo('Generating Loan Transaction Matrix Report... This may take a moment.');
+            function generateLeaveTrendsReport() {
+                const employeeName = document.getElementById('leaveTrendsEmployee').value;
+                const startDate = document.getElementById('leaveTrendsStartDate').value;
+                const endDate = document.getElementById('leaveTrendsEndDate').value;
 
-            google.script.run
-                .withSuccessHandler(function(result) {
-                    hideLoading();
-                    if (result.success) {
-                        showReportResult(
-                            'Loan Transaction Matrix Report',
-                            result.data.url,
-                            `Period: ${formatDate(startDate)} to ${formatDate(endDate)} | Employees with transactions: ${result.data.employeeCount} | Transaction dates: ${result.data.transactionDateCount}`
-                        );
-                    } else {
-                        showError('Failed to generate report: ' + result.error);
-                    }
-                })
-                .withFailureHandler(function(error) {
-                    hideLoading();
-                    showError('Error: ' + error.message);
-                })
-                .generateLoanTransactionMatrixReport(startDate, endDate);
-        }
+                if (!startDate || !endDate) {
+                    showError('Please select both start and end dates');
+                    return;
+                }
 
-        function generateWeeklyReport() {
-            const weekEnding = document.getElementById('weeklyReportDate').value;
+                if (new Date(endDate) < new Date(startDate)) {
+                    showError('End date must be after start date');
+                    return;
+                }
 
-            if (!weekEnding) {
-                showError('Please select week ending date');
-                return;
+                showLoading();
+                showInfo('Generating Employee Leave Trends Report... This may take a moment.');
+
+                google.script.run
+                    .withSuccessHandler(function(result) {
+                        hideLoading();
+                        if (result.success) {
+                            const empText = employeeName ? 'Employee: ' + employeeName : 'All Employees';
+                            showReportResult(
+                                'Employee Leave Trends Report',
+                                result.data.url,
+                                `${empText} | Period: ${formatDate(startDate)} to ${formatDate(endDate)} | Employees Analyzed: ${result.data.totalEmployees} | Leave Records: ${result.data.totalLeaveRecords}`
+                            );
+                        } else {
+                            showError('Failed to generate report: ' + result.error);
+                        }
+                    })
+                    .withFailureHandler(function(error) {
+                        hideLoading();
+                        showError('Error: ' + error.message);
+                    })
+                    .generateLeaveTrendsReport(startDate, endDate, employeeName || null);
             }
 
-            showLoading();
-            showInfo('Generating Weekly Payroll Summary... This may take a moment.');
+            function showReportResult(reportName, url, details) {
+                document.getElementById('reportMessage').innerHTML = `
+                    <strong>${reportName}</strong><br>
+                    <small>${details}</small>
+                `;
+                document.getElementById('reportLink').href = url;
+                document.getElementById('reportResults').style.display = 'block';
 
-            google.script.run
-                .withSuccessHandler(function(result) {
-                    hideLoading();
-                    if (result.success) {
-                        showReportResult(
-                            'Weekly Payroll Summary',
-                            result.data.url,
-                            `Week Ending: ${formatDate(weekEnding)} | Employees: ${result.data.totalEmployees} | Total Paid to Accounts: ${formatCurrency(result.data.totalPaidToAccounts)}`
-                        );
-                    } else {
-                        showError('Failed to generate report: ' + result.error);
-                    }
-                })
-                .withFailureHandler(function(error) {
-                    hideLoading();
-                    showError('Error: ' + error.message);
-                })
-                .generateWeeklyPayrollSummaryReport(weekEnding);
-        }
+                showSuccess(reportName + ' generated successfully!');
 
-        function generateMonthlyReport() {
-            const monthInput = document.getElementById('monthlyReportMonth').value;
-
-            if (!monthInput) {
-                showError('Please select a month');
-                return;
+                // Scroll to results
+                document.getElementById('reportResults').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             }
 
-            // Convert YYYY-MM to a date (use 15th of month as mid-point)
-            const monthDate = monthInput + '-15';
-
-            showLoading();
-            showInfo('Generating Monthly Payroll Summary... This may take a moment.');
-
-            google.script.run
-                .withSuccessHandler(function(result) {
-                    hideLoading();
-                    if (result.success) {
-                        showReportResult(
-                            'Monthly Payroll Summary',
-                            result.data.url,
-                            `Month: ${result.data.month} | Period: ${formatDate(result.data.periodStart)} to ${formatDate(result.data.periodEnd)} | Employees: ${result.data.totalEmployees} | Total Net Pay: ${formatCurrency(result.data.totalNetPay)}`
-                        );
-                    } else {
-                        showError('Failed to generate report: ' + result.error);
-                    }
-                })
-                .withFailureHandler(function(error) {
-                    hideLoading();
-                    showError('Error: ' + error.message);
-                })
-                .generateMonthlyPayrollSummaryReport(monthDate);
-        }
-
-        function generateLeaveTrendsReport() {
-            const employeeName = document.getElementById('leaveTrendsEmployee').value;
-            const startDate = document.getElementById('leaveTrendsStartDate').value;
-            const endDate = document.getElementById('leaveTrendsEndDate').value;
-
-            if (!startDate || !endDate) {
-                showError('Please select both start and end dates');
-                return;
-            }
-
-            if (new Date(endDate) < new Date(startDate)) {
-                showError('End date must be after start date');
-                return;
-            }
-
-            showLoading();
-            showInfo('Generating Employee Leave Trends Report... This may take a moment.');
-
-            google.script.run
-                .withSuccessHandler(function(result) {
-                    hideLoading();
-                    if (result.success) {
-                        const empText = employeeName ? 'Employee: ' + employeeName : 'All Employees';
-                        showReportResult(
-                            'Employee Leave Trends Report',
-                            result.data.url,
-                            `${empText} | Period: ${formatDate(startDate)} to ${formatDate(endDate)} | Employees Analyzed: ${result.data.totalEmployees} | Leave Records: ${result.data.totalLeaveRecords}`
-                        );
-                    } else {
-                        showError('Failed to generate report: ' + result.error);
-                    }
-                })
-                .withFailureHandler(function(error) {
-                    hideLoading();
-                    showError('Error: ' + error.message);
-                })
-                .generateLeaveTrendsReport(startDate, endDate, employeeName || null);
-        }
-
-        function showReportResult(reportName, url, details) {
-            document.getElementById('reportMessage').innerHTML = `
-                <strong>${reportName}</strong><br>
-                <small>${details}</small>
-            `;
-            document.getElementById('reportLink').href = url;
-            document.getElementById('reportResults').style.display = 'block';
-
-            showSuccess(reportName + ' generated successfully!');
-
-            // Scroll to results
-            document.getElementById('reportResults').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        }
-
-        // Load employees on page load
-        loadEmployees();
+            // Load employees on page load
+            loadEmployees();
+        })();
     </script>
 </body>
 </html>
