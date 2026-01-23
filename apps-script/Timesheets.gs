@@ -1760,6 +1760,10 @@ function parseClockDataExcel_v2(fileBlob) {
       else if (header.indexOf('device sn') >= 0) colMap.deviceSn = i;
       else if (header.indexOf('type') >= 0) colMap.type = i;
       else if (header.indexOf('source') >= 0) colMap.source = i;
+      else if (header.indexOf('time zone') >= 0 || header.indexOf('timezone') >= 0) colMap.timeZone = i;
+      else if (header.indexOf('verification mode') >= 0) colMap.verificationMode = i;
+      else if (header.indexOf('mobile punchcard') >= 0 || header.indexOf('mobile punch') >= 0) colMap.mobilePunchcard = i;
+      else if (header.indexOf('upload time') >= 0) colMap.uploadTime = i;
     }
 
     Logger.log('📋 Column mapping: ' + JSON.stringify(colMap));
@@ -1926,7 +1930,11 @@ function parseClockDataExcel_v2(fileBlob) {
         DeviceName: String(row[colMap.deviceName] || '').trim(),
         DeviceSN: colMap.deviceSn !== undefined ? String(row[colMap.deviceSn] || '').trim() : '',
         Type: colMap.type !== undefined ? String(row[colMap.type] || '').trim() : '',
-        Source: colMap.source !== undefined ? String(row[colMap.source] || '').trim() : ''
+        Source: colMap.source !== undefined ? String(row[colMap.source] || '').trim() : '',
+        TimeZone: colMap.timeZone !== undefined ? String(row[colMap.timeZone] || '').trim() : '',
+        VerificationMode: colMap.verificationMode !== undefined ? String(row[colMap.verificationMode] || '').trim() : '',
+        MobilePunchcard: colMap.mobilePunchcard !== undefined ? String(row[colMap.mobilePunchcard] || '').trim() : '',
+        UploadTime: colMap.uploadTime !== undefined ? row[colMap.uploadTime] : ''
       };
 
       records.push(record);
@@ -2107,6 +2115,13 @@ function storeRawClockData(clockRecords, importId) {
         record.DeviceName,                     // DEVICE_NAME
         record.PunchTime,                      // PUNCH_TIME
         record.Department,                     // DEPARTMENT
+        record.DeviceSN || '',                 // DEVICE_SN
+        record.Type || '',                     // TYPE
+        record.Source || '',                   // SOURCE
+        record.TimeZone || '',                 // TIME_ZONE
+        record.VerificationMode || '',         // VERIFICATION_MODE
+        record.MobilePunchcard || '',          // MOBILE_PUNCHCARD
+        record.UploadTime || '',               // UPLOAD_TIME
         'Draft',                               // STATUS
         new Date(),                            // CREATED_DATE
         '',                                    // LOCKED_DATE

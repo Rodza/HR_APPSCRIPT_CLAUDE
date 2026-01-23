@@ -296,6 +296,13 @@ var RAW_CLOCK_DATA_COLUMNS = [
   'DEVICE_NAME',             // Clock In/Bathroom Entry/Exit
   'PUNCH_TIME',              // Actual punch timestamp
   'DEPARTMENT',              // From clock-in data
+  'DEVICE_SN',               // Device serial number
+  'TYPE',                    // Transaction type (Normal, etc.)
+  'SOURCE',                  // Transaction source (Access Device, etc.)
+  'TIME_ZONE',               // Timezone from device
+  'VERIFICATION_MODE',       // Verification method (Face, Fingerprint, etc.)
+  'MOBILE_PUNCHCARD',        // Mobile punchcard number if applicable
+  'UPLOAD_TIME',             // When data was uploaded from device
   'STATUS',                  // Draft/Reviewed/Approved/Locked
   'CREATED_DATE',            // When record was imported
   'LOCKED_DATE',             // When record was locked
