@@ -188,9 +188,9 @@ function addLoanTransaction(data) {
 function getCurrentLoanBalance(employeeId, asOfDate) {
   try {
     Logger.log('\n========== GET CURRENT LOAN BALANCE ==========');
-    Logger.log('Employee ID: ' + employeeId);
+    Logger.log('Employee ID: ' + employeeId + ' (type: ' + typeof employeeId + ')');
     if (asOfDate) {
-      Logger.log('As of date: ' + formatDate(asOfDate));
+      Logger.log('As of date (raw): ' + asOfDate + ' (type: ' + typeof asOfDate + ')');
     }
 
     const sheets = getSheets();
@@ -202,6 +202,7 @@ function getCurrentLoanBalance(employeeId, asOfDate) {
 
     const data = loanSheet.getDataRange().getValues();
     const headers = data[0];
+    Logger.log('Total rows in EmployeeLoans: ' + (data.length - 1));
 
     // Find column indexes
     const empIdCol = findColumnIndex(headers, 'Employee ID');
@@ -209,24 +210,44 @@ function getCurrentLoanBalance(employeeId, asOfDate) {
     const timestampCol = findColumnIndex(headers, 'Timestamp');
     const balanceAfterCol = findColumnIndex(headers, 'BalanceAfter');
 
+    Logger.log('Column indexes - EmpID: ' + empIdCol + ', TransDate: ' + transDateCol + ', Balance: ' + balanceAfterCol);
+
     if (empIdCol === -1 || transDateCol === -1 || balanceAfterCol === -1) {
       throw new Error('Required columns not found in EmployeeLoans sheet');
     }
 
-    // Parse asOfDate if provided - normalize to start of day for comparison
-    let filterDate = null;
+    // Convert asOfDate to YYYY-MM-DD string for simple comparison
+    let filterDateString = null;
     if (asOfDate) {
-      filterDate = parseDate(asOfDate);
-      // Normalize to end of day for inclusive comparison
-      filterDate = new Date(filterDate.getFullYear(), filterDate.getMonth(), filterDate.getDate(), 23, 59, 59, 999);
-      Logger.log('Filter date (end of day): ' + filterDate.toISOString());
+      const filterDate = parseDate(asOfDate);
+      filterDateString = filterDate.getFullYear() + '-' +
+                        String(filterDate.getMonth() + 1).padStart(2, '0') + '-' +
+                        String(filterDate.getDate()).padStart(2, '0');
+      Logger.log('Filter date string (YYYY-MM-DD): ' + filterDateString);
     }
 
     // Filter records for this employee
     const employeeRecords = [];
+    let rowsChecked = 0;
+    let rowsMatchedEmployee = 0;
+    let rowsPassedDateFilter = 0;
+
     for (let i = 1; i < data.length; i++) {
       const row = data[i];
+      rowsChecked++;
+
+      // Debug: Log first 3 rows
+      if (i <= 3) {
+        Logger.log('Row ' + i + ' Employee ID: "' + row[empIdCol] + '" (type: ' + typeof row[empIdCol] + ')');
+      }
+
       if (row[empIdCol] === employeeId) {
+        rowsMatchedEmployee++;
+
+        if (rowsMatchedEmployee <= 3) {
+          Logger.log('✓ Row ' + i + ' matches employee ' + employeeId);
+        }
+
         try {
           // Skip if critical data is missing
           if (!row[transDateCol] || !row[timestampCol]) {
@@ -241,16 +262,26 @@ function getCurrentLoanBalance(employeeId, asOfDate) {
           }
 
           const transactionDate = parseDate(row[transDateCol]);
-          // Normalize transaction date to compare dates only (ignore time)
-          const transactionDateOnly = new Date(transactionDate.getFullYear(), transactionDate.getMonth(), transactionDate.getDate());
 
-          // Filter by asOfDate if provided
-          if (filterDate) {
-            const filterDateOnly = new Date(filterDate.getFullYear(), filterDate.getMonth(), filterDate.getDate());
-            if (transactionDateOnly > filterDateOnly) {
-              Logger.log('⚠️ Skipping row ' + (i + 1) + ' - transaction date ' + formatDate(transactionDate) + ' after as-of date ' + formatDate(filterDate));
+          // Convert transaction date to YYYY-MM-DD string for simple comparison
+          const transDateString = transactionDate.getFullYear() + '-' +
+                                 String(transactionDate.getMonth() + 1).padStart(2, '0') + '-' +
+                                 String(transactionDate.getDate()).padStart(2, '0');
+
+          // Filter by asOfDate if provided (simple string comparison)
+          if (filterDateString) {
+            if (transDateString > filterDateString) {
+              if (rowsMatchedEmployee <= 3) {
+                Logger.log('⚠️ Skipping row ' + (i + 1) + ' - transaction date ' + transDateString + ' after filter date ' + filterDateString);
+              }
               continue;
             }
+          }
+
+          rowsPassedDateFilter++;
+
+          if (rowsPassedDateFilter <= 3) {
+            Logger.log('✓ Row ' + i + ' passed date filter. Date: ' + transDateString + ', Balance: R' + balanceAfter);
           }
 
           employeeRecords.push({
@@ -265,13 +296,15 @@ function getCurrentLoanBalance(employeeId, asOfDate) {
       }
     }
 
+    Logger.log('📊 Summary - Rows checked: ' + rowsChecked + ', Matched employee: ' + rowsMatchedEmployee + ', Passed date filter: ' + rowsPassedDateFilter);
+
     if (employeeRecords.length === 0) {
-      Logger.log('ℹ️ No loan records found for employee');
+      Logger.log('ℹ️ No loan records found for employee after filtering');
       Logger.log('========== GET CURRENT LOAN BALANCE COMPLETE ==========\n');
       return { success: true, data: 0 };
     }
 
-    // Sort chronologically: TransactionDate first, then Timestamp
+    // Sort chronologically: TransactionDate first, then Timestamp (descending to get most recent)
     employeeRecords.sort((a, b) => {
       if (a.transactionDate.getTime() !== b.transactionDate.getTime()) {
         return b.transactionDate - a.transactionDate;  // Descending
@@ -281,7 +314,7 @@ function getCurrentLoanBalance(employeeId, asOfDate) {
 
     const currentBalance = employeeRecords[0].balanceAfter;
 
-    Logger.log('✅ Current balance: R' + currentBalance.toFixed(2));
+    Logger.log('✅ Current balance: R' + currentBalance.toFixed(2) + ' (from ' + employeeRecords.length + ' records)');
     Logger.log('========== GET CURRENT LOAN BALANCE COMPLETE ==========\n');
 
     return { success: true, data: currentBalance };
