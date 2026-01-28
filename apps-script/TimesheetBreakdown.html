@@ -352,9 +352,9 @@
                 return;
             }
 
+            // populateWeekFilter will automatically select the most recent week and call filterData()
+            // which in turn calls updateStats() and renderEmployees() with filtered data
             populateWeekFilter(allData);
-            updateStats(allData);
-            renderEmployees(allData);
         }
 
         function handleError(error) {
@@ -384,8 +384,36 @@
         }
 
         function populateWeekFilter(data) {
-            const weeks = [...new Set(data.map(e => e.weekEnding))].sort().reverse();
+            // Extract ALL unique dates from ALL employees' daily breakdowns
+            const allDates = new Set();
+            data.forEach(emp => {
+                if (emp.dailyBreakdown && Array.isArray(emp.dailyBreakdown)) {
+                    emp.dailyBreakdown.forEach(day => {
+                        if (day.date) {
+                            allDates.add(day.date);
+                        }
+                    });
+                }
+            });
+
+            // Calculate the Friday (week ending) for each date
+            const weekEndings = new Set();
+            allDates.forEach(dateStr => {
+                const date = new Date(dateStr);
+                const dayOfWeek = date.getDay();
+                // Calculate days to Friday (Friday = 5)
+                const daysToFriday = dayOfWeek <= 5 ? (5 - dayOfWeek) : (5 + 7 - dayOfWeek);
+                const friday = new Date(date);
+                friday.setDate(friday.getDate() + daysToFriday);
+                // Format as YYYY-MM-DD
+                const fridayStr = friday.toISOString().split('T')[0];
+                weekEndings.add(fridayStr);
+            });
+
+            // Sort weeks in reverse (newest first)
+            const weeks = [...weekEndings].sort().reverse();
             const select = document.getElementById('weekFilter');
+
             weeks.forEach(week => {
                 const option = document.createElement('option');
                 option.value = week;
