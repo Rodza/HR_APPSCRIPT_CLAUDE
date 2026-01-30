@@ -719,6 +719,9 @@ function generateWeeklyPayrollSummaryReport(weekEnding) {
       employees: payslips.length,
       standardHours: 0,
       overtimeHours: 0,
+      leavePay: 0,
+      bonusPay: 0,
+      otherIncome: 0,
       grossPay: 0,
       uif: 0,
       otherDeductions: 0,
@@ -751,6 +754,9 @@ function generateWeeklyPayrollSummaryReport(weekEnding) {
 
       totals.standardHours += totalHours;
       totals.overtimeHours += totalOvertimeHours;
+      totals.leavePay += p['LEAVE PAY'] || 0;
+      totals.bonusPay += p['BONUS PAY'] || 0;
+      totals.otherIncome += p['OTHERINCOME'] || 0;
       totals.grossPay += p['GROSSSALARY'] || 0;
       totals.uif += p['UIF'] || 0;
       totals.otherDeductions += p['OTHER DEDUCTIONS'] || 0;
@@ -796,11 +802,17 @@ function generateWeeklyPayrollSummaryReport(weekEnding) {
     registerSheet.setRowHeight(1, 30);
 
     // Column headers
-    registerSheet.getRange('A3:K3').setValues([[
+    registerSheet.getRange('A3:Q3').setValues([[
       'Employee',
       'Employer',
+      'Employment Status',
+      'Hourly Rate',
       'Std Hours',
       'OT Hours',
+      'Leave Pay',
+      'Bonus Pay',
+      'Other Income',
+      'Other Income Notes',
       'Gross Pay',
       'UIF',
       'Other Ded.',
@@ -809,7 +821,7 @@ function generateWeeklyPayrollSummaryReport(weekEnding) {
       'New Loan',
       'Paid to Account'
     ]]);
-    registerSheet.getRange('A3:K3').setFontWeight('bold').setBackground('#4CAF50').setFontColor('#FFFFFF').setHorizontalAlignment('center');
+    registerSheet.getRange('A3:Q3').setFontWeight('bold').setBackground('#4CAF50').setFontColor('#FFFFFF').setHorizontalAlignment('center');
     registerSheet.setRowHeight(3, 25);
 
     // Data rows
@@ -819,11 +831,20 @@ function generateWeeklyPayrollSummaryReport(weekEnding) {
       const stdHours = (p['HOURS'] || 0) + ((p['MINUTES'] || 0) / 60);
       const otHours = (p['OVERTIMEHOURS'] || 0) + ((p['OVERTIMEMINUTES'] || 0) / 60);
 
-      registerSheet.getRange(rowNum, 1, 1, 11).setValues([[
+      // Collect Other Income notes if present
+      const otherIncomeNotes = ((p['OTHERINCOME'] || 0) > 0 && p['OTHER INCOME TEXT']) ? p['OTHER INCOME TEXT'] : '';
+
+      registerSheet.getRange(rowNum, 1, 1, 17).setValues([[
         p['EMPLOYEE NAME'],
         p['EMPLOYER'],
+        p['EMPLOYEMENT STATUS'] || '',
+        p['HOURLY RATE'] || 0,
         decimalHoursToTime(stdHours),
         decimalHoursToTime(otHours),
+        p['LEAVE PAY'] || 0,
+        p['BONUS PAY'] || 0,
+        p['OTHERINCOME'] || 0,
+        otherIncomeNotes,
         p['GROSSSALARY'] || 0,
         p['UIF'] || 0,
         p['OTHER DEDUCTIONS'] || 0,
@@ -836,11 +857,17 @@ function generateWeeklyPayrollSummaryReport(weekEnding) {
     }
 
     // Totals row
-    registerSheet.getRange(rowNum, 1, 1, 11).setValues([[
+    registerSheet.getRange(rowNum, 1, 1, 17).setValues([[
       'TOTALS',
       totals.employees + ' employees',
+      '',  // No total for employment status
+      '',  // No total for hourly rate
       decimalHoursToTime(totals.standardHours),
       decimalHoursToTime(totals.overtimeHours),
+      totals.leavePay,
+      totals.bonusPay,
+      totals.otherIncome,
+      '',  // No total for notes column
       totals.grossPay,
       totals.uif,
       totals.otherDeductions,
@@ -849,32 +876,41 @@ function generateWeeklyPayrollSummaryReport(weekEnding) {
       totals.newLoans,
       totals.paidToAccounts
     ]]);
-    registerSheet.getRange(rowNum, 1, 1, 11).setFontWeight('bold').setBackground('#FFD700');
+    registerSheet.getRange(rowNum, 1, 1, 17).setFontWeight('bold').setBackground('#FFD700');
 
     // Format currency and number columns
-    registerSheet.getRange(4, 3, payslips.length + 1, 2).setNumberFormat('@');  // Std Hours and OT Hours as text (HH:MM format)
-    registerSheet.getRange(4, 5, payslips.length + 1, 7).setNumberFormat('"R"#,##0.00');  // Currency columns
+    registerSheet.getRange(4, 4, payslips.length, 1).setNumberFormat('"R"#,##0.00');  // Column D - Hourly Rate (not including totals row)
+    registerSheet.getRange(4, 5, payslips.length + 1, 2).setNumberFormat('@');  // Columns E-F - Std Hours and OT Hours as text (HH:MM format)
+    registerSheet.getRange(4, 7, payslips.length + 1, 3).setNumberFormat('"R"#,##0.00');  // Columns G-I - Leave Pay, Bonus Pay, Other Income
+    // Column J (Other Income Notes) is text, no formatting needed
+    registerSheet.getRange(4, 11, payslips.length + 1, 7).setNumberFormat('"R"#,##0.00');  // Columns K-Q - Gross Pay through Paid to Account
 
     // Set hardcoded column widths for optimal layout
     registerSheet.setColumnWidth(1, 220);  // Column A - Employee
     registerSheet.setColumnWidth(2, 135);  // Column B - Employer
-    registerSheet.setColumnWidth(3, 80);   // Column C - Std Hours
-    registerSheet.setColumnWidth(4, 80);   // Column D - OT Hours
-    registerSheet.setColumnWidth(5, 90);   // Column E - Gross Pay
-    registerSheet.setColumnWidth(6, 80);   // Column F - UIF
-    registerSheet.setColumnWidth(7, 110);  // Column G - Other Ded.
-    registerSheet.setColumnWidth(8, 110);  // Column H - Net Pay
-    registerSheet.setColumnWidth(9, 110);  // Column I - Loan Ded.
-    registerSheet.setColumnWidth(10, 110); // Column J - New Loan
-    registerSheet.setColumnWidth(11, 110); // Column K - Paid to Account
+    registerSheet.setColumnWidth(3, 110);  // Column C - Employment Status
+    registerSheet.setColumnWidth(4, 90);   // Column D - Hourly Rate
+    registerSheet.setColumnWidth(5, 80);   // Column E - Std Hours
+    registerSheet.setColumnWidth(6, 80);   // Column F - OT Hours
+    registerSheet.setColumnWidth(7, 90);   // Column G - Leave Pay
+    registerSheet.setColumnWidth(8, 90);   // Column H - Bonus Pay
+    registerSheet.setColumnWidth(9, 100);  // Column I - Other Income
+    registerSheet.setColumnWidth(10, 150); // Column J - Other Income Notes
+    registerSheet.setColumnWidth(11, 90);  // Column K - Gross Pay
+    registerSheet.setColumnWidth(12, 80);  // Column L - UIF
+    registerSheet.setColumnWidth(13, 110); // Column M - Other Ded.
+    registerSheet.setColumnWidth(14, 110); // Column N - Net Pay
+    registerSheet.setColumnWidth(15, 110); // Column O - Loan Ded.
+    registerSheet.setColumnWidth(16, 110); // Column P - New Loan
+    registerSheet.setColumnWidth(17, 110); // Column Q - Paid to Account
 
-    // Merge header cells A1:K1 and apply formatting
-    registerSheet.getRange('A1:K1').merge();
+    // Merge header cells A1:Q1 and apply formatting
+    registerSheet.getRange('A1:Q1').merge();
     registerSheet.getRange('A1').setFontWeight('bold').setFontSize(14).setHorizontalAlignment('center');
 
     // Add borders to the entire table (from column headers through last data row)
     const lastRegisterRow = rowNum;
-    const registerTableRange = registerSheet.getRange('A3:K' + lastRegisterRow);
+    const registerTableRange = registerSheet.getRange('A3:Q' + lastRegisterRow);
     registerTableRange.setBorder(true, true, true, true, true, true, 'black', SpreadsheetApp.BorderStyle.SOLID);
 
     // ===== TAB 2: Summary =====
