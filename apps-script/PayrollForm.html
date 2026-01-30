@@ -578,7 +578,7 @@
                     console.error('loadEmployees failed:', error);
                     showError('Error loading employees: ' + error.message);
                 })
-                .listEmployees({ activeOnly: true }, SESSION_TOKEN);
+                .listEmployees({ activeOnly: true, pageSize: 999 }, SESSION_TOKEN);
         }
 
         function onEmployeeChange() {

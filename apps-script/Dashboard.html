@@ -552,7 +552,7 @@
                     console.error('Failed to load employee count:', error);
                     document.getElementById('totalEmployees').textContent = 'Error';
                 })
-                .listEmployees({ activeOnly: true }, SESSION_TOKEN);
+                .listEmployees({ activeOnly: true, pageSize: 999 }, SESSION_TOKEN);
 
             // Load outstanding loans total
             google.script.run
