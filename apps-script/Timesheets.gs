@@ -2070,6 +2070,10 @@ function storeRawClockData(clockRecords, importId, weekEnding) {
       throw new Error('RAW_CLOCK_DATA sheet not found');
     }
 
+    // Ensure sheet headers match RAW_CLOCK_DATA_COLUMNS before writing data
+    // This prevents data/header misalignment when column definitions are updated
+    ensureSheetHeaders(rawDataSheet, RAW_CLOCK_DATA_COLUMNS);
+
     // Resolve employee IDs from clock references
     const employeeMap = buildEmployeeClockRefMap();
 
@@ -2219,6 +2223,10 @@ function processRawClockData(importId) {
     if (!rawDataSheet) {
       throw new Error('RAW_CLOCK_DATA sheet not found');
     }
+
+    // Ensure sheet headers match RAW_CLOCK_DATA_COLUMNS before reading data
+    // This prevents field lookup misalignment when column definitions are updated
+    ensureSheetHeaders(rawDataSheet, RAW_CLOCK_DATA_COLUMNS);
 
     // Get all raw data for this import
     const data = rawDataSheet.getDataRange().getValues();
@@ -2542,6 +2550,9 @@ function getTimesheetBreakdownData() {
     if (!rawClockSheet) {
       throw new Error('RAW_CLOCK_DATA sheet not found');
     }
+
+    // Ensure sheet headers match RAW_CLOCK_DATA_COLUMNS before reading data
+    ensureSheetHeaders(rawClockSheet, RAW_CLOCK_DATA_COLUMNS);
 
     // Get raw clock data
     const rawData = rawClockSheet.getDataRange().getValues();
