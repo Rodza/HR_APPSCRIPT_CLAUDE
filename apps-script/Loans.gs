@@ -441,17 +441,22 @@ function getLoanHistory(employeeId, startDate, endDate) {
     Logger.log('  Skipped (error): ' + skippedError);
 
     // Sort chronologically: TransactionDate first, then Timestamp
+    // Handle null/invalid dates by sorting them to the end
     records.sort((a, b) => {
-      const dateA = parseDate(a['TransactionDate']);
-      const dateB = parseDate(b['TransactionDate']);
+      try {
+        const dateA = a['TransactionDate'] ? parseDate(a['TransactionDate']) : new Date(0);
+        const dateB = b['TransactionDate'] ? parseDate(b['TransactionDate']) : new Date(0);
 
-      if (dateA.getTime() !== dateB.getTime()) {
-        return dateA - dateB;  // Ascending (oldest first)
+        if (dateA.getTime() !== dateB.getTime()) {
+          return dateA - dateB;  // Ascending (oldest first)
+        }
+
+        const timeA = a['Timestamp'] ? parseDate(a['Timestamp']) : new Date(0);
+        const timeB = b['Timestamp'] ? parseDate(b['Timestamp']) : new Date(0);
+        return timeA - timeB;  // Ascending
+      } catch (e) {
+        return 0;
       }
-
-      const timeA = parseDate(a['Timestamp']);
-      const timeB = parseDate(b['Timestamp']);
-      return timeA - timeB;  // Ascending
     });
 
     // Sanitize records for web serialization

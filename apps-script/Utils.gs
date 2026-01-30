@@ -362,9 +362,15 @@ function buildObjectFromRow(row, headers) {
     var header = String(headers[i]);
     var value = row[i];
 
-    // Handle dates
+    // Handle dates - validate that Date objects are valid
     if (value instanceof Date) {
-      obj[header] = value;
+      // Check if the Date is valid
+      if (isNaN(value.getTime())) {
+        // Invalid date - set to null
+        obj[header] = null;
+      } else {
+        obj[header] = value;
+      }
     }
     // Handle numbers
     else if (typeof value === 'number') {
@@ -633,6 +639,11 @@ function formatDate(date) {
     date = new Date(date);
   }
 
+  // Check if date is valid
+  if (isNaN(date.getTime())) {
+    return '';
+  }
+
   var year = date.getFullYear();
   var month = ('0' + (date.getMonth() + 1)).slice(-2);
   var day = ('0' + date.getDate()).slice(-2);
@@ -653,9 +664,14 @@ function formatDateDDMMYYYY(date) {
     date = new Date(date);
   }
 
+  // Check if date is valid
+  if (isNaN(date.getTime())) {
+    return '';
+  }
+
   var year = date.getFullYear();
   var month = ('0' + (date.getMonth() + 1)).slice(-2);
-  var day = ('0' + date.getDate()).slice(-2);
+  var day = ('0' + (date.getDate()).slice(-2);
 
   return day + '-' + month + '-' + year;
 }
