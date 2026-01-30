@@ -1006,20 +1006,10 @@ function approveTimesheet(id) {
     }
 
     // Check if payslip already exists for this employee/week
-    // Calculate week ending as the Friday of the import week
-    const importDate = timesheetRecord['IMPORTED_DATE'] ? new Date(timesheetRecord['IMPORTED_DATE']) : new Date();
-    const dayOfWeek = importDate.getDay();
-    // Calculate days to get to Friday (day 5)
-    // If today is Friday (5), use today. Otherwise find the Friday of this week.
-    let daysToFriday = 5 - dayOfWeek;
-    if (daysToFriday < 0) {
-      daysToFriday += 7; // Go to next Friday if we're past Friday
-    }
-    const weekEndingDate = new Date(importDate);
-    weekEndingDate.setDate(importDate.getDate() + daysToFriday);
-
-    // Normalize to date-only format (strip time components)
-    const weekEnding = normalizeToDateOnly(weekEndingDate);
+    // Use the WEEKENDING from the pending timesheet (set during import from raw clock data)
+    const weekEnding = timesheetRecord['WEEKENDING']
+      ? normalizeToDateOnly(new Date(timesheetRecord['WEEKENDING']))
+      : normalizeToDateOnly(getWeekEnding(new Date()));
     const duplicatePayslip = checkDuplicatePayslip(timesheetRecord['EMPLOYEE NAME'], weekEnding);
 
     if (duplicatePayslip) {
@@ -1548,8 +1538,8 @@ function importClockData(fileBlob, filename, override) {
       replaceImport(dupCheck.existingImportId, importId);
     }
 
-    // Store raw clock data
-    const storeResult = storeRawClockData(clockRecords, importId);
+    // Store raw clock data (pass weekEnding so each record gets the correct WEEK_ENDING)
+    const storeResult = storeRawClockData(clockRecords, importId, weekEnding);
     if (!storeResult.success) {
       throw new Error('Failed to store clock data: ' + storeResult.error);
     }
@@ -2070,7 +2060,7 @@ function createImportRecord(data) {
  * @param {string} importId - Import ID
  * @returns {Object} Result
  */
-function storeRawClockData(clockRecords, importId) {
+function storeRawClockData(clockRecords, importId, weekEnding) {
   try {
     const sheets = getSheets();
     const rawDataSheet = sheets.rawClockData;
@@ -2110,7 +2100,7 @@ function storeRawClockData(clockRecords, importId) {
         String(record.ClockInRef).trim(),      // EMPLOYEE_CLOCK_REF
         empInfo.name || record.EmployeeName,   // EMPLOYEE_NAME
         empInfo.id || '',                      // EMPLOYEE_ID
-        record.WeekEnding,                     // WEEK_ENDING
+        weekEnding || record.WeekEnding || '', // WEEK_ENDING (use passed weekEnding, fallback to record field)
         record.PunchDate,                      // PUNCH_DATE
         record.DeviceName,                     // DEVICE_NAME
         record.PunchTime,                      // PUNCH_TIME
