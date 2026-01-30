@@ -427,9 +427,9 @@ function listPayslips(filters) {
       filters = {};
     }
 
-    // Pagination settings - default to 50 most recent payslips
+    // Pagination settings - no default limit unless explicitly specified
     var page = filters.page ? parseInt(filters.page) : 1;
-    var pageSize = filters.pageSize ? parseInt(filters.pageSize) : 50;
+    var pageSize = filters.pageSize ? parseInt(filters.pageSize) : null;
 
     const sheets = getSheets();
     const salarySheet = sheets.salary;
@@ -459,6 +459,17 @@ function listPayslips(filters) {
       });
     }
 
+    // Handle dateRange filter (used by monthly reports)
+    if (filters.dateRange) {
+      const start = parseDate(filters.dateRange.start);
+      const end = parseDate(filters.dateRange.end);
+      payslips = payslips.filter(p => {
+        if (!p.WEEKENDING) return false;
+        const payslipDate = parseDate(p.WEEKENDING);
+        return payslipDate >= start && payslipDate <= end;
+      });
+    }
+
     if (filters.startDate) {
       const start = parseDate(filters.startDate);
       payslips = payslips.filter(p => {
@@ -484,12 +495,20 @@ function listPayslips(filters) {
 
     // Calculate pagination
     var totalPayslips = payslips.length;
-    var totalPages = Math.ceil(totalPayslips / pageSize);
-    var startIndex = (page - 1) * pageSize;
-    var endIndex = Math.min(startIndex + pageSize, totalPayslips);
+    var pagePayslips;
+    var totalPages;
 
-    // Get page slice (first 50 will be the most recent 50 after sorting)
-    var pagePayslips = payslips.slice(startIndex, endIndex);
+    if (pageSize) {
+      // Pagination enabled
+      totalPages = Math.ceil(totalPayslips / pageSize);
+      var startIndex = (page - 1) * pageSize;
+      var endIndex = Math.min(startIndex + pageSize, totalPayslips);
+      pagePayslips = payslips.slice(startIndex, endIndex);
+    } else {
+      // No pagination - return all payslips
+      totalPages = 1;
+      pagePayslips = payslips;
+    }
 
     const sanitizedPayslips = pagePayslips.map(function(payslip) {
       return sanitizeForWeb(payslip);
