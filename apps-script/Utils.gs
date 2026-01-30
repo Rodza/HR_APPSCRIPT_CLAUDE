@@ -688,6 +688,54 @@ function findColumnIndex(headers, columnName) {
   return indexOf(headers, columnName);
 }
 
+/**
+ * Ensures sheet headers match the expected column definitions.
+ * If headers are missing or misaligned, updates them to match.
+ * This prevents data/header misalignment when column definitions are updated.
+ *
+ * @param {Sheet} sheet - The Google Sheet to check
+ * @param {Array<string>} expectedColumns - Array of expected column header names
+ */
+function ensureSheetHeaders(sheet, expectedColumns) {
+  if (!sheet || !expectedColumns || expectedColumns.length === 0) return;
+
+  var lastCol = sheet.getLastColumn();
+  if (lastCol === 0) {
+    // Empty sheet - write headers
+    var headerRange = sheet.getRange(1, 1, 1, expectedColumns.length);
+    headerRange.setValues([expectedColumns]);
+    headerRange.setFontWeight('bold');
+    headerRange.setBackground('#f3f3f3');
+    Logger.log('✅ Headers written to empty sheet "' + sheet.getName() + '" (' + expectedColumns.length + ' columns)');
+    return;
+  }
+
+  var checkCols = Math.max(lastCol, expectedColumns.length);
+  var currentHeaders = sheet.getRange(1, 1, 1, checkCols).getValues()[0];
+
+  // Check if headers match expected columns
+  var needsUpdate = false;
+  for (var i = 0; i < expectedColumns.length; i++) {
+    if (String(currentHeaders[i] || '').trim() !== expectedColumns[i]) {
+      needsUpdate = true;
+      break;
+    }
+  }
+
+  if (needsUpdate) {
+    Logger.log('⚠️ Sheet "' + sheet.getName() + '" headers do not match expected columns, updating...');
+    Logger.log('   Expected ' + expectedColumns.length + ' columns: ' + expectedColumns.join(', '));
+    Logger.log('   Found ' + lastCol + ' columns: ' + currentHeaders.slice(0, lastCol).join(', '));
+
+    var newHeaderRange = sheet.getRange(1, 1, 1, expectedColumns.length);
+    newHeaderRange.setValues([expectedColumns]);
+    newHeaderRange.setFontWeight('bold');
+    newHeaderRange.setBackground('#f3f3f3');
+
+    Logger.log('✅ Headers updated to ' + expectedColumns.length + ' columns');
+  }
+}
+
 // ============================================================================
 // ID GENERATION
 // ============================================================================
