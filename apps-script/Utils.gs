@@ -780,11 +780,16 @@ function generateFullUUID() {
 
 /**
  * Sanitize object for serialization to web app
- * Converts dates, handles null values, ensures all data is serializable
+ * Converts dates to ISO 8601 format (YYYY-MM-DD), handles null values, ensures all data is serializable
  * This is a general-purpose version that works for any object type
  *
+ * Date format: YYYY-MM-DD (ISO 8601 standard)
+ * - Reliably parsed by JavaScript new Date()
+ * - Works across all browsers and timezones
+ * - International standard format
+ *
  * @param {Object} obj - Object to sanitize
- * @returns {Object} Sanitized object
+ * @returns {Object} Sanitized object with dates as YYYY-MM-DD strings
  */
 function sanitizeForWeb(obj) {
   var sanitized = {};
@@ -793,9 +798,9 @@ function sanitizeForWeb(obj) {
     if (obj.hasOwnProperty(key)) {
       var value = obj[key];
 
-      // Convert Date objects to DD-MM-YYYY format (date only, no time)
+      // Convert Date objects to YYYY-MM-DD format (ISO 8601 standard, date only, no time)
       if (value instanceof Date) {
-        sanitized[key] = formatDateDDMMYYYY(value);
+        sanitized[key] = formatDate(value);
       }
       // Convert null/undefined to empty string
       else if (value === null || value === undefined) {
