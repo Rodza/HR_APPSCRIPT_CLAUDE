@@ -1189,11 +1189,11 @@ function generateMonthlyPayrollSummaryReport(monthDate) {
       'Hourly Rate',
       'Std Hours',
       'OT Hours',
-      'Gross Pay',
       'Leave Pay',
       'Bonus Pay',
       'Other Income',
       'Other Income Notes',
+      'Gross Pay',
       'UIF',
       'Other Ded.',
       'Net Pay'
@@ -1220,11 +1220,11 @@ function generateMonthlyPayrollSummaryReport(monthDate) {
         emp.hourlyRate,
         stdHoursFormatted,
         otHoursFormatted,
-        emp.grossPay,
         emp.leavePay,
         emp.bonusPay,
         emp.otherIncome,
         otherIncomeNotesText,
+        emp.grossPay,
         emp.uif,
         emp.otherDeductions,
         emp.netPay
@@ -1243,11 +1243,11 @@ function generateMonthlyPayrollSummaryReport(monthDate) {
       '',  // No total for hourly rate
       totalStdHoursFormatted,
       totalOtHoursFormatted,
-      totals.grossPay,
       totals.leavePay,
       totals.bonusPay,
       totals.otherIncome,
       '',  // No total for notes column
+      totals.grossPay,
       totals.uif,
       totals.otherDeductions,
       totals.netPay
@@ -1257,7 +1257,9 @@ function generateMonthlyPayrollSummaryReport(monthDate) {
     // Format currency and number columns
     registerSheet.getRange(5, 4, employeeArray.length, 1).setNumberFormat('"R"#,##0.00');  // Column D - Hourly Rate (not including totals row)
     // Columns E and F (Std Hours and OT Hours) are now text format (HH:MM), no number formatting needed
-    registerSheet.getRange(5, 7, employeeArray.length + 1, 4).setNumberFormat('"R"#,##0.00');  // Currency columns G-J (Gross to Other Income)
+    registerSheet.getRange(5, 7, employeeArray.length + 1, 3).setNumberFormat('"R"#,##0.00');  // Currency columns G-I (Leave Pay to Other Income)
+    // Column J (Other Income Notes) is text, no formatting needed
+    registerSheet.getRange(5, 11, employeeArray.length + 1, 1).setNumberFormat('"R"#,##0.00');  // Currency column K (Gross Pay)
     registerSheet.getRange(5, 12, employeeArray.length + 1, 3).setNumberFormat('"R"#,##0.00');  // Currency columns L-N (UIF to Net Pay)
 
     // Set hardcoded column widths for optimal layout
@@ -1267,11 +1269,11 @@ function generateMonthlyPayrollSummaryReport(monthDate) {
     registerSheet.setColumnWidth(4, 90);   // Column D - Hourly Rate
     registerSheet.setColumnWidth(5, 80);   // Column E - Std Hours
     registerSheet.setColumnWidth(6, 80);   // Column F - OT Hours
-    registerSheet.setColumnWidth(7, 90);   // Column G - Gross Pay
-    registerSheet.setColumnWidth(8, 90);   // Column H - Leave Pay
-    registerSheet.setColumnWidth(9, 90);   // Column I - Bonus Pay
-    registerSheet.setColumnWidth(10, 100); // Column J - Other Income
-    registerSheet.setColumnWidth(11, 150); // Column K - Other Income Notes
+    registerSheet.setColumnWidth(7, 90);   // Column G - Leave Pay
+    registerSheet.setColumnWidth(8, 90);   // Column H - Bonus Pay
+    registerSheet.setColumnWidth(9, 100);  // Column I - Other Income
+    registerSheet.setColumnWidth(10, 150); // Column J - Other Income Notes
+    registerSheet.setColumnWidth(11, 90);  // Column K - Gross Pay
     registerSheet.setColumnWidth(12, 80);  // Column L - UIF
     registerSheet.setColumnWidth(13, 110); // Column M - Other Ded.
     registerSheet.setColumnWidth(14, 110); // Column N - Net Pay
