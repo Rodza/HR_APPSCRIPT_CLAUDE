@@ -42,9 +42,13 @@ function createPayslip(data) {
     if (data.loanDeductionThisWeek !== undefined) data.LoanDeductionThisWeek = data.loanDeductionThisWeek;
     if (data.newLoanThisWeek !== undefined) data.NewLoanThisWeek = data.newLoanThisWeek;
     if (data.loanDisbursementType !== undefined) data.LoanDisbursementType = data.loanDisbursementType;
-    if (data.weekEnding !== undefined) {
+    if (data.weekEnding !== undefined && data.weekEnding !== null && data.weekEnding !== '') {
       // Normalize date to strip time components for consistency
-      data.WEEKENDING = normalizeToDateOnly(parseDate(data.weekEnding));
+      try {
+        data.WEEKENDING = normalizeToDateOnly(parseDate(data.weekEnding));
+      } catch (e) {
+        throw new Error('Invalid Week Ending date format. Please enter a valid date.');
+      }
     }
     if (data.notes !== undefined) data.NOTES = data.notes;
 
@@ -315,9 +319,13 @@ function updatePayslip(recordNumber, data) {
     if (data.loanDeductionThisWeek !== undefined) data.LoanDeductionThisWeek = data.loanDeductionThisWeek;
     if (data.newLoanThisWeek !== undefined) data.NewLoanThisWeek = data.newLoanThisWeek;
     if (data.loanDisbursementType !== undefined) data.LoanDisbursementType = data.loanDisbursementType;
-    if (data.weekEnding !== undefined) {
+    if (data.weekEnding !== undefined && data.weekEnding !== null && data.weekEnding !== '') {
       // Normalize date to strip time components for consistency
-      data.WEEKENDING = normalizeToDateOnly(parseDate(data.weekEnding));
+      try {
+        data.WEEKENDING = normalizeToDateOnly(parseDate(data.weekEnding));
+      } catch (e) {
+        throw new Error('Invalid Week Ending date format. Please enter a valid date.');
+      }
     }
     if (data.notes !== undefined) data.NOTES = data.notes;
     if (data.employeeName !== undefined) data['EMPLOYEE NAME'] = data.employeeName;
@@ -546,6 +554,13 @@ function validatePayslip(data) {
 
   if (!data.WEEKENDING) {
     errors.push('Week Ending date is required');
+  } else {
+    // Validate date format if WEEKENDING is present
+    try {
+      parseDate(data.WEEKENDING);
+    } catch (e) {
+      errors.push('Invalid Week Ending date format. Please enter a valid date.');
+    }
   }
 
   // Check for duplicate payslip

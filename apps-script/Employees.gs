@@ -516,14 +516,27 @@ function createEmployee(employeeData, sessionToken) {
     employeeData = transformEmployeeFieldNames(employeeData);
 
     // Normalize date fields to strip time components
-    if (employeeData['DATE OF BIRTH']) {
-      employeeData['DATE OF BIRTH'] = normalizeToDateOnly(parseDate(employeeData['DATE OF BIRTH']));
+    // Only parse if field has a value (not empty string, null, or undefined)
+    if (employeeData['DATE OF BIRTH'] && employeeData['DATE OF BIRTH'] !== '') {
+      try {
+        employeeData['DATE OF BIRTH'] = normalizeToDateOnly(parseDate(employeeData['DATE OF BIRTH']));
+      } catch (e) {
+        throw new Error('Invalid Date of Birth format. Please enter a valid date.');
+      }
     }
-    if (employeeData['EMPLOYMENT DATE']) {
-      employeeData['EMPLOYMENT DATE'] = normalizeToDateOnly(parseDate(employeeData['EMPLOYMENT DATE']));
+    if (employeeData['EMPLOYMENT DATE'] && employeeData['EMPLOYMENT DATE'] !== '') {
+      try {
+        employeeData['EMPLOYMENT DATE'] = normalizeToDateOnly(parseDate(employeeData['EMPLOYMENT DATE']));
+      } catch (e) {
+        throw new Error('Invalid Employment Date format. Please enter a valid date.');
+      }
     }
-    if (employeeData['TERMINATION DATE']) {
-      employeeData['TERMINATION DATE'] = normalizeToDateOnly(parseDate(employeeData['TERMINATION DATE']));
+    if (employeeData['TERMINATION DATE'] && employeeData['TERMINATION DATE'] !== '') {
+      try {
+        employeeData['TERMINATION DATE'] = normalizeToDateOnly(parseDate(employeeData['TERMINATION DATE']));
+      } catch (e) {
+        throw new Error('Invalid Termination Date format. Please enter a valid date.');
+      }
     }
 
     var requiredFields = getConfig('EMPLOYEE_REQUIRED_FIELDS');
@@ -607,14 +620,27 @@ function updateEmployee(id, employeeData, sessionToken) {
     employeeData = transformEmployeeFieldNames(employeeData);
 
     // Normalize date fields to strip time components
-    if (employeeData['DATE OF BIRTH']) {
-      employeeData['DATE OF BIRTH'] = normalizeToDateOnly(parseDate(employeeData['DATE OF BIRTH']));
+    // Only parse if field has a value (not empty string, null, or undefined)
+    if (employeeData['DATE OF BIRTH'] && employeeData['DATE OF BIRTH'] !== '') {
+      try {
+        employeeData['DATE OF BIRTH'] = normalizeToDateOnly(parseDate(employeeData['DATE OF BIRTH']));
+      } catch (e) {
+        throw new Error('Invalid Date of Birth format. Please enter a valid date.');
+      }
     }
-    if (employeeData['EMPLOYMENT DATE']) {
-      employeeData['EMPLOYMENT DATE'] = normalizeToDateOnly(parseDate(employeeData['EMPLOYMENT DATE']));
+    if (employeeData['EMPLOYMENT DATE'] && employeeData['EMPLOYMENT DATE'] !== '') {
+      try {
+        employeeData['EMPLOYMENT DATE'] = normalizeToDateOnly(parseDate(employeeData['EMPLOYMENT DATE']));
+      } catch (e) {
+        throw new Error('Invalid Employment Date format. Please enter a valid date.');
+      }
     }
-    if (employeeData['TERMINATION DATE']) {
-      employeeData['TERMINATION DATE'] = normalizeToDateOnly(parseDate(employeeData['TERMINATION DATE']));
+    if (employeeData['TERMINATION DATE'] && employeeData['TERMINATION DATE'] !== '') {
+      try {
+        employeeData['TERMINATION DATE'] = normalizeToDateOnly(parseDate(employeeData['TERMINATION DATE']));
+      } catch (e) {
+        throw new Error('Invalid Termination Date format. Please enter a valid date.');
+      }
     }
 
     var sheets = getSheets();
@@ -681,9 +707,16 @@ function updateEmployee(id, employeeData, sessionToken) {
 function terminateEmployee(id, terminationDate) {
   try {
     // Normalize termination date to strip time components
-    var normalizedDate = terminationDate
-      ? normalizeToDateOnly(parseDate(terminationDate))
-      : normalizeToDateOnly(new Date());
+    var normalizedDate;
+    if (terminationDate && terminationDate !== '') {
+      try {
+        normalizedDate = normalizeToDateOnly(parseDate(terminationDate));
+      } catch (e) {
+        throw new Error('Invalid Termination Date format. Please enter a valid date.');
+      }
+    } else {
+      normalizedDate = normalizeToDateOnly(new Date());
+    }
 
     var updateData = {
       'EMPLOYMENT STATUS': 'Terminated',

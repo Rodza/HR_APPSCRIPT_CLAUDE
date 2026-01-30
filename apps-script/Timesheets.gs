@@ -1280,6 +1280,13 @@ function validateTimesheet(data) {
 
   if (!data.weekEnding) {
     errors.push('Week Ending is required');
+  } else {
+    // Validate date format
+    try {
+      parseDate(data.weekEnding);
+    } catch (e) {
+      errors.push('Invalid Week Ending date format. Please enter a valid date.');
+    }
   }
 
   if (data.hours === undefined || data.hours === null) {
