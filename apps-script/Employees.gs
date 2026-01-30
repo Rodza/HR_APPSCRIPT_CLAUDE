@@ -154,10 +154,27 @@ function listEmployees(filters, sessionToken) {
     var headers = data[0];
     var employees = [];
 
+    // Find REFNAME column index for better row validation
+    var refNameColIndex = -1;
+    for (var h = 0; h < headers.length; h++) {
+      if (headers[h] === 'REFNAME') {
+        refNameColIndex = h;
+        break;
+      }
+    }
+
     for (var i = 1; i < data.length; i++) {
-      if (data[i][0]) {
+      // Check if row has a REFNAME (employee name) instead of just checking first column
+      // This ensures we include employees even if the 'id' field is empty
+      var hasRefName = refNameColIndex >= 0 && data[i][refNameColIndex] && data[i][refNameColIndex].toString().trim() !== '';
+
+      if (hasRefName) {
         try {
           var employee = buildObjectFromRow(data[i], headers);
+          // Generate ID if missing to ensure all employees have a unique identifier
+          if (!employee.id || employee.id === '') {
+            employee.id = generateId();
+          }
           employees.push(employee);
         } catch (rowError) {
           // Skip invalid rows silently
@@ -268,10 +285,26 @@ function listEmployeesFull(filters) {
     var employees = [];
     var skippedRows = 0;
 
+    // Find REFNAME column index for better row validation
+    var refNameColIndex = -1;
+    for (var h = 0; h < headers.length; h++) {
+      if (headers[h] === 'REFNAME') {
+        refNameColIndex = h;
+        break;
+      }
+    }
+
     for (var i = 1; i < data.length; i++) {
-      if (data[i][0]) { // Skip empty rows
+      // Check if row has a REFNAME (employee name) instead of just checking first column
+      var hasRefName = refNameColIndex >= 0 && data[i][refNameColIndex] && data[i][refNameColIndex].toString().trim() !== '';
+
+      if (hasRefName) {
         try {
           var employee = buildObjectFromRow(data[i], headers);
+          // Generate ID if missing to ensure all employees have a unique identifier
+          if (!employee.id || employee.id === '') {
+            employee.id = generateId();
+          }
           employees.push(employee);
         } catch (rowError) {
           console.error('Error building row ' + (i + 1) + ':', rowError);
