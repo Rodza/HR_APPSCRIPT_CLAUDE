@@ -822,8 +822,8 @@ function generateWeeklyPayrollSummaryReport(weekEnding) {
       registerSheet.getRange(rowNum, 1, 1, 11).setValues([[
         p['EMPLOYEE NAME'],
         p['EMPLOYER'],
-        stdHours,
-        otHours,
+        decimalHoursToTime(stdHours),
+        decimalHoursToTime(otHours),
         p['GROSSSALARY'] || 0,
         p['UIF'] || 0,
         p['OTHER DEDUCTIONS'] || 0,
@@ -839,8 +839,8 @@ function generateWeeklyPayrollSummaryReport(weekEnding) {
     registerSheet.getRange(rowNum, 1, 1, 11).setValues([[
       'TOTALS',
       totals.employees + ' employees',
-      totals.standardHours,
-      totals.overtimeHours,
+      decimalHoursToTime(totals.standardHours),
+      decimalHoursToTime(totals.overtimeHours),
       totals.grossPay,
       totals.uif,
       totals.otherDeductions,
@@ -852,8 +852,7 @@ function generateWeeklyPayrollSummaryReport(weekEnding) {
     registerSheet.getRange(rowNum, 1, 1, 11).setFontWeight('bold').setBackground('#FFD700');
 
     // Format currency and number columns
-    registerSheet.getRange(4, 3, payslips.length + 1, 1).setNumberFormat('0.00');  // Std Hours
-    registerSheet.getRange(4, 4, payslips.length + 1, 1).setNumberFormat('0.00');  // OT Hours
+    registerSheet.getRange(4, 3, payslips.length + 1, 2).setNumberFormat('@');  // Std Hours and OT Hours as text (HH:MM format)
     registerSheet.getRange(4, 5, payslips.length + 1, 7).setNumberFormat('"R"#,##0.00');  // Currency columns
 
     // Set hardcoded column widths for optimal layout
