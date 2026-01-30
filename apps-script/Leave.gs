@@ -359,25 +359,40 @@ function listLeave(filters) {
       if (filters.startDate) {
         const filterStartDate = parseDate(filters.startDate);
         records = records.filter(r => {
-          const leaveStart = parseDate(r['STARTDATE.LEAVE']);
-          return leaveStart >= filterStartDate;
+          if (!r['STARTDATE.LEAVE']) return false;
+          try {
+            const leaveStart = parseDate(r['STARTDATE.LEAVE']);
+            return leaveStart >= filterStartDate;
+          } catch (e) {
+            return false;
+          }
         });
       }
 
       if (filters.endDate) {
         const filterEndDate = parseDate(filters.endDate);
         records = records.filter(r => {
-          const leaveEnd = parseDate(r['RETURNDATE.LEAVE']);
-          return leaveEnd <= filterEndDate;
+          if (!r['RETURNDATE.LEAVE']) return false;
+          try {
+            const leaveEnd = parseDate(r['RETURNDATE.LEAVE']);
+            return leaveEnd <= filterEndDate;
+          } catch (e) {
+            return false;
+          }
         });
       }
     }
 
     // Sort records by start date (descending - most recent first)
+    // Handle null/invalid dates by sorting them to the end
     records.sort((a, b) => {
-      const dateA = parseDate(a['STARTDATE.LEAVE']);
-      const dateB = parseDate(b['STARTDATE.LEAVE']);
-      return dateB - dateA;
+      try {
+        const dateA = a['STARTDATE.LEAVE'] ? parseDate(a['STARTDATE.LEAVE']) : new Date(0);
+        const dateB = b['STARTDATE.LEAVE'] ? parseDate(b['STARTDATE.LEAVE']) : new Date(0);
+        return dateB - dateA;
+      } catch (e) {
+        return 0;
+      }
     });
 
     // Sanitize records for web serialization (convert Date objects to ISO strings)

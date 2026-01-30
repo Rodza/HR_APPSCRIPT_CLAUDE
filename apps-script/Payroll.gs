@@ -462,8 +462,12 @@ function listPayslips(filters) {
       const targetDateStr = formatDate(parseDate(filters.weekEnding));
       payslips = payslips.filter(p => {
         if (!p.WEEKENDING) return false;
-        const payslipDateStr = formatDate(parseDate(p.WEEKENDING));
-        return payslipDateStr === targetDateStr;
+        try {
+          const payslipDateStr = formatDate(parseDate(p.WEEKENDING));
+          return payslipDateStr === targetDateStr;
+        } catch (e) {
+          return false;
+        }
       });
     }
 
@@ -473,32 +477,51 @@ function listPayslips(filters) {
       const end = parseDate(filters.dateRange.end);
       payslips = payslips.filter(p => {
         if (!p.WEEKENDING) return false;
-        const payslipDate = parseDate(p.WEEKENDING);
-        return payslipDate >= start && payslipDate <= end;
+        try {
+          const payslipDate = parseDate(p.WEEKENDING);
+          return payslipDate >= start && payslipDate <= end;
+        } catch (e) {
+          return false;
+        }
       });
     }
 
     if (filters.startDate) {
       const start = parseDate(filters.startDate);
       payslips = payslips.filter(p => {
-        const payslipDate = parseDate(p.WEEKENDING);
-        return payslipDate >= start;
+        if (!p.WEEKENDING) return false;
+        try {
+          const payslipDate = parseDate(p.WEEKENDING);
+          return payslipDate >= start;
+        } catch (e) {
+          return false;
+        }
       });
     }
 
     if (filters.endDate) {
       const end = parseDate(filters.endDate);
       payslips = payslips.filter(p => {
-        const payslipDate = parseDate(p.WEEKENDING);
-        return payslipDate <= end;
+        if (!p.WEEKENDING) return false;
+        try {
+          const payslipDate = parseDate(p.WEEKENDING);
+          return payslipDate <= end;
+        } catch (e) {
+          return false;
+        }
       });
     }
 
     // Sort by week ending date in descending order (newest first)
+    // Handle null/invalid dates by sorting them to the end
     payslips.sort(function(a, b) {
-      const dateA = parseDate(a.WEEKENDING);
-      const dateB = parseDate(b.WEEKENDING);
-      return dateB - dateA; // Descending order (newest first)
+      try {
+        const dateA = a.WEEKENDING ? parseDate(a.WEEKENDING) : new Date(0);
+        const dateB = b.WEEKENDING ? parseDate(b.WEEKENDING) : new Date(0);
+        return dateB - dateA; // Descending order (newest first)
+      } catch (e) {
+        return 0;
+      }
     });
 
     // Calculate pagination
