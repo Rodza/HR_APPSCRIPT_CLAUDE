@@ -642,7 +642,21 @@ function validateLeave(data) {
         errors.push('Return date cannot be before start date');
       }
     } catch (e) {
-      errors.push('Invalid date format: ' + e.message);
+      errors.push('Invalid date format. Please enter valid dates for Start Date and Return Date.');
+    }
+  } else if (data.startDate && !data.returnDate) {
+    // Only start date provided - validate it
+    try {
+      parseDate(data.startDate);
+    } catch (e) {
+      errors.push('Invalid Start Date format. Please enter a valid date.');
+    }
+  } else if (!data.startDate && data.returnDate) {
+    // Only return date provided - validate it
+    try {
+      parseDate(data.returnDate);
+    } catch (e) {
+      errors.push('Invalid Return Date format. Please enter a valid date.');
     }
   }
 

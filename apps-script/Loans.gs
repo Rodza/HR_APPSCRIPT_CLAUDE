@@ -819,6 +819,13 @@ function validateLoan(data) {
 
   if (!data.transactionDate) {
     errors.push('Transaction Date is required');
+  } else {
+    // Validate date format
+    try {
+      parseDate(data.transactionDate);
+    } catch (e) {
+      errors.push('Invalid Transaction Date format. Please enter a valid date.');
+    }
   }
 
   if (data.loanAmount === undefined || data.loanAmount === null) {
