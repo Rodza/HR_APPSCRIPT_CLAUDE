@@ -837,8 +837,8 @@ function generateWeeklyPayrollSummaryReport(weekEnding) {
       registerSheet.getRange(rowNum, 1, 1, 17).setValues([[
         p['EMPLOYEE NAME'],
         p['EMPLOYER'],
-        p['EMPLOYEMENT STATUS'] || '',
-        p['HOURLY RATE'] || 0,
+        p['EMPLOYMENT STATUS'] || '',
+        p['HOURLYRATE'] || 0,
         decimalHoursToTime(stdHours),
         decimalHoursToTime(otHours),
         p['LEAVE PAY'] || 0,
