@@ -35,9 +35,18 @@
       </div>
     </div>
 
-    <!-- Employee Count -->
-    <div class="mb-2">
+    <!-- Employee Count and Pagination Controls -->
+    <div class="mb-2 d-flex justify-content-between align-items-center">
       <span id="employeeCount" class="text-muted">Loading employees...</span>
+      <div id="paginationControls" class="btn-group" style="display: none;">
+        <button class="btn btn-sm btn-outline-secondary" id="prevPageBtn" onclick="previousPage()">
+          <i class="fas fa-chevron-left"></i> Previous
+        </button>
+        <span class="btn btn-sm btn-outline-secondary disabled" id="pageInfo">Page 1</span>
+        <button class="btn btn-sm btn-outline-secondary" id="nextPageBtn" onclick="nextPage()">
+          Next <i class="fas fa-chevron-right"></i>
+        </button>
+      </div>
     </div>
 
     <!-- Employee Table -->
@@ -71,6 +80,8 @@
   // Store all employees for client-side filtering
   var allEmployees = [];
   var searchTimeout = null;
+  var currentPage = 1;
+  var currentPagination = null;
 
   /**
    * Initialize when the module loads
@@ -83,13 +94,20 @@
   /**
    * Load employees from server
    */
-  function loadEmployees() {
+  function loadEmployees(page) {
     console.log('Loading employees...');
-    
+
+    // Use provided page or current page
+    if (page !== undefined) {
+      currentPage = page;
+    }
+
     var filters = {
       employer: document.getElementById('employerFilter')?.value || '',
       status: document.getElementById('statusFilter')?.value || '',
-      search: document.getElementById('searchInput')?.value || ''
+      search: document.getElementById('searchInput')?.value || '',
+      page: currentPage,
+      pageSize: 50
     };
     
     // Show loading state
@@ -149,6 +167,7 @@
   function displayEmployees(employees, pagination) {
     console.log('Displaying', employees.length, 'employees');
     allEmployees = employees;
+    currentPagination = pagination;
 
     var tbody = document.getElementById('employeeTableBody');
     if (!tbody) {
@@ -228,6 +247,11 @@
    */
   function updateEmployeeCount(count, pagination) {
     var countElement = document.getElementById('employeeCount');
+    var paginationControls = document.getElementById('paginationControls');
+    var prevBtn = document.getElementById('prevPageBtn');
+    var nextBtn = document.getElementById('nextPageBtn');
+    var pageInfo = document.getElementById('pageInfo');
+
     if (countElement) {
       if (count === 0) {
         countElement.textContent = 'No employees';
@@ -241,6 +265,36 @@
       } else {
         countElement.textContent = 'Showing ' + count + ' employees';
       }
+    }
+
+    // Show/hide pagination controls
+    if (pagination && pagination.totalPages > 1) {
+      if (paginationControls) paginationControls.style.display = '';
+      if (pageInfo) pageInfo.textContent = 'Page ' + pagination.page + ' of ' + pagination.totalPages;
+
+      // Enable/disable buttons based on current page
+      if (prevBtn) {
+        if (pagination.page <= 1) {
+          prevBtn.disabled = true;
+          prevBtn.classList.add('disabled');
+        } else {
+          prevBtn.disabled = false;
+          prevBtn.classList.remove('disabled');
+        }
+      }
+
+      if (nextBtn) {
+        if (pagination.page >= pagination.totalPages) {
+          nextBtn.disabled = true;
+          nextBtn.classList.add('disabled');
+        } else {
+          nextBtn.disabled = false;
+          nextBtn.classList.remove('disabled');
+        }
+      }
+    } else {
+      // Hide pagination if only 1 page
+      if (paginationControls) paginationControls.style.display = 'none';
     }
   }
 
@@ -263,6 +317,7 @@
    * Apply filters
    */
   function applyFilters() {
+    currentPage = 1; // Reset to first page when filters change
     loadEmployees();
   }
 
@@ -273,12 +328,31 @@
     var searchInput = document.getElementById('searchInput');
     var employerFilter = document.getElementById('employerFilter');
     var statusFilter = document.getElementById('statusFilter');
-    
+
     if (searchInput) searchInput.value = '';
     if (employerFilter) employerFilter.value = '';
     if (statusFilter) statusFilter.value = '';
-    
+
+    currentPage = 1;
     loadEmployees();
+  }
+
+  /**
+   * Go to previous page
+   */
+  function previousPage() {
+    if (currentPagination && currentPage > 1) {
+      loadEmployees(currentPage - 1);
+    }
+  }
+
+  /**
+   * Go to next page
+   */
+  function nextPage() {
+    if (currentPagination && currentPage < currentPagination.totalPages) {
+      loadEmployees(currentPage + 1);
+    }
   }
 
   /**
