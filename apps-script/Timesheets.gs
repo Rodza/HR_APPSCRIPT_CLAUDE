@@ -842,7 +842,7 @@ function addPendingTimesheet(data) {
     // Generate ID
     const id = generateFullUUID();
     const importedBy = getCurrentUser();
-    const importedDate = normalizeToDateOnly(new Date());
+    const importedDate = new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
     const weekEnding = parseDate(data.weekEnding);
 
     // Prepare row data
@@ -1008,8 +1008,8 @@ function approveTimesheet(id) {
     // Check if payslip already exists for this employee/week
     // Use the WEEKENDING from the pending timesheet (set during import from raw clock data)
     const weekEnding = timesheetRecord['WEEKENDING']
-      ? normalizeToDateOnly(new Date(timesheetRecord['WEEKENDING']))
-      : normalizeToDateOnly(getWeekEnding(new Date()));
+      ? parseDate(timesheetRecord['WEEKENDING'])
+      : parseDate(getWeekEnding(new Date()));
     const duplicatePayslip = checkDuplicatePayslip(timesheetRecord['EMPLOYEE NAME'], weekEnding);
 
     if (duplicatePayslip) {
@@ -1053,7 +1053,7 @@ function approveTimesheet(id) {
 
     pendingSheet.getRange(rowIndex, statusCol + 1).setValue('Approved');
     pendingSheet.getRange(rowIndex, reviewedByCol + 1).setValue(getCurrentUser());
-    pendingSheet.getRange(rowIndex, reviewedDateCol + 1).setValue(normalizeToDateOnly(new Date()));
+    pendingSheet.getRange(rowIndex, reviewedDateCol + 1).setValue(new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate()));
 
     SpreadsheetApp.flush();
 
@@ -1123,7 +1123,7 @@ function rejectTimesheet(id, reason) {
     // Update status
     pendingSheet.getRange(rowIndex, statusCol + 1).setValue('Rejected');
     pendingSheet.getRange(rowIndex, reviewedByCol + 1).setValue(getCurrentUser());
-    pendingSheet.getRange(rowIndex, reviewedDateCol + 1).setValue(normalizeToDateOnly(new Date()));
+    pendingSheet.getRange(rowIndex, reviewedDateCol + 1).setValue(new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate()));
 
     if (reason) {
       const currentNotes = sheetData[rowIndex - 1][notesCol] || '';
@@ -1639,6 +1639,7 @@ function parseClockDataExcel_v2(fileBlob) {
     Logger.log('📁 Created temp file with ID: ' + fileId);
 
     let data;
+    let displayData;
     let convertedFileId;
 
     try {
@@ -1679,7 +1680,7 @@ function parseClockDataExcel_v2(fileBlob) {
       // Get both raw values and display values for comparison
       const range = sheet.getDataRange();
       data = range.getValues(); // Get Date objects
-      const displayData = range.getDisplayValues(); // Get formatted strings
+      displayData = range.getDisplayValues(); // Get formatted strings
 
       Logger.log('📊 Retrieved ' + data.length + ' rows from converted sheet');
       Logger.log('========================================\n');
@@ -2351,7 +2352,7 @@ function createEnhancedPendingTimesheet(data) {
       data.notes || '',                // 17. NOTES ✅ Fixed position
       'Pending',                       // 18. STATUS ✅ Fixed position
       getCurrentUser(),                // 19. IMPORTED_BY ✅ Fixed position
-      normalizeToDateOnly(new Date()), // 20. IMPORTED_DATE ✅ Fixed position
+      new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate()), // 20. IMPORTED_DATE (date only, no time)
       '',                              // 21. REVIEWED_BY ✅ Fixed position
       '',                              // 22. REVIEWED_DATE ✅ Fixed position
       '',                              // 23. PAYSLIP_ID ✅ Fixed position
