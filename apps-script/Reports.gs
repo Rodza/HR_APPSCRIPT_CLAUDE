@@ -731,339 +731,207 @@ function generateWeeklyPayrollSummaryReport(weekEnding) {
       paidToAccounts: 0
     };
 
-    const byEmployer = {};
+    // Group payslips by employment status
     const byEmploymentStatus = {};
-
-    // DEBUG: Log first payslip to see what fields are available
-    if (payslips.length > 0) {
-      Logger.log('🔍 DEBUG: First payslip keys: ' + Object.keys(payslips[0]).join(', '));
-      Logger.log('🔍 DEBUG: First payslip PaidtoAccount value: ' + payslips[0]['PaidtoAccount']);
-      Logger.log('🔍 DEBUG: First payslip PaidtoAccount type: ' + typeof payslips[0]['PaidtoAccount']);
-      Logger.log('🔍 DEBUG: First payslip NETTSALARY: ' + payslips[0]['NETTSALARY']);
-    }
 
     for (let i = 0; i < payslips.length; i++) {
       const p = payslips[i];
+      const status = p['EMPLOYMENT STATUS'] || 'Unknown';
 
-      const totalHours = (p['HOURS'] || 0) + ((p['MINUTES'] || 0) / 60);
-      const totalOvertimeHours = (p['OVERTIMEHOURS'] || 0) + ((p['OVERTIMEMINUTES'] || 0) / 60);
-
-      // DEBUG: Log PaidtoAccount for first 3 payslips
-      if (i < 3) {
-        Logger.log('🔍 Payslip ' + (i + 1) + ' (' + p['EMPLOYEE NAME'] + '): PaidtoAccount = ' + p['PaidtoAccount'] + ', Net = ' + p['NETTSALARY']);
+      if (!byEmploymentStatus[status]) {
+        byEmploymentStatus[status] = [];
       }
-
-      totals.standardHours += totalHours;
-      totals.overtimeHours += totalOvertimeHours;
-      totals.leavePay += p['LEAVE PAY'] || 0;
-      totals.bonusPay += p['BONUS PAY'] || 0;
-      totals.otherIncome += p['OTHERINCOME'] || 0;
-      totals.grossPay += p['GROSSSALARY'] || 0;
-      totals.uif += p['UIF'] || 0;
-      totals.otherDeductions += p['OTHER DEDUCTIONS'] || 0;
-      totals.loanDeductions += p['LoanDeductionThisWeek'] || 0;
-      totals.newLoans += p['NewLoanThisWeek'] || 0;
-      totals.netPay += p['NETTSALARY'] || 0;
-
-      const paidToAccountValue = p['PaidtoAccount'] || 0;
-      totals.paidToAccounts += paidToAccountValue;
-
-      // DEBUG: Log the running total
-      if (i < 3) {
-        Logger.log('🔍   Added ' + paidToAccountValue + ' to total, running total now: ' + totals.paidToAccounts);
-      }
-
-      // Track by employer
-      const employer = p['EMPLOYER'];
-      if (!byEmployer[employer]) {
-        byEmployer[employer] = {
-          count: 0,
-          grossPay: 0,
-          netPay: 0,
-          paidToAccounts: 0
-        };
-      }
-
-      byEmployer[employer].count++;
-      byEmployer[employer].grossPay += p['GROSSSALARY'] || 0;
-      byEmployer[employer].netPay += p['NETTSALARY'] || 0;
-      byEmployer[employer].paidToAccounts += p['PaidtoAccount'] || 0;
-
-      // Track by employment status
-      const employmentStatus = p['EMPLOYMENT STATUS'] || 'Unknown';
-      if (!byEmploymentStatus[employmentStatus]) {
-        byEmploymentStatus[employmentStatus] = {
-          count: 0,
-          grossPay: 0,
-          netPay: 0,
-          paidToAccounts: 0
-        };
-      }
-
-      byEmploymentStatus[employmentStatus].count++;
-      byEmploymentStatus[employmentStatus].grossPay += p['GROSSSALARY'] || 0;
-      byEmploymentStatus[employmentStatus].netPay += p['NETTSALARY'] || 0;
-      byEmploymentStatus[employmentStatus].paidToAccounts += p['PaidtoAccount'] || 0;
+      byEmploymentStatus[status].push(p);
     }
 
     // Create Google Sheet
     const fileName = 'Weekly Payroll Summary - ' + formatDate(weekEnd);
     const spreadsheet = SpreadsheetApp.create(fileName);
 
-    // ===== TAB 1: Payroll Register =====
+    // ===== Payroll Register =====
     const registerSheet = spreadsheet.getActiveSheet();
     registerSheet.setName('Payroll Register');
 
-    // Header - set text first (merge will happen after setting widths)
+    // Main Header
     registerSheet.getRange('A1').setValue('WEEKLY PAYROLL REGISTER - Week Ending: ' + formatDate(weekEnd));
     registerSheet.setRowHeight(1, 30);
-
-    // Column headers
-    registerSheet.getRange('A3:O3').setValues([[
-      'Employee',
-      'Employer',
-      'Std Hours',
-      'OT Hours',
-      'Leave Pay',
-      'Bonus Pay',
-      'Other Income',
-      'Other Income Notes',
-      'Gross Pay',
-      'UIF',
-      'Other Ded.',
-      'Net Pay',
-      'Loan Ded.',
-      'New Loan',
-      'Paid to Account'
-    ]]);
-    registerSheet.getRange('A3:O3').setFontWeight('bold').setBackground('#4CAF50').setFontColor('#FFFFFF').setHorizontalAlignment('center');
-    registerSheet.setRowHeight(3, 25);
-
-    // Data rows
-    let rowNum = 4;
-    for (let i = 0; i < payslips.length; i++) {
-      const p = payslips[i];
-      const stdHours = (p['HOURS'] || 0) + ((p['MINUTES'] || 0) / 60);
-      const otHours = (p['OVERTIMEHOURS'] || 0) + ((p['OVERTIMEMINUTES'] || 0) / 60);
-
-      // Collect Other Income notes if present
-      const otherIncomeNotes = ((p['OTHERINCOME'] || 0) > 0 && p['OTHER INCOME TEXT']) ? p['OTHER INCOME TEXT'] : '';
-
-      registerSheet.getRange(rowNum, 1, 1, 15).setValues([[
-        p['EMPLOYEE NAME'],
-        p['EMPLOYER'],
-        decimalHoursToTime(stdHours),
-        decimalHoursToTime(otHours),
-        p['LEAVE PAY'] || 0,
-        p['BONUS PAY'] || 0,
-        p['OTHERINCOME'] || 0,
-        otherIncomeNotes,
-        p['GROSSSALARY'] || 0,
-        p['UIF'] || 0,
-        p['OTHER DEDUCTIONS'] || 0,
-        p['NETTSALARY'] || 0,
-        p['LoanDeductionThisWeek'] || 0,
-        p['NewLoanThisWeek'] || 0,
-        p['PaidtoAccount'] || 0
-      ]]);
-      rowNum++;
-    }
-
-    // Totals row
-    registerSheet.getRange(rowNum, 1, 1, 15).setValues([[
-      'TOTALS',
-      totals.employees + ' employees',
-      decimalHoursToTime(totals.standardHours),
-      decimalHoursToTime(totals.overtimeHours),
-      totals.leavePay,
-      totals.bonusPay,
-      totals.otherIncome,
-      '',  // No total for notes column
-      totals.grossPay,
-      totals.uif,
-      totals.otherDeductions,
-      totals.netPay,
-      totals.loanDeductions,
-      totals.newLoans,
-      totals.paidToAccounts
-    ]]);
-    registerSheet.getRange(rowNum, 1, 1, 15).setFontWeight('bold').setBackground('#FFD700');
-
-    // Format currency and number columns
-    registerSheet.getRange(4, 3, payslips.length + 1, 2).setNumberFormat('@');  // Columns C-D - Std Hours and OT Hours as text (HH:MM format)
-    registerSheet.getRange(4, 5, payslips.length + 1, 3).setNumberFormat('"R"#,##0.00');  // Columns E-G - Leave Pay, Bonus Pay, Other Income
-    // Column H (Other Income Notes) is text, no formatting needed
-    registerSheet.getRange(4, 9, payslips.length + 1, 7).setNumberFormat('"R"#,##0.00');  // Columns I-O - Gross Pay through Paid to Account
 
     // Set hardcoded column widths for optimal layout
     registerSheet.setColumnWidth(1, 220);  // Column A - Employee
     registerSheet.setColumnWidth(2, 135);  // Column B - Employer
-    registerSheet.setColumnWidth(3, 80);   // Column C - Std Hours
-    registerSheet.setColumnWidth(4, 80);   // Column D - OT Hours
-    registerSheet.setColumnWidth(5, 90);   // Column E - Leave Pay
-    registerSheet.setColumnWidth(6, 90);   // Column F - Bonus Pay
-    registerSheet.setColumnWidth(7, 100);  // Column G - Other Income
-    registerSheet.setColumnWidth(8, 150);  // Column H - Other Income Notes
-    registerSheet.setColumnWidth(9, 90);   // Column I - Gross Pay
-    registerSheet.setColumnWidth(10, 80);  // Column J - UIF
-    registerSheet.setColumnWidth(11, 110); // Column K - Other Ded.
-    registerSheet.setColumnWidth(12, 110); // Column L - Net Pay
-    registerSheet.setColumnWidth(13, 110); // Column M - Loan Ded.
-    registerSheet.setColumnWidth(14, 110); // Column N - New Loan
-    registerSheet.setColumnWidth(15, 110); // Column O - Paid to Account
+    registerSheet.setColumnWidth(3, 110);  // Column C - Employment Status
+    registerSheet.setColumnWidth(4, 90);   // Column D - Hourly Rate
+    registerSheet.setColumnWidth(5, 80);   // Column E - Std Hours
+    registerSheet.setColumnWidth(6, 80);   // Column F - OT Hours
+    registerSheet.setColumnWidth(7, 90);   // Column G - Leave Pay
+    registerSheet.setColumnWidth(8, 90);   // Column H - Bonus Pay
+    registerSheet.setColumnWidth(9, 100);  // Column I - Other Income
+    registerSheet.setColumnWidth(10, 150); // Column J - Other Income Notes
+    registerSheet.setColumnWidth(11, 90);  // Column K - Gross Pay
+    registerSheet.setColumnWidth(12, 80);  // Column L - UIF
+    registerSheet.setColumnWidth(13, 110); // Column M - Other Ded.
+    registerSheet.setColumnWidth(14, 110); // Column N - Net Pay
+    registerSheet.setColumnWidth(15, 110); // Column O - Loan Ded.
+    registerSheet.setColumnWidth(16, 110); // Column P - New Loan
+    registerSheet.setColumnWidth(17, 110); // Column Q - Paid to Account
 
-    // Merge header cells A1:O1 and apply formatting
-    registerSheet.getRange('A1:O1').merge();
+    // Merge header cells A1:Q1 and apply formatting
+    registerSheet.getRange('A1:Q1').merge();
     registerSheet.getRange('A1').setFontWeight('bold').setFontSize(14).setHorizontalAlignment('center');
 
-    // Add borders to the entire table (from column headers through last data row)
-    const lastRegisterRow = rowNum;
-    const registerTableRange = registerSheet.getRange('A3:O' + lastRegisterRow);
-    registerTableRange.setBorder(true, true, true, true, true, true, 'black', SpreadsheetApp.BorderStyle.SOLID);
+    let rowNum = 3;
 
-    // ===== TAB 2: Summary =====
-    const summarySheet = spreadsheet.insertSheet('Summary');
+    // Sort employment statuses to ensure consistent order
+    const statusOrder = ['Permanent', 'Temporary', 'Resigned', 'Dismissed', 'Absconded', 'Unknown'];
+    const sortedStatuses = Object.keys(byEmploymentStatus).sort((a, b) => {
+      const indexA = statusOrder.indexOf(a);
+      const indexB = statusOrder.indexOf(b);
+      if (indexA === -1 && indexB === -1) return a.localeCompare(b);
+      if (indexA === -1) return 1;
+      if (indexB === -1) return -1;
+      return indexA - indexB;
+    });
 
-    // Header
-    summarySheet.getRange('A1:B1').setValues([['PAYROLL SUMMARY', '']]);
-    summarySheet.getRange('A1:B1').setFontWeight('bold').setFontSize(14);
+    // Create a section for each employment status
+    for (const status of sortedStatuses) {
+      const statusPayslips = byEmploymentStatus[status];
 
-    summarySheet.getRange('A2:B2').setValues([['Week Ending:', formatDate(weekEnd)]]);
+      // Section header
+      registerSheet.getRange(rowNum, 1).setValue('Weekly Report ' + status + ' Employees');
+      registerSheet.getRange(rowNum, 1, 1, 17).merge();
+      registerSheet.getRange(rowNum, 1).setFontWeight('bold').setFontSize(12);
+      registerSheet.setRowHeight(rowNum, 25);
+      rowNum++;
 
-    // Overall summary
-    summarySheet.getRange('A4:B4').setValues([['OVERALL SUMMARY', '']]);
-    summarySheet.getRange('A4:B4').setFontWeight('bold').setBackground('#4CAF50').setFontColor('#FFFFFF');
-
-    summarySheet.getRange('A5:B12').setValues([
-      ['Total Employees:', totals.employees],
-      ['Total Standard Hours:', totals.standardHours],
-      ['Total Overtime Hours:', totals.overtimeHours],
-      ['Total Gross Pay:', totals.grossPay],
-      ['Total UIF:', totals.uif],
-      ['Total Deductions:', totals.otherDeductions + totals.loanDeductions],
-      ['Total Net Pay:', totals.netPay],
-      ['Total Paid to Accounts:', totals.paidToAccounts]
-    ]);
-
-    summarySheet.getRange('A5:A12').setFontWeight('bold');
-    // Format hours as numbers (not currency)
-    summarySheet.getRange('B6:B7').setNumberFormat('0.00');
-    // Format currency values
-    summarySheet.getRange('B8:B12').setNumberFormat('"R"#,##0.00');
-
-    // By employer
-    summarySheet.getRange('A13:B13').setValues([['BY EMPLOYER', '']]);
-    summarySheet.getRange('A13:B13').setFontWeight('bold').setBackground('#4CAF50').setFontColor('#FFFFFF');
-
-    let summaryRow = 14;
-    for (const employer in byEmployer) {
-      const data = byEmployer[employer];
-      summarySheet.getRange(summaryRow, 1, 1, 2).setValues([[employer, '']]);
-      summarySheet.getRange(summaryRow, 1).setFontWeight('bold');
-      summaryRow++;
-
-      summarySheet.getRange(summaryRow, 1, 4, 2).setValues([
-        ['  Employees:', data.count],
-        ['  Gross Pay:', data.grossPay],
-        ['  Net Pay:', data.netPay],
-        ['  Paid to Accounts:', data.paidToAccounts]
-      ]);
-
-      // Format only currency values (Gross Pay, Net Pay, Paid to Accounts), skip Employees count
-      summarySheet.getRange(summaryRow + 1, 2, 3, 1).setNumberFormat('"R"#,##0.00');
-      summaryRow += 5;
-    }
-
-    // By Employment Status
-    summaryRow += 1; // Add extra spacing
-    summarySheet.getRange(summaryRow, 1, 1, 2).setValues([['BY EMPLOYMENT STATUS', '']]);
-    summarySheet.getRange(summaryRow, 1, 1, 2).setFontWeight('bold').setBackground('#4CAF50').setFontColor('#FFFFFF');
-    summaryRow++;
-
-    for (const status in byEmploymentStatus) {
-      const data = byEmploymentStatus[status];
-      summarySheet.getRange(summaryRow, 1, 1, 2).setValues([[status, '']]);
-      summarySheet.getRange(summaryRow, 1).setFontWeight('bold');
-      summaryRow++;
-
-      summarySheet.getRange(summaryRow, 1, 4, 2).setValues([
-        ['  Employees:', data.count],
-        ['  Gross Pay:', data.grossPay],
-        ['  Net Pay:', data.netPay],
-        ['  Paid to Accounts:', data.paidToAccounts]
-      ]);
-
-      // Format only currency values (Gross Pay, Net Pay, Paid to Accounts), skip Employees count
-      summarySheet.getRange(summaryRow + 1, 2, 3, 1).setNumberFormat('"R"#,##0.00');
-      summaryRow += 5;
-    }
-
-    // Auto-resize
-    summarySheet.autoResizeColumns(1, 2);
-
-    // ===== TAB 3: Payslip Received Register =====
-    const receivedSheet = spreadsheet.insertSheet('Payslip Received Register');
-
-    // Header - set text first (merge will happen after auto-resize)
-    receivedSheet.getRange('A1').setValue('Payslip Received Register - Week Ending: ' + formatDate(weekEnd));
-    receivedSheet.setRowHeight(1, 30); // Header row height
-
-    // Column headers
-    receivedSheet.getRange('A3:E3').setValues([[
-      'Weekending',
-      'Employer',
-      'Employee Name',
-      'Record Number',
-      'Signature'
-    ]]);
-    receivedSheet.getRange('A3:E3').setFontWeight('bold').setBackground('#4CAF50').setFontColor('#FFFFFF').setHorizontalAlignment('center');
-    receivedSheet.setRowHeight(3, 25); // Column header row height
-
-    // Data rows
-    let receivedRowNum = 4;
-    for (let i = 0; i < payslips.length; i++) {
-      const p = payslips[i];
-      receivedSheet.getRange(receivedRowNum, 1, 1, 5).setValues([[
-        formatDate(weekEnd),
-        p['EMPLOYER'],
-        p['EMPLOYEE NAME'],
-        p['RECORDNUMBER'],
-        '' // Blank for signature
+      // Column headers
+      registerSheet.getRange(rowNum, 1, 1, 17).setValues([[
+        'Employee',
+        'Employer',
+        'Employment Status',
+        'Hourly Rate',
+        'Std Hours',
+        'OT Hours',
+        'Leave Pay',
+        'Bonus Pay',
+        'Other Income',
+        'Other Income Notes',
+        'Gross Pay',
+        'UIF',
+        'Other Ded.',
+        'Net Pay',
+        'Loan Ded.',
+        'New Loan',
+        'Paid to Account'
       ]]);
-      // Set row height to 50px to accommodate signatures
-      receivedSheet.setRowHeight(receivedRowNum, 50);
-      receivedRowNum++;
+      registerSheet.getRange(rowNum, 1, 1, 17).setFontWeight('bold').setBackground('#4CAF50').setFontColor('#FFFFFF').setHorizontalAlignment('center');
+      registerSheet.setRowHeight(rowNum, 25);
+      const headerRow = rowNum;
+      rowNum++;
+
+      // Calculate section totals
+      let sectionTotals = {
+        employees: statusPayslips.length,
+        standardHours: 0,
+        overtimeHours: 0,
+        leavePay: 0,
+        bonusPay: 0,
+        otherIncome: 0,
+        grossPay: 0,
+        uif: 0,
+        otherDeductions: 0,
+        loanDeductions: 0,
+        newLoans: 0,
+        netPay: 0,
+        paidToAccounts: 0
+      };
+
+      // Data rows
+      const dataStartRow = rowNum;
+      for (let i = 0; i < statusPayslips.length; i++) {
+        const p = statusPayslips[i];
+        const stdHours = (p['HOURS'] || 0) + ((p['MINUTES'] || 0) / 60);
+        const otHours = (p['OVERTIMEHOURS'] || 0) + ((p['OVERTIMEMINUTES'] || 0) / 60);
+
+        // Accumulate totals
+        sectionTotals.standardHours += stdHours;
+        sectionTotals.overtimeHours += otHours;
+        sectionTotals.leavePay += p['LEAVE PAY'] || 0;
+        sectionTotals.bonusPay += p['BONUS PAY'] || 0;
+        sectionTotals.otherIncome += p['OTHERINCOME'] || 0;
+        sectionTotals.grossPay += p['GROSSSALARY'] || 0;
+        sectionTotals.uif += p['UIF'] || 0;
+        sectionTotals.otherDeductions += p['OTHER DEDUCTIONS'] || 0;
+        sectionTotals.loanDeductions += p['LoanDeductionThisWeek'] || 0;
+        sectionTotals.newLoans += p['NewLoanThisWeek'] || 0;
+        sectionTotals.netPay += p['NETTSALARY'] || 0;
+        sectionTotals.paidToAccounts += p['PaidtoAccount'] || 0;
+
+        // Collect Other Income notes if present
+        const otherIncomeNotes = ((p['OTHERINCOME'] || 0) > 0 && p['OTHER INCOME TEXT']) ? p['OTHER INCOME TEXT'] : '';
+
+        registerSheet.getRange(rowNum, 1, 1, 17).setValues([[
+          p['EMPLOYEE NAME'],
+          p['EMPLOYER'],
+          p['EMPLOYMENT STATUS'] || '',
+          p['HOURLY RATE'] || 0,
+          decimalHoursToTime(stdHours),
+          decimalHoursToTime(otHours),
+          p['LEAVE PAY'] || 0,
+          p['BONUS PAY'] || 0,
+          p['OTHERINCOME'] || 0,
+          otherIncomeNotes,
+          p['GROSSSALARY'] || 0,
+          p['UIF'] || 0,
+          p['OTHER DEDUCTIONS'] || 0,
+          p['NETTSALARY'] || 0,
+          p['LoanDeductionThisWeek'] || 0,
+          p['NewLoanThisWeek'] || 0,
+          p['PaidtoAccount'] || 0
+        ]]);
+        rowNum++;
+      }
+
+      // Totals row
+      registerSheet.getRange(rowNum, 1, 1, 17).setValues([[
+        'TOTALS',
+        sectionTotals.employees + ' employees',
+        '',  // No total for employment status
+        '',  // No total for hourly rate
+        decimalHoursToTime(sectionTotals.standardHours),
+        decimalHoursToTime(sectionTotals.overtimeHours),
+        sectionTotals.leavePay,
+        sectionTotals.bonusPay,
+        sectionTotals.otherIncome,
+        '',  // No total for notes column
+        sectionTotals.grossPay,
+        sectionTotals.uif,
+        sectionTotals.otherDeductions,
+        sectionTotals.netPay,
+        sectionTotals.loanDeductions,
+        sectionTotals.newLoans,
+        sectionTotals.paidToAccounts
+      ]]);
+      registerSheet.getRange(rowNum, 1, 1, 17).setFontWeight('bold').setBackground('#FFD700');
+      const totalsRow = rowNum;
+      rowNum++;
+
+      // Format currency and number columns for this section
+      if (statusPayslips.length > 0) {
+        registerSheet.getRange(dataStartRow, 4, statusPayslips.length, 1).setNumberFormat('"R"#,##0.00');  // Column D - Hourly Rate
+        registerSheet.getRange(dataStartRow, 7, statusPayslips.length + 1, 3).setNumberFormat('"R"#,##0.00');  // Columns G-I (Leave Pay to Other Income)
+        registerSheet.getRange(dataStartRow, 11, statusPayslips.length + 1, 7).setNumberFormat('"R"#,##0.00');  // Columns K-Q (Gross Pay through Paid to Account)
+      }
+
+      // Add borders to this section's table
+      const sectionTableRange = registerSheet.getRange(headerRow, 1, rowNum - headerRow, 17);
+      sectionTableRange.setBorder(true, true, true, true, true, true, 'black', SpreadsheetApp.BorderStyle.SOLID);
+
+      // Add spacing between sections
+      rowNum += 2;
     }
-
-    // Set hardcoded column widths for optimal A4 portrait layout
-    receivedSheet.setColumnWidth(1, 85);   // Column A - Weekending
-    receivedSheet.setColumnWidth(2, 135);  // Column B - Employer
-    receivedSheet.setColumnWidth(3, 220);  // Column C - Employee Name
-    receivedSheet.setColumnWidth(4, 110);  // Column D - Record Number
-    receivedSheet.setColumnWidth(5, 220);  // Column E - Signature
-
-    // Merge header cells A1:E1 and apply formatting
-    receivedSheet.getRange('A1:E1').merge();
-    receivedSheet.getRange('A1').setFontWeight('bold').setFontSize(14).setHorizontalAlignment('center');
-
-    // Add borders to the entire table (from column headers through last data row)
-    const lastRow = receivedRowNum - 1;
-    const tableRange = receivedSheet.getRange('A3:E' + lastRow);
-    tableRange.setBorder(true, true, true, true, true, true, 'black', SpreadsheetApp.BorderStyle.SOLID);
-
-    // NOTE: For optimal A4 portrait printing, manually configure in Google Sheets:
-    // File > Print > Set page orientation to Portrait, paper size to A4,
-    // margins to Narrow, and scale to "Fit to width" = 1 page
 
     // Move to reports folder and set sharing
     const reportUrl = moveToReportsFolder(spreadsheet);
-
-    // DEBUG: Log final totals before returning
-    Logger.log('🔍 DEBUG: Final totals before return:');
-    Logger.log('🔍   Total Employees: ' + totals.employees);
-    Logger.log('🔍   Total Gross Pay: ' + totals.grossPay);
-    Logger.log('🔍   Total Net Pay: ' + totals.netPay);
-    Logger.log('🔍   Total Paid to Accounts: ' + totals.paidToAccounts);
 
     Logger.log('✅ Report generated: ' + fileName);
     Logger.log('📎 URL: ' + reportUrl);
@@ -1075,8 +943,7 @@ function generateWeeklyPayrollSummaryReport(weekEnding) {
         url: reportUrl,
         fileName: fileName,
         weekEnding: formatDate(weekEnd),
-        totalEmployees: totals.employees,
-        totalPaidToAccounts: totals.paidToAccounts
+        totalEmployees: payslips.length
       }
     };
 
@@ -1181,69 +1048,22 @@ function generateMonthlyPayrollSummaryReport(monthDate) {
       employeeData[empName].weeksWorked++;
     }
 
-    // Convert to array and sort by employee name
+    // Convert to array and group by employment status
     const employeeArray = Object.values(employeeData);
     employeeArray.sort((a, b) => a.employeeName.localeCompare(b.employeeName));
 
     Logger.log('👥 Unique employees: ' + employeeArray.length);
 
-    // Calculate totals
-    let totals = {
-      employees: employeeArray.length,
-      standardHours: 0,
-      overtimeHours: 0,
-      grossPay: 0,
-      leavePay: 0,
-      bonusPay: 0,
-      otherIncome: 0,
-      uif: 0,
-      otherDeductions: 0,
-      netPay: 0
-    };
-
-    const byEmployer = {};
+    // Group employees by employment status
     const byEmploymentStatus = {};
-
     for (let i = 0; i < employeeArray.length; i++) {
       const emp = employeeArray[i];
+      const status = emp.employmentStatus || 'Unknown';
 
-      totals.standardHours += emp.standardHours;
-      totals.overtimeHours += emp.overtimeHours;
-      totals.grossPay += emp.grossPay;
-      totals.leavePay += emp.leavePay;
-      totals.bonusPay += emp.bonusPay;
-      totals.otherIncome += emp.otherIncome;
-      totals.uif += emp.uif;
-      totals.otherDeductions += emp.otherDeductions;
-      totals.netPay += emp.netPay;
-
-      // Track by employer
-      const employer = emp.employer;
-      if (!byEmployer[employer]) {
-        byEmployer[employer] = {
-          count: 0,
-          grossPay: 0,
-          netPay: 0
-        };
+      if (!byEmploymentStatus[status]) {
+        byEmploymentStatus[status] = [];
       }
-
-      byEmployer[employer].count++;
-      byEmployer[employer].grossPay += emp.grossPay;
-      byEmployer[employer].netPay += emp.netPay;
-
-      // Track by employment status
-      const employmentStatus = emp.employmentStatus || 'Unknown';
-      if (!byEmploymentStatus[employmentStatus]) {
-        byEmploymentStatus[employmentStatus] = {
-          count: 0,
-          grossPay: 0,
-          netPay: 0
-        };
-      }
-
-      byEmploymentStatus[employmentStatus].count++;
-      byEmploymentStatus[employmentStatus].grossPay += emp.grossPay;
-      byEmploymentStatus[employmentStatus].netPay += emp.netPay;
+      byEmploymentStatus[status].push(emp);
     }
 
     // Create Google Sheet
@@ -1252,98 +1072,17 @@ function generateMonthlyPayrollSummaryReport(monthDate) {
     const fileName = 'Monthly Payroll Summary - ' + monthName + ' ' + inputDate.getFullYear();
     const spreadsheet = SpreadsheetApp.create(fileName);
 
-    // ===== TAB 1: Payroll Register =====
+    // ===== Payroll Register =====
     const registerSheet = spreadsheet.getActiveSheet();
     registerSheet.setName('Payroll Register');
 
-    // Header
+    // Main Header
     registerSheet.getRange('A1').setValue('MONTHLY PAYROLL REGISTER - ' + monthName + ' ' + inputDate.getFullYear());
     registerSheet.setRowHeight(1, 30);
 
     // Period row
     registerSheet.getRange('A2').setValue('Period: ' + formatDate(firstFriday) + ' to ' + formatDate(lastFriday));
     registerSheet.getRange('A2').setFontStyle('italic');
-
-    // Column headers
-    registerSheet.getRange('A4:N4').setValues([[
-      'Employee',
-      'Employer',
-      'Employment Status',
-      'Hourly Rate',
-      'Std Hours',
-      'OT Hours',
-      'Leave Pay',
-      'Bonus Pay',
-      'Other Income',
-      'Other Income Notes',
-      'Gross Pay',
-      'UIF',
-      'Other Ded.',
-      'Net Pay'
-    ]]);
-    registerSheet.getRange('A4:N4').setFontWeight('bold').setBackground('#4CAF50').setFontColor('#FFFFFF').setHorizontalAlignment('center');
-    registerSheet.setRowHeight(4, 25);
-
-    // Data rows
-    let rowNum = 5;
-    for (let i = 0; i < employeeArray.length; i++) {
-      const emp = employeeArray[i];
-
-      // Join other income notes with commas
-      const otherIncomeNotesText = emp.otherIncomeNotes.join(', ');
-
-      // Convert hours to HH:MM format
-      const stdHoursFormatted = decimalHoursToTime(emp.standardHours);
-      const otHoursFormatted = decimalHoursToTime(emp.overtimeHours);
-
-      registerSheet.getRange(rowNum, 1, 1, 14).setValues([[
-        emp.employeeName,
-        emp.employer,
-        emp.employmentStatus,
-        emp.hourlyRate,
-        stdHoursFormatted,
-        otHoursFormatted,
-        emp.leavePay,
-        emp.bonusPay,
-        emp.otherIncome,
-        otherIncomeNotesText,
-        emp.grossPay,
-        emp.uif,
-        emp.otherDeductions,
-        emp.netPay
-      ]]);
-      rowNum++;
-    }
-
-    // Totals row
-    const totalStdHoursFormatted = decimalHoursToTime(totals.standardHours);
-    const totalOtHoursFormatted = decimalHoursToTime(totals.overtimeHours);
-
-    registerSheet.getRange(rowNum, 1, 1, 14).setValues([[
-      'TOTALS',
-      totals.employees + ' employees',
-      '',  // No total for employment status
-      '',  // No total for hourly rate
-      totalStdHoursFormatted,
-      totalOtHoursFormatted,
-      totals.leavePay,
-      totals.bonusPay,
-      totals.otherIncome,
-      '',  // No total for notes column
-      totals.grossPay,
-      totals.uif,
-      totals.otherDeductions,
-      totals.netPay
-    ]]);
-    registerSheet.getRange(rowNum, 1, 1, 14).setFontWeight('bold').setBackground('#FFD700');
-
-    // Format currency and number columns
-    registerSheet.getRange(5, 4, employeeArray.length, 1).setNumberFormat('"R"#,##0.00');  // Column D - Hourly Rate (not including totals row)
-    // Columns E and F (Std Hours and OT Hours) are now text format (HH:MM), no number formatting needed
-    registerSheet.getRange(5, 7, employeeArray.length + 1, 3).setNumberFormat('"R"#,##0.00');  // Currency columns G-I (Leave Pay to Other Income)
-    // Column J (Other Income Notes) is text, no formatting needed
-    registerSheet.getRange(5, 11, employeeArray.length + 1, 1).setNumberFormat('"R"#,##0.00');  // Currency column K (Gross Pay)
-    registerSheet.getRange(5, 12, employeeArray.length + 1, 3).setNumberFormat('"R"#,##0.00');  // Currency columns L-N (UIF to Net Pay)
 
     // Set hardcoded column widths for optimal layout
     registerSheet.setColumnWidth(1, 220);  // Column A - Employee
@@ -1365,90 +1104,147 @@ function generateMonthlyPayrollSummaryReport(monthDate) {
     registerSheet.getRange('A1:N1').merge();
     registerSheet.getRange('A1').setFontWeight('bold').setFontSize(14).setHorizontalAlignment('center');
 
-    // Add borders to the entire table (from column headers through last data row)
-    const lastRegisterRow = rowNum;
-    const registerTableRange = registerSheet.getRange('A4:N' + lastRegisterRow);
-    registerTableRange.setBorder(true, true, true, true, true, true, 'black', SpreadsheetApp.BorderStyle.SOLID);
+    let rowNum = 4;
 
-    // ===== TAB 2: Summary =====
-    const summarySheet = spreadsheet.insertSheet('Summary');
+    // Sort employment statuses to ensure consistent order
+    const statusOrder = ['Permanent', 'Temporary', 'Resigned', 'Dismissed', 'Absconded', 'Unknown'];
+    const sortedStatuses = Object.keys(byEmploymentStatus).sort((a, b) => {
+      const indexA = statusOrder.indexOf(a);
+      const indexB = statusOrder.indexOf(b);
+      if (indexA === -1 && indexB === -1) return a.localeCompare(b);
+      if (indexA === -1) return 1;
+      if (indexB === -1) return -1;
+      return indexA - indexB;
+    });
 
-    // Header
-    summarySheet.getRange('A1:B1').setValues([['MONTHLY PAYROLL SUMMARY', '']]);
-    summarySheet.getRange('A1:B1').setFontWeight('bold').setFontSize(14);
+    // Create a section for each employment status
+    for (const status of sortedStatuses) {
+      const employees = byEmploymentStatus[status];
 
-    summarySheet.getRange('A2:B2').setValues([['Month:', monthName + ' ' + inputDate.getFullYear()]]);
-    summarySheet.getRange('A3:B3').setValues([['Period:', formatDate(firstFriday) + ' to ' + formatDate(lastFriday)]]);
+      // Section header
+      registerSheet.getRange(rowNum, 1).setValue('Monthly Report ' + status + ' Employees');
+      registerSheet.getRange(rowNum, 1, 1, 14).merge();
+      registerSheet.getRange(rowNum, 1).setFontWeight('bold').setFontSize(12);
+      registerSheet.setRowHeight(rowNum, 25);
+      rowNum++;
 
-    // Overall summary
-    summarySheet.getRange('A5:B5').setValues([['OVERALL SUMMARY', '']]);
-    summarySheet.getRange('A5:B5').setFontWeight('bold').setBackground('#4CAF50').setFontColor('#FFFFFF');
+      // Column headers
+      registerSheet.getRange(rowNum, 1, 1, 14).setValues([[
+        'Employee',
+        'Employer',
+        'Employment Status',
+        'Hourly Rate',
+        'Std Hours',
+        'OT Hours',
+        'Leave Pay',
+        'Bonus Pay',
+        'Other Income',
+        'Other Income Notes',
+        'Gross Pay',
+        'UIF',
+        'Other Ded.',
+        'Net Pay'
+      ]]);
+      registerSheet.getRange(rowNum, 1, 1, 14).setFontWeight('bold').setBackground('#4CAF50').setFontColor('#FFFFFF').setHorizontalAlignment('center');
+      registerSheet.setRowHeight(rowNum, 25);
+      const headerRow = rowNum;
+      rowNum++;
 
-    summarySheet.getRange('A6:B14').setValues([
-      ['Total Employees:', totals.employees],
-      ['Total Standard Hours:', totals.standardHours],
-      ['Total Overtime Hours:', totals.overtimeHours],
-      ['Total Gross Pay:', totals.grossPay],
-      ['Total Leave Pay:', totals.leavePay],
-      ['Total Bonus Pay:', totals.bonusPay],
-      ['Total Other Income:', totals.otherIncome],
-      ['Total UIF:', totals.uif],
-      ['Total Deductions:', totals.otherDeductions]
-    ]);
+      // Calculate section totals
+      let sectionTotals = {
+        employees: employees.length,
+        standardHours: 0,
+        overtimeHours: 0,
+        grossPay: 0,
+        leavePay: 0,
+        bonusPay: 0,
+        otherIncome: 0,
+        uif: 0,
+        otherDeductions: 0,
+        netPay: 0
+      };
 
-    summarySheet.getRange('A6:A14').setFontWeight('bold');
-    // Format hours as numbers (not currency)
-    summarySheet.getRange('B7:B8').setNumberFormat('0.00');
-    // Format currency values
-    summarySheet.getRange('B9:B14').setNumberFormat('"R"#,##0.00');
+      // Data rows
+      const dataStartRow = rowNum;
+      for (let i = 0; i < employees.length; i++) {
+        const emp = employees[i];
 
-    // By employer
-    summarySheet.getRange('A16:B16').setValues([['BY EMPLOYER', '']]);
-    summarySheet.getRange('A16:B16').setFontWeight('bold').setBackground('#4CAF50').setFontColor('#FFFFFF');
+        // Accumulate totals
+        sectionTotals.standardHours += emp.standardHours;
+        sectionTotals.overtimeHours += emp.overtimeHours;
+        sectionTotals.grossPay += emp.grossPay;
+        sectionTotals.leavePay += emp.leavePay;
+        sectionTotals.bonusPay += emp.bonusPay;
+        sectionTotals.otherIncome += emp.otherIncome;
+        sectionTotals.uif += emp.uif;
+        sectionTotals.otherDeductions += emp.otherDeductions;
+        sectionTotals.netPay += emp.netPay;
 
-    let summaryRow = 17;
-    for (const employer in byEmployer) {
-      const data = byEmployer[employer];
-      summarySheet.getRange(summaryRow, 1, 1, 2).setValues([[employer, '']]);
-      summarySheet.getRange(summaryRow, 1).setFontWeight('bold');
-      summaryRow++;
+        // Join other income notes with commas
+        const otherIncomeNotesText = emp.otherIncomeNotes.join(', ');
 
-      summarySheet.getRange(summaryRow, 1, 3, 2).setValues([
-        ['  Employees:', data.count],
-        ['  Gross Pay:', data.grossPay],
-        ['  Net Pay:', data.netPay]
-      ]);
+        // Convert hours to HH:MM format
+        const stdHoursFormatted = decimalHoursToTime(emp.standardHours);
+        const otHoursFormatted = decimalHoursToTime(emp.overtimeHours);
 
-      // Format only currency values (Gross Pay and Net Pay), skip Employees count
-      summarySheet.getRange(summaryRow + 1, 2, 2, 1).setNumberFormat('"R"#,##0.00');
-      summaryRow += 4;
+        registerSheet.getRange(rowNum, 1, 1, 14).setValues([[
+          emp.employeeName,
+          emp.employer,
+          emp.employmentStatus,
+          emp.hourlyRate,
+          stdHoursFormatted,
+          otHoursFormatted,
+          emp.leavePay,
+          emp.bonusPay,
+          emp.otherIncome,
+          otherIncomeNotesText,
+          emp.grossPay,
+          emp.uif,
+          emp.otherDeductions,
+          emp.netPay
+        ]]);
+        rowNum++;
+      }
+
+      // Totals row
+      const totalStdHoursFormatted = decimalHoursToTime(sectionTotals.standardHours);
+      const totalOtHoursFormatted = decimalHoursToTime(sectionTotals.overtimeHours);
+
+      registerSheet.getRange(rowNum, 1, 1, 14).setValues([[
+        'TOTALS',
+        sectionTotals.employees + ' employees',
+        '',  // No total for employment status
+        '',  // No total for hourly rate
+        totalStdHoursFormatted,
+        totalOtHoursFormatted,
+        sectionTotals.leavePay,
+        sectionTotals.bonusPay,
+        sectionTotals.otherIncome,
+        '',  // No total for notes column
+        sectionTotals.grossPay,
+        sectionTotals.uif,
+        sectionTotals.otherDeductions,
+        sectionTotals.netPay
+      ]]);
+      registerSheet.getRange(rowNum, 1, 1, 14).setFontWeight('bold').setBackground('#FFD700');
+      const totalsRow = rowNum;
+      rowNum++;
+
+      // Format currency and number columns for this section
+      if (employees.length > 0) {
+        registerSheet.getRange(dataStartRow, 4, employees.length, 1).setNumberFormat('"R"#,##0.00');  // Column D - Hourly Rate
+        registerSheet.getRange(dataStartRow, 7, employees.length + 1, 3).setNumberFormat('"R"#,##0.00');  // Columns G-I (Leave Pay to Other Income)
+        registerSheet.getRange(dataStartRow, 11, employees.length + 1, 1).setNumberFormat('"R"#,##0.00');  // Column K (Gross Pay)
+        registerSheet.getRange(dataStartRow, 12, employees.length + 1, 3).setNumberFormat('"R"#,##0.00');  // Columns L-N (UIF to Net Pay)
+      }
+
+      // Add borders to this section's table
+      const sectionTableRange = registerSheet.getRange(headerRow, 1, rowNum - headerRow, 14);
+      sectionTableRange.setBorder(true, true, true, true, true, true, 'black', SpreadsheetApp.BorderStyle.SOLID);
+
+      // Add spacing between sections
+      rowNum += 2;
     }
-
-    // By Employment Status
-    summaryRow += 1; // Add extra spacing
-    summarySheet.getRange(summaryRow, 1, 1, 2).setValues([['BY EMPLOYMENT STATUS', '']]);
-    summarySheet.getRange(summaryRow, 1, 1, 2).setFontWeight('bold').setBackground('#4CAF50').setFontColor('#FFFFFF');
-    summaryRow++;
-
-    for (const status in byEmploymentStatus) {
-      const data = byEmploymentStatus[status];
-      summarySheet.getRange(summaryRow, 1, 1, 2).setValues([[status, '']]);
-      summarySheet.getRange(summaryRow, 1).setFontWeight('bold');
-      summaryRow++;
-
-      summarySheet.getRange(summaryRow, 1, 3, 2).setValues([
-        ['  Employees:', data.count],
-        ['  Gross Pay:', data.grossPay],
-        ['  Net Pay:', data.netPay]
-      ]);
-
-      // Format only currency values (Gross Pay and Net Pay), skip Employees count
-      summarySheet.getRange(summaryRow + 1, 2, 2, 1).setNumberFormat('"R"#,##0.00');
-      summaryRow += 4;
-    }
-
-    // Auto-resize
-    summarySheet.autoResizeColumns(1, 2);
 
     // Move to reports folder and set sharing
     const reportUrl = moveToReportsFolder(spreadsheet);
@@ -1465,8 +1261,7 @@ function generateMonthlyPayrollSummaryReport(monthDate) {
         month: monthName + ' ' + inputDate.getFullYear(),
         periodStart: formatDate(firstFriday),
         periodEnd: formatDate(lastFriday),
-        totalEmployees: totals.employees,
-        totalNetPay: totals.netPay
+        totalEmployees: employeeArray.length
       }
     };
 
