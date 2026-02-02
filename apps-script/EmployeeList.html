@@ -24,8 +24,9 @@
           <option value="">All Status</option>
           <option value="Permanent">Permanent</option>
           <option value="Temporary">Temporary</option>
-          <option value="Contract">Contract</option>
-          <option value="Terminated">Terminated</option>
+          <option value="Resigned">Resigned</option>
+          <option value="Dismissed">Dismissed</option>
+          <option value="Absconded">Absconded</option>
         </select>
       </div>
       <div class="col-md-2">
@@ -403,10 +404,9 @@
         return 'bg-success';
       case 'Temporary':
         return 'bg-warning';
-      case 'Contract':
-        return 'bg-info';
-      case 'Terminated':
       case 'Resigned':
+      case 'Dismissed':
+      case 'Absconded':
         return 'bg-danger';
       default:
         return 'bg-secondary';
