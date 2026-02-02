@@ -124,6 +124,9 @@
             <!-- Table -->
             <div class="table-responsive">
                 <div class="mb-2">
+                    <button class="btn btn-primary btn-sm" onclick="saveAllModified()" id="saveAllBtn" style="display:none;">
+                        <i class="fas fa-save"></i> Save All Changes (<span id="modifiedCount">0</span>)
+                    </button>
                     <button class="btn btn-success btn-sm" onclick="bulkApprove()" id="bulkApproveBtn" style="display:none;">
                         <i class="fas fa-check-double"></i> Approve Selected (<span id="selectedCount">0</span>)
                     </button>
@@ -696,6 +699,19 @@
             if (saveBtn) {
                 saveBtn.style.display = modifiedRows[timesheetId] ? 'inline-block' : 'none';
             }
+
+            // Update Save All button
+            updateSaveAllButton();
+        }
+
+        function updateSaveAllButton() {
+            const modifiedCount = Object.values(modifiedRows).filter(v => v === true).length;
+            document.getElementById('modifiedCount').textContent = modifiedCount;
+            document.getElementById('saveAllBtn').style.display = modifiedCount > 0 ? 'inline-block' : 'none';
+        }
+
+        function hasUnsavedChanges() {
+            return Object.values(modifiedRows).some(v => v === true);
         }
 
         function saveInlineEdit(timesheetId) {
@@ -756,6 +772,9 @@
                             ts.OVERTIMEHOURS = data.overtimeHours;
                             ts.OVERTIMEMINUTES = data.overtimeMinutes;
                         }
+
+                        // Update Save All button
+                        updateSaveAllButton();
                     } else {
                         showError(result.error);
                     }
@@ -765,6 +784,106 @@
                     showError('Error: ' + error.message);
                 })
                 .updatePendingTimesheet(timesheetId, data);
+        }
+
+        function saveAllModified() {
+            const modifiedIds = Object.keys(modifiedRows).filter(id => modifiedRows[id] === true);
+
+            if (modifiedIds.length === 0) {
+                showWarning('No changes to save');
+                return;
+            }
+
+            if (!confirm(`Save changes to ${modifiedIds.length} timesheet(s)?`)) {
+                return;
+            }
+
+            showLoading();
+
+            let saved = 0;
+            let failed = 0;
+            let current = 0;
+
+            function saveNext() {
+                if (current >= modifiedIds.length) {
+                    hideLoading();
+                    if (failed === 0) {
+                        showSuccess(`Successfully saved ${saved} timesheet(s)`);
+                    } else {
+                        showWarning(`Saved ${saved}, failed ${failed}`);
+                    }
+                    // Update Save All button after all saves are complete
+                    updateSaveAllButton();
+                    return;
+                }
+
+                const timesheetId = modifiedIds[current];
+                current++;
+
+                const hours = document.getElementById('hours-' + timesheetId);
+                const mins = document.getElementById('mins-' + timesheetId);
+                const otHours = document.getElementById('ot-hours-' + timesheetId);
+                const otMins = document.getElementById('ot-mins-' + timesheetId);
+
+                if (!hours || !mins || !otHours || !otMins) {
+                    failed++;
+                    saveNext();
+                    return;
+                }
+
+                const data = {
+                    hours: parseInt(hours.value) || 0,
+                    minutes: parseInt(mins.value) || 0,
+                    overtimeHours: parseInt(otHours.value) || 0,
+                    overtimeMinutes: parseInt(otMins.value) || 0,
+                    notes: ''
+                };
+
+                google.script.run
+                    .withSuccessHandler(function(result) {
+                        if (result && result.success) {
+                            saved++;
+
+                            // Update original values and remove modified styling
+                            hours.setAttribute('data-original', hours.value);
+                            mins.setAttribute('data-original', mins.value);
+                            otHours.setAttribute('data-original', otHours.value);
+                            otMins.setAttribute('data-original', otMins.value);
+
+                            hours.classList.remove('modified');
+                            mins.classList.remove('modified');
+                            otHours.classList.remove('modified');
+                            otMins.classList.remove('modified');
+
+                            // Hide save button
+                            const saveBtn = document.getElementById('save-btn-' + timesheetId);
+                            if (saveBtn) {
+                                saveBtn.style.display = 'none';
+                            }
+
+                            modifiedRows[timesheetId] = false;
+
+                            // Update local data
+                            const ts = allTimesheets.find(t => t.ID === timesheetId);
+                            if (ts) {
+                                ts.HOURS = data.hours;
+                                ts.MINUTES = data.minutes;
+                                ts.OVERTIMEHOURS = data.overtimeHours;
+                                ts.OVERTIMEMINUTES = data.overtimeMinutes;
+                            }
+                        } else {
+                            failed++;
+                        }
+                        saveNext();
+                    })
+                    .withFailureHandler(function(error) {
+                        failed++;
+                        saveNext();
+                    })
+                    .updatePendingTimesheet(timesheetId, data);
+            }
+
+            saveNext();
         }
 
         // ==================== BULK SELECTION ====================
@@ -931,6 +1050,23 @@
         // Load timesheets on page load
         document.getElementById('filterStatus').value = 'Pending'; // Default to pending only
         loadTimesheets();
+
+        // Expose unsaved changes check globally for navigation interception
+        window.checkUnsavedChanges = hasUnsavedChanges;
+
+        // Warn user before closing/refreshing if there are unsaved changes
+        window.addEventListener('beforeunload', function(e) {
+            if (hasUnsavedChanges()) {
+                e.preventDefault();
+                e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
+                return e.returnValue;
+            }
+        });
+
+        // Clean up global function when this module is unloaded
+        window.addEventListener('unload', function() {
+            delete window.checkUnsavedChanges;
+        });
 
         // ==================== UTILITY FUNCTIONS ====================
         // These functions allow the module to work standalone (e.g., in OAuth dialogs)

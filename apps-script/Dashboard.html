@@ -374,6 +374,15 @@
         // ==================== MODULE LOADING ====================
 
         function loadModule(module, eventOrData) {
+            // Check for unsaved changes before navigating
+            if (typeof window.checkUnsavedChanges === 'function') {
+                if (window.checkUnsavedChanges()) {
+                    if (!confirm('You have unsaved changes. Do you want to leave without saving?')) {
+                        return; // Cancel navigation
+                    }
+                }
+            }
+
             // Check if the second parameter is an actual event object
             var isEvent = eventOrData && typeof eventOrData.preventDefault === 'function';
             var moduleData = null;
