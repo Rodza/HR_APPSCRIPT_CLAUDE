@@ -376,9 +376,23 @@
         function loadModule(module, eventOrData) {
             // Check for unsaved changes before navigating
             if (typeof window.checkUnsavedChanges === 'function') {
-                if (window.checkUnsavedChanges()) {
-                    if (!confirm('You have unsaved changes. Do you want to leave without saving?')) {
+                // Try to determine if checkUnsavedChanges expects a callback or returns a boolean
+                // by checking its length property (number of parameters)
+                if (window.checkUnsavedChanges.length > 0) {
+                    // Function expects a callback parameter - use callback-based approach
+                    var continueNavigation = false;
+                    window.checkUnsavedChanges(function() {
+                        continueNavigation = true;
+                    });
+                    if (!continueNavigation) {
                         return; // Cancel navigation
+                    }
+                } else {
+                    // Function returns a boolean - use return value approach
+                    if (window.checkUnsavedChanges()) {
+                        if (!confirm('You have unsaved changes. Do you want to leave without saving?')) {
+                            return; // Cancel navigation
+                        }
                     }
                 }
             }
