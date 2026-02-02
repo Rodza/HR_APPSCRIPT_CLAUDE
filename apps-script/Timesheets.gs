@@ -1974,7 +1974,7 @@ function determineWeekEnding(records) {
   // Find latest date
   const latestDate = new Date(Math.max.apply(null, dates));
 
-  // Get week ending (Saturday)
+  // Get week ending (Friday)
   return getWeekEnding(latestDate);
 }
 

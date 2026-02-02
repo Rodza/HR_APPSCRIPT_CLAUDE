@@ -38,7 +38,9 @@ var COMPANY_INFO = {
 var EMPLOYMENT_STATUS_LIST = [
   'Permanent',
   'Temporary',
-  'Contract'
+  'Resigned',
+  'Dismissed',
+  'Absconded'
 ];
 
 /**
