@@ -873,7 +873,7 @@ function generateWeeklyPayrollSummaryReport(weekEnding) {
           p['EMPLOYEE NAME'],
           p['EMPLOYER'],
           p['EMPLOYMENT STATUS'] || '',
-          p['HOURLY RATE'] || 0,
+          p['HOURLYRATE'] || 0,
           decimalHoursToTime(stdHours),
           decimalHoursToTime(otHours),
           p['LEAVE PAY'] || 0,
@@ -929,6 +929,60 @@ function generateWeeklyPayrollSummaryReport(weekEnding) {
       // Add spacing between sections
       rowNum += 2;
     }
+
+    // ===== Payslip Received Register =====
+    const receivedSheet = spreadsheet.insertSheet('Payslip Received Register');
+
+    // Header - set text first (merge will happen after auto-resize)
+    receivedSheet.getRange('A1').setValue('Payslip Received Register - Week Ending: ' + formatDate(weekEnd));
+    receivedSheet.setRowHeight(1, 30); // Header row height
+
+    // Column headers
+    receivedSheet.getRange('A3:E3').setValues([[
+      'Weekending',
+      'Employer',
+      'Employee Name',
+      'Record Number',
+      'Signature'
+    ]]);
+    receivedSheet.getRange('A3:E3').setFontWeight('bold').setBackground('#4CAF50').setFontColor('#FFFFFF').setHorizontalAlignment('center');
+    receivedSheet.setRowHeight(3, 25); // Column header row height
+
+    // Data rows
+    let receivedRowNum = 4;
+    for (let i = 0; i < payslips.length; i++) {
+      const p = payslips[i];
+      receivedSheet.getRange(receivedRowNum, 1, 1, 5).setValues([[
+        formatDate(weekEnd),
+        p['EMPLOYER'],
+        p['EMPLOYEE NAME'],
+        p['RECORDNUMBER'],
+        '' // Blank for signature
+      ]]);
+      // Set row height to 50px to accommodate signatures
+      receivedSheet.setRowHeight(receivedRowNum, 50);
+      receivedRowNum++;
+    }
+
+    // Set hardcoded column widths for optimal A4 portrait layout
+    receivedSheet.setColumnWidth(1, 85);   // Column A - Weekending
+    receivedSheet.setColumnWidth(2, 135);  // Column B - Employer
+    receivedSheet.setColumnWidth(3, 220);  // Column C - Employee Name
+    receivedSheet.setColumnWidth(4, 110);  // Column D - Record Number
+    receivedSheet.setColumnWidth(5, 220);  // Column E - Signature
+
+    // Merge header cells A1:E1 and apply formatting
+    receivedSheet.getRange('A1:E1').merge();
+    receivedSheet.getRange('A1').setFontWeight('bold').setFontSize(14).setHorizontalAlignment('center');
+
+    // Add borders to the entire table (from column headers through last data row)
+    const lastRow = receivedRowNum - 1;
+    const tableRange = receivedSheet.getRange('A3:E' + lastRow);
+    tableRange.setBorder(true, true, true, true, true, true, 'black', SpreadsheetApp.BorderStyle.SOLID);
+
+    // NOTE: For optimal A4 portrait printing, manually configure in Google Sheets:
+    // File > Print > Set page orientation to Portrait, paper size to A4,
+    // margins to Narrow, and scale to "Fit to width" = 1 page
 
     // Move to reports folder and set sharing
     const reportUrl = moveToReportsFolder(spreadsheet);
