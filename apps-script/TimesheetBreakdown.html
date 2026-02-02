@@ -481,14 +481,13 @@
 
             // First filter by week and also filter each employee's dailyBreakdown
             if (weekFilter) {
-                filtered = filtered
-                    .filter(e => e.weekEnding === weekFilter)
-                    .map(e => {
-                        // Calculate the week start date (Monday) from the week ending date (Friday)
-                        const weekEndDate = new Date(weekFilter);
-                        const weekStartDate = new Date(weekEndDate);
-                        weekStartDate.setDate(weekEndDate.getDate() - 4); // Friday - 4 = Monday
+                // Calculate the week start date (Monday) from the week ending date (Friday)
+                const weekEndDate = new Date(weekFilter);
+                const weekStartDate = new Date(weekEndDate);
+                weekStartDate.setDate(weekEndDate.getDate() - 4); // Friday - 4 = Monday
 
+                filtered = filtered
+                    .map(e => {
                         // Filter dailyBreakdown to only include days within this week
                         const filteredBreakdown = e.dailyBreakdown.filter(d => {
                             const dayDate = new Date(d.date);
@@ -508,9 +507,11 @@
                             ...e,
                             dailyBreakdown: filteredBreakdown,
                             totalMinutes: recalculatedTotalMinutes,
-                            lunchDeductionMinutes: recalculatedLunchMinutes
+                            lunchDeductionMinutes: recalculatedLunchMinutes,
+                            weekEnding: weekFilter // Update weekEnding to match the filtered week
                         };
-                    });
+                    })
+                    .filter(e => e.dailyBreakdown.length > 0); // Only keep employees with at least one day in this week
             }
 
             if (searchTerm) {
