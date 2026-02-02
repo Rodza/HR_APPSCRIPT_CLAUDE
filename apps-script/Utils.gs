@@ -935,30 +935,30 @@ function parseExcelDate(value) {
 }
 
 /**
- * Get week ending date (Saturday) for a given date
+ * Get week ending date (Friday) for a given date
  *
  * @param {Date|string} date - Date to get week ending for
- * @returns {Date} Saturday of that week
+ * @returns {Date} Friday of that week
  */
 function getWeekEnding(date) {
   var d = parseDate(date);
 
-  // Get day of week (0 = Sunday, 6 = Saturday)
+  // Get day of week (0 = Sunday, 5 = Friday, 6 = Saturday)
   var dayOfWeek = d.getDay();
 
-  // Calculate days until Saturday
-  var daysUntilSaturday = (6 - dayOfWeek + 7) % 7;
+  // Calculate days until Friday
+  var daysUntilFriday = (5 - dayOfWeek + 7) % 7;
 
-  // If already Saturday, use current date
-  if (daysUntilSaturday === 0 && dayOfWeek === 6) {
+  // If already Friday, use current date
+  if (daysUntilFriday === 0 && dayOfWeek === 5) {
     return d;
   }
 
-  // Add days to get to Saturday
-  var saturday = new Date(d);
-  saturday.setDate(d.getDate() + daysUntilSaturday);
+  // Add days to get to Friday
+  var friday = new Date(d);
+  friday.setDate(d.getDate() + daysUntilFriday);
 
-  return saturday;
+  return friday;
 }
 
 /**
