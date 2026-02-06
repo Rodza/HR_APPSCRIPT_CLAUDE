@@ -966,6 +966,29 @@ function processDayData(dayData, config) {
       // Don't count morning time
       appliedRules.push('noMorningClockIn');
     }
+
+    // Check 6: Bathroom visit immediately after clock-in (within 10 minutes)
+    if (punches[0].type === 'in' && dayData.bathroomPunches.length > 0) {
+      var EARLY_BATHROOM_THRESHOLD_MS = 10 * 60 * 1000; // 10 minutes
+      var clockInTime = punches[0].time;
+
+      for (var b = 0; b < dayData.bathroomPunches.length; b++) {
+        var bp = dayData.bathroomPunches[b];
+        var deviceLower = (bp.device || '').toLowerCase();
+
+        // Only check bathroom entries, not exits
+        if (deviceLower.indexOf('entry') < 0) continue;
+
+        var timeSinceClockIn = bp.time.getTime() - clockInTime.getTime();
+        if (timeSinceClockIn > 0 && timeSinceClockIn <= EARLY_BATHROOM_THRESHOLD_MS) {
+          var minutesAfter = Math.round(timeSinceClockIn / 60000);
+          warnings.push('Bathroom visit ' + minutesAfter + ' min after clock-in (Clock-in: ' +
+                         formatTime(clockInTime) + ', Bathroom entry: ' + formatTime(bp.time) + ')');
+          appliedRules.push('earlyBathroomAfterClockIn');
+          break; // Only flag once per day
+        }
+      }
+    }
   }
 
   // Checks for Mon-Thu (expected 4 punches)
