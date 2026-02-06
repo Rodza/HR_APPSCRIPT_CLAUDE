@@ -1033,6 +1033,44 @@ function processDayData(dayData, config) {
   Logger.log('  First IN: ' + (firstIn ? formatTime(firstIn) : 'NONE'));
   Logger.log('  Last OUT: ' + (lastOut ? formatTime(lastOut) : 'NONE'));
 
+  // GUARD: Bathroom-only day — employee only scanned at bathroom devices, never at main clock
+  // Do NOT project a full day; flag for manual supervisor review instead
+  if (dayData.clockInPunches.length === 0 && dayData.bathroomPunches.length > 0) {
+    Logger.log('  ⚠️ BATHROOM-ONLY DAY: ' + dayData.bathroomPunches.length + ' bathroom punch(es), 0 main punches');
+    warnings.push('Bathroom clock only - no main device clock-in/out detected. Day requires manual review');
+    appliedRules.push('bathroomOnlyDay');
+
+    // Still calculate bathroom data for reference display
+    var bathroomResult = calculateBathroomTime(dayData.bathroomPunches, config, [], isFriday);
+    if (bathroomResult.warnings.length > 0) {
+      warnings = warnings.concat(bathroomResult.warnings);
+    }
+
+    // Collect bathroom punch times for display
+    var bathroomPunchTimes = [];
+    for (var i = 0; i < dayData.bathroomPunches.length; i++) {
+      bathroomPunchTimes.push(formatTime(dayData.bathroomPunches[i].time));
+    }
+
+    return {
+      date: dayData.date,
+      clockIn: null,
+      clockOut: null,
+      adjustedIn: null,
+      adjustedOut: null,
+      punchTimes: bathroomPunchTimes,
+      lunchTaken: false,
+      lunchMinutes: 0,
+      bathroomMinutes: 0,
+      bathroomBreaks: bathroomResult.breaks,
+      bathroomUnpairedEntries: bathroomResult.unpairedEntries,
+      bathroomUnpairedExits: bathroomResult.unpairedExits,
+      totalMinutes: 0,
+      warnings: warnings,
+      appliedRules: appliedRules
+    };
+  }
+
   // If incomplete day and projectIncompleteDays is enabled
   if (config.projectIncompleteDays && (!firstIn || !lastOut)) {
     warnings.push('Incomplete day - missing clock-in or clock-out');
