@@ -285,7 +285,7 @@
 
     /**
      * Format ISO 8601 datetime for display
-     * Converts ISO format to DD-MM-YYYY HH:MM
+     * Converts ISO format to DD-MM-YYYY (date only)
      */
     window.formatISODateTime = function(isoString) {
       if (!isoString) return '';
@@ -294,14 +294,12 @@
         var d = new Date(isoString);
         if (isNaN(d.getTime())) return '';
 
-        // Format: DD-MM-YYYY HH:MM
+        // Format: DD-MM-YYYY (date only, no time)
         var day = String(d.getDate()).padStart(2, '0');
         var month = String(d.getMonth() + 1).padStart(2, '0');
         var year = d.getFullYear();
-        var hours = String(d.getHours()).padStart(2, '0');
-        var minutes = String(d.getMinutes()).padStart(2, '0');
 
-        return day + '-' + month + '-' + year + ' ' + hours + ':' + minutes;
+        return day + '-' + month + '-' + year;
       } catch (e) {
         return '';
       }
