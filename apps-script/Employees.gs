@@ -103,13 +103,8 @@ function sanitizeEmployeeForWeb(emp) {
       var value = emp[key];
 
       // Convert Date objects to DD-MM-YYYY format (date only, no time)
-      // Exception: EMPLSTATUSCHANGED should be kept in ISO 8601 format
       if (value instanceof Date) {
-        if (key === 'EMPLSTATUSCHANGED') {
-          sanitized[key] = value.toISOString();
-        } else {
-          sanitized[key] = formatDateDDMMYYYY(value);
-        }
+        sanitized[key] = formatDateDDMMYYYY(value);
       }
       // Convert null/undefined to empty string
       else if (value === null || value === undefined) {
@@ -714,9 +709,9 @@ function updateEmployee(id, employeeData, sessionToken) {
     var oldStatusNormalized = oldEmploymentStatus ? String(oldEmploymentStatus).trim() : '';
     var newStatusNormalized = newEmploymentStatus ? String(newEmploymentStatus).trim() : '';
 
-    // If employment status is changing, capture the date in ISO 8601 format
+    // If employment status is changing, capture the date in ISO date format (YYYY-MM-DD)
     if (newStatusNormalized && oldStatusNormalized !== newStatusNormalized) {
-      employeeData.EMPLSTATUSCHANGED = new Date().toISOString();
+      employeeData.EMPLSTATUSCHANGED = new Date().toISOString().substring(0, 10);
       logInfo('Employment status changed from "' + oldStatusNormalized + '" to "' + newStatusNormalized + '"');
     }
 

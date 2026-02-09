@@ -368,7 +368,17 @@
             if (!isoString) return '';
 
             try {
-                const d = new Date(isoString);
+                // Handle both ISO date (YYYY-MM-DD) and ISO timestamp formats
+                var d;
+                if (typeof isoString === 'string' && isoString.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                    // YYYY-MM-DD format
+                    var parts = isoString.split('-');
+                    d = new Date(parts[0], parts[1] - 1, parts[2]);
+                } else {
+                    // Full ISO timestamp or other format
+                    d = new Date(isoString);
+                }
+
                 if (isNaN(d.getTime())) return '';
 
                 // Format: DD-MM-YYYY (date only, no time)
