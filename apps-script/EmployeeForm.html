@@ -271,7 +271,8 @@
             document.getElementById('incomeTaxNumber').value = employee['INCOME TAX NUMBER'] || '';
             document.getElementById('terminationDate').value = employee['TERMINATION DATE'] ?
                 formatDateForInput(employee['TERMINATION DATE']) : '';
-            document.getElementById('emplStatusChanged').value = employee.EMPLSTATUSCHANGED || '';
+            document.getElementById('emplStatusChanged').value = employee.EMPLSTATUSCHANGED ?
+                formatISODateTimeForDisplay(employee.EMPLSTATUSCHANGED) : '';
             document.getElementById('overalSize').value = employee.OveralSize || '';
             document.getElementById('shoeSize').value = employee.ShoeSize || '';
             document.getElementById('notes').value = employee.NOTES || '';
@@ -361,6 +362,26 @@
             const month = String(d.getMonth() + 1).padStart(2, '0');
             const day = String(d.getDate()).padStart(2, '0');
             return `${year}-${month}-${day}`;
+        }
+
+        function formatISODateTimeForDisplay(isoString) {
+            if (!isoString) return '';
+
+            try {
+                const d = new Date(isoString);
+                if (isNaN(d.getTime())) return '';
+
+                // Format: DD-MM-YYYY HH:MM
+                const day = String(d.getDate()).padStart(2, '0');
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const year = d.getFullYear();
+                const hours = String(d.getHours()).padStart(2, '0');
+                const minutes = String(d.getMinutes()).padStart(2, '0');
+
+                return `${day}-${month}-${year} ${hours}:${minutes}`;
+            } catch (e) {
+                return '';
+            }
         }
 
         // Initialize form when DOM is ready
