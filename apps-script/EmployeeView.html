@@ -172,6 +172,14 @@
           </div>
         </div>
         ` : ''}
+        ${employee.EMPLSTATUSCHANGED ? `
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label class="text-muted small">Status Changed Date</label>
+            <div>${formatISODateTime(employee.EMPLSTATUSCHANGED)}</div>
+          </div>
+        </div>
+        ` : ''}
       </div>
 
       <!-- Additional Information -->
@@ -273,6 +281,39 @@
       }
 
       return d.toLocaleDateString('en-ZA', { year: 'numeric', month: 'long', day: 'numeric' });
+    };
+
+    /**
+     * Format ISO 8601 datetime for display
+     * Converts ISO format to DD-MM-YYYY (date only)
+     * Handles both YYYY-MM-DD and full ISO timestamp formats
+     */
+    window.formatISODateTime = function(isoString) {
+      if (!isoString) return '';
+
+      try {
+        // Handle both ISO date (YYYY-MM-DD) and ISO timestamp formats
+        var d;
+        if (typeof isoString === 'string' && isoString.match(/^\d{4}-\d{2}-\d{2}$/)) {
+          // YYYY-MM-DD format
+          var parts = isoString.split('-');
+          d = new Date(parts[0], parts[1] - 1, parts[2]);
+        } else {
+          // Full ISO timestamp or other format
+          d = new Date(isoString);
+        }
+
+        if (isNaN(d.getTime())) return '';
+
+        // Format: DD-MM-YYYY (date only, no time)
+        var day = String(d.getDate()).padStart(2, '0');
+        var month = String(d.getMonth() + 1).padStart(2, '0');
+        var year = d.getFullYear();
+
+        return day + '-' + month + '-' + year;
+      } catch (e) {
+        return '';
+      }
     };
 
     /**

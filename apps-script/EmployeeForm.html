@@ -271,7 +271,8 @@
             document.getElementById('incomeTaxNumber').value = employee['INCOME TAX NUMBER'] || '';
             document.getElementById('terminationDate').value = employee['TERMINATION DATE'] ?
                 formatDateForInput(employee['TERMINATION DATE']) : '';
-            document.getElementById('emplStatusChanged').value = employee.EMPLSTATUSCHANGED || '';
+            document.getElementById('emplStatusChanged').value = employee.EMPLSTATUSCHANGED ?
+                formatISODateTimeForDisplay(employee.EMPLSTATUSCHANGED) : '';
             document.getElementById('overalSize').value = employee.OveralSize || '';
             document.getElementById('shoeSize').value = employee.ShoeSize || '';
             document.getElementById('notes').value = employee.NOTES || '';
@@ -361,6 +362,34 @@
             const month = String(d.getMonth() + 1).padStart(2, '0');
             const day = String(d.getDate()).padStart(2, '0');
             return `${year}-${month}-${day}`;
+        }
+
+        function formatISODateTimeForDisplay(isoString) {
+            if (!isoString) return '';
+
+            try {
+                // Handle both ISO date (YYYY-MM-DD) and ISO timestamp formats
+                var d;
+                if (typeof isoString === 'string' && isoString.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                    // YYYY-MM-DD format
+                    var parts = isoString.split('-');
+                    d = new Date(parts[0], parts[1] - 1, parts[2]);
+                } else {
+                    // Full ISO timestamp or other format
+                    d = new Date(isoString);
+                }
+
+                if (isNaN(d.getTime())) return '';
+
+                // Format: DD-MM-YYYY (date only, no time)
+                const day = String(d.getDate()).padStart(2, '0');
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const year = d.getFullYear();
+
+                return `${day}-${month}-${year}`;
+            } catch (e) {
+                return '';
+            }
         }
 
         // Initialize form when DOM is ready
