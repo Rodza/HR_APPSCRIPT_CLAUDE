@@ -252,10 +252,26 @@
 
     /**
      * Format date for display
+     * Handles DD-MM-YYYY format from backend
      */
     window.formatDate = function(dateValue) {
       if (!dateValue) return '';
-      var d = new Date(dateValue);
+
+      var d;
+      // Check if date is in DD-MM-YYYY format (e.g., "14-09-1993")
+      if (typeof dateValue === 'string' && dateValue.match(/^\d{2}-\d{2}-\d{4}$/)) {
+        var parts = dateValue.split('-');
+        // Create date from DD-MM-YYYY: new Date(year, monthIndex, day)
+        d = new Date(parts[2], parts[1] - 1, parts[0]);
+      } else {
+        d = new Date(dateValue);
+      }
+
+      // Check if date is valid
+      if (isNaN(d.getTime())) {
+        return '';
+      }
+
       return d.toLocaleDateString('en-ZA', { year: 'numeric', month: 'long', day: 'numeric' });
     };
 
