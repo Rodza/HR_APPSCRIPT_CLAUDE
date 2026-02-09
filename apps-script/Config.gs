@@ -136,6 +136,7 @@ var EMPLOYEE_ALL_FIELDS = [
   'INCOME TAX NUMBER',       // Optional
   'EMPLOYMENT DATE',         // Optional
   'TERMINATION DATE',        // Optional
+  'EMPLSTATUSCHANGED',       // Optional - Date when employment status was changed
   'NOTES',                   // Optional
   'OveralSize',              // Optional (uniform)
   'ShoeSize',                // Optional (uniform)

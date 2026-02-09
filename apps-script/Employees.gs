@@ -513,6 +513,7 @@ function transformEmployeeFieldNames(data) {
     'employmentDate': 'EMPLOYMENT DATE',
     'incomeTaxNumber': 'INCOME TAX NUMBER',
     'terminationDate': 'TERMINATION DATE',
+    'emplStatusChanged': 'EMPLSTATUSCHANGED',
     'overalSize': 'OveralSize',
     'shoeSize': 'ShoeSize',
     'notes': 'NOTES'
@@ -697,6 +698,16 @@ function updateEmployee(id, employeeData, sessionToken) {
 
     if (rowIndex === -1) {
       throw new Error('Employee not found: ' + id);
+    }
+
+    // Check if employment status is changing
+    var employmentStatusCol = indexOf(headers, 'EMPLOYMENT STATUS');
+    var oldEmploymentStatus = employmentStatusCol >= 0 ? data[rowIndex][employmentStatusCol] : null;
+    var newEmploymentStatus = employeeData['EMPLOYMENT STATUS'];
+
+    // If employment status is changing, capture the date in ISO 8601 format
+    if (newEmploymentStatus && oldEmploymentStatus !== newEmploymentStatus) {
+      employeeData.EMPLSTATUSCHANGED = new Date().toISOString();
     }
 
     employeeData.MODIFIED_BY = getCurrentUser(sessionToken);

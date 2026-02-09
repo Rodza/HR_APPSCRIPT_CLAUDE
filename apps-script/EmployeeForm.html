@@ -167,6 +167,13 @@
                                 <div class="form-text">Leave blank if still employed</div>
                             </div>
                         </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="emplStatusChanged" class="form-label">Status Changed Date</label>
+                                <input type="text" class="form-control" id="emplStatusChanged" readonly>
+                                <div class="form-text">Automatically captured when employment status changes</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -264,6 +271,7 @@
             document.getElementById('incomeTaxNumber').value = employee['INCOME TAX NUMBER'] || '';
             document.getElementById('terminationDate').value = employee['TERMINATION DATE'] ?
                 formatDateForInput(employee['TERMINATION DATE']) : '';
+            document.getElementById('emplStatusChanged').value = employee.EMPLSTATUSCHANGED || '';
             document.getElementById('overalSize').value = employee.OveralSize || '';
             document.getElementById('shoeSize').value = employee.ShoeSize || '';
             document.getElementById('notes').value = employee.NOTES || '';
