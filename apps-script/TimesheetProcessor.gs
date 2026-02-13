@@ -525,83 +525,89 @@ function calculateBathroomTime(bathroomPunches, config, clockPunches, isFriday) 
     Logger.log('    ' + (i + 1) + '. ' + formatTime(exits[i].time));
   }
 
-  // Match entries with exits
-  // CRITICAL: Only match entries and exits that are within work periods.
-  // Previously, entries outside work periods (before clock-in, during lunch, after clock-out)
-  // were matched to exits and consumed them, causing valid in-work entries to cascade to
-  // much later exits, producing massively inflated break durations.
-  var usedExits = [];
-  var outsideWorkPeriodBreaks = [];
+  // Match entries with exits using EXIT-DRIVEN, CLOSEST-PRECEDING-ENTRY approach.
+  // For each exit, find the nearest unmatched entry that precedes it.
+  // This prevents cascade mismatches caused by duplicate/close entries stealing exits
+  // from subsequent real entries (e.g., a re-scan 2 min after first entry would steal
+  // the exit meant for the next break, inflating all subsequent break durations).
+  // Only match entries and exits that are within work periods.
+  var matchedEntries = [];
+  var matchedExits = [];
 
-  Logger.log('  🔗 Matching entries to exits (work-period filtered):');
+  Logger.log('  🔗 Matching exits to closest preceding entries (work-period filtered):');
 
-  for (var i = 0; i < entries.length; i++) {
-    var entry = entries[i];
+  for (var j = 0; j < exits.length; j++) {
+    var exit = exits[j];
 
-    // Skip entries outside work periods entirely - do NOT let them consume exits
-    if (!isWithinWorkPeriods(entry.time)) {
-      Logger.log('    🚻 Entry at ' + formatTime(entry.time) + ' outside work periods - skipped');
+    // Skip exits outside work periods
+    if (!isWithinWorkPeriods(exit.time)) {
+      Logger.log('    🚻 Exit at ' + formatTime(exit.time) + ' outside work periods - skipped');
       continue;
     }
 
-    var matched = false;
+    // Find the closest preceding unmatched entry within work periods
+    var bestEntryIdx = -1;
+    var bestTimeDiff = Infinity;
 
-    // Find the first exit that comes after this entry AND is within work periods
-    for (var j = 0; j < exits.length; j++) {
-      if (usedExits.indexOf(j) >= 0) continue; // Already used
+    for (var i = 0; i < entries.length; i++) {
+      if (matchedEntries.indexOf(i) >= 0) continue; // Already matched
+      if (!isWithinWorkPeriods(entries[i].time)) continue; // Outside work
 
-      var exit = exits[j];
-
-      // Skip exits outside work periods - don't consume them
-      if (!isWithinWorkPeriods(exit.time)) continue;
-
-      if (exit.time.getTime() > entry.time.getTime()) {
-        // Found a matching exit
-        var duration = (exit.time.getTime() - entry.time.getTime()) / (60 * 1000);
-
-        Logger.log('    Entry ' + formatTime(entry.time) + ' → Exit ' + formatTime(exit.time) + ' (' + Math.round(duration) + 'm)');
-
-        var breakInfo = {
-          entry: formatTime(entry.time),
-          exit: formatTime(exit.time),
-          minutes: Math.round(duration)
-        };
-
-        // Count this break - both entry and exit are confirmed within work periods
-        totalMinutes += duration;
-
-        // Check for long bathroom break
-        if (duration > config.longBathroomThreshold) {
-          breakInfo.warning = 'Long bathroom break (' + Math.round(duration) + ' min)';
-          warnings.push(breakInfo.warning);
-        }
-
-        breaks.push(breakInfo);
-        Logger.log('    ✓ Bathroom break ' + breakInfo.entry + '-' + breakInfo.exit + ' (' + breakInfo.minutes + 'm) - COUNTED');
-
-        usedExits.push(j);
-        matched = true;
-        break;
+      var timeDiff = exit.time.getTime() - entries[i].time.getTime();
+      if (timeDiff > 0 && timeDiff < bestTimeDiff) {
+        bestEntryIdx = i;
+        bestTimeDiff = timeDiff;
       }
     }
 
-    if (!matched) {
-      unpairedEntries.push(formatTime(entry.time));
-      warnings.push('Bathroom entry at ' + formatTime(entry.time) + ' without exit');
+    if (bestEntryIdx >= 0) {
+      var entry = entries[bestEntryIdx];
+      var duration = bestTimeDiff / (60 * 1000);
+
+      Logger.log('    Exit ' + formatTime(exit.time) + ' ← Entry ' + formatTime(entry.time) + ' (' + Math.round(duration) + 'm)');
+
+      var breakInfo = {
+        entry: formatTime(entry.time),
+        exit: formatTime(exit.time),
+        minutes: Math.round(duration)
+      };
+
+      // Count this break
+      totalMinutes += duration;
+
+      // Check for long bathroom break
+      if (duration > config.longBathroomThreshold) {
+        breakInfo.warning = 'Long bathroom break (' + Math.round(duration) + ' min)';
+        warnings.push(breakInfo.warning);
+      }
+
+      breaks.push(breakInfo);
+      Logger.log('    ✓ Bathroom break ' + breakInfo.entry + '-' + breakInfo.exit + ' (' + breakInfo.minutes + 'm) - COUNTED');
+
+      matchedEntries.push(bestEntryIdx);
+      matchedExits.push(j);
+    } else {
+      // Exit without a preceding entry within work periods
+      unpairedExits.push(formatTime(exit.time));
+      warnings.push('Bathroom exit at ' + formatTime(exit.time) + ' without entry');
     }
   }
 
-  // Find exits without entries (only report those within work periods)
-  for (var j = 0; j < exits.length; j++) {
-    if (usedExits.indexOf(j) === -1) {
-      if (isWithinWorkPeriods(exits[j].time)) {
-        unpairedExits.push(formatTime(exits[j].time));
-        warnings.push('Bathroom exit at ' + formatTime(exits[j].time) + ' without entry');
-      } else {
-        Logger.log('    🚻 Unpaired exit at ' + formatTime(exits[j].time) + ' outside work periods - ignored');
-      }
+  // Find unmatched entries within work periods
+  for (var i = 0; i < entries.length; i++) {
+    if (matchedEntries.indexOf(i) >= 0) continue;
+    if (isWithinWorkPeriods(entries[i].time)) {
+      unpairedEntries.push(formatTime(entries[i].time));
+      Logger.log('    🚻 Unpaired entry at ' + formatTime(entries[i].time) + ' within work periods');
+    } else {
+      Logger.log('    🚻 Entry at ' + formatTime(entries[i].time) + ' outside work periods - ignored');
     }
   }
+
+  // Sort breaks by entry time for display
+  breaks.sort(function(a, b) {
+    return a.entry.localeCompare(b.entry);
+  });
 
   // Check daily threshold
   if (totalMinutes > config.dailyBathroomThreshold) {
