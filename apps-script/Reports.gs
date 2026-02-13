@@ -984,6 +984,97 @@ function generateWeeklyPayrollSummaryReport(weekEnding) {
     // File > Print > Set page orientation to Portrait, paper size to A4,
     // margins to Narrow, and scale to "Fit to width" = 1 page
 
+    // ===== Payments Schedule =====
+    const paymentsSheet = spreadsheet.insertSheet('Payments Schedule');
+
+    // Header
+    paymentsSheet.getRange('A1').setValue('Payments Schedule - Week Ending: ' + formatDate(weekEnd));
+    paymentsSheet.setRowHeight(1, 30);
+
+    // Column headers
+    paymentsSheet.getRange('A3:E3').setValues([[
+      'Employee',
+      'Net Pay',
+      'Loan Ded.',
+      'New Loan',
+      'Paid to Account'
+    ]]);
+    paymentsSheet.getRange('A3:E3').setFontWeight('bold').setBackground('#4CAF50').setFontColor('#FFFFFF').setHorizontalAlignment('center');
+    paymentsSheet.setRowHeight(3, 25);
+
+    // Data rows - combine all employees (Permanent and Temporary)
+    let paymentsRowNum = 4;
+
+    // Sort payslips by employment status (Permanent first, then Temporary) and then by employee name
+    const sortedPayslips = payslips.slice().sort((a, b) => {
+      const statusA = a['EMPLOYMENT STATUS'] || 'Unknown';
+      const statusB = b['EMPLOYMENT STATUS'] || 'Unknown';
+      const statusOrder = ['Permanent', 'Temporary', 'Resigned', 'Dismissed', 'Absconded', 'Unknown'];
+
+      const indexA = statusOrder.indexOf(statusA);
+      const indexB = statusOrder.indexOf(statusB);
+
+      // Compare by status first
+      if (indexA !== indexB) {
+        if (indexA === -1) return 1;
+        if (indexB === -1) return -1;
+        return indexA - indexB;
+      }
+
+      // If same status, compare by employee name
+      const nameA = a['EMPLOYEE NAME'] || '';
+      const nameB = b['EMPLOYEE NAME'] || '';
+      return nameA.localeCompare(nameB);
+    });
+
+    for (let i = 0; i < sortedPayslips.length; i++) {
+      const p = sortedPayslips[i];
+      paymentsSheet.getRange(paymentsRowNum, 1, 1, 5).setValues([[
+        p['EMPLOYEE NAME'],
+        p['NETTSALARY'] || 0,
+        p['LoanDeductionThisWeek'] || 0,
+        p['NewLoanThisWeek'] || 0,
+        p['PaidtoAccount'] || 0
+      ]]);
+      paymentsRowNum++;
+    }
+
+    // Totals row
+    const totalNetPay = sortedPayslips.reduce((sum, p) => sum + (p['NETTSALARY'] || 0), 0);
+    const totalLoanDed = sortedPayslips.reduce((sum, p) => sum + (p['LoanDeductionThisWeek'] || 0), 0);
+    const totalNewLoan = sortedPayslips.reduce((sum, p) => sum + (p['NewLoanThisWeek'] || 0), 0);
+    const totalPaidToAccount = sortedPayslips.reduce((sum, p) => sum + (p['PaidtoAccount'] || 0), 0);
+
+    paymentsSheet.getRange(paymentsRowNum, 1, 1, 5).setValues([[
+      'TOTALS',
+      totalNetPay,
+      totalLoanDed,
+      totalNewLoan,
+      totalPaidToAccount
+    ]]);
+    paymentsSheet.getRange(paymentsRowNum, 1, 1, 5).setFontWeight('bold').setBackground('#FFD700');
+
+    // Set column widths
+    paymentsSheet.setColumnWidth(1, 220);  // Column A - Employee
+    paymentsSheet.setColumnWidth(2, 120);  // Column B - Net Pay
+    paymentsSheet.setColumnWidth(3, 120);  // Column C - Loan Ded.
+    paymentsSheet.setColumnWidth(4, 120);  // Column D - New Loan
+    paymentsSheet.setColumnWidth(5, 140);  // Column E - Paid to Account
+
+    // Merge header cells A1:E1 and apply formatting
+    paymentsSheet.getRange('A1:E1').merge();
+    paymentsSheet.getRange('A1').setFontWeight('bold').setFontSize(14).setHorizontalAlignment('center');
+
+    // Format currency columns (B-E) for data rows and totals
+    if (sortedPayslips.length > 0) {
+      paymentsSheet.getRange(4, 2, sortedPayslips.length + 1, 4).setNumberFormat('"R"#,##0.00');
+    }
+
+    // Add borders to the entire table
+    const paymentsLastRow = paymentsRowNum;
+    const paymentsTableRange = paymentsSheet.getRange('A3:E' + paymentsLastRow);
+    paymentsTableRange.setBorder(true, true, true, true, true, true, 'black', SpreadsheetApp.BorderStyle.SOLID);
+
     // Move to reports folder and set sharing
     const reportUrl = moveToReportsFolder(spreadsheet);
 
