@@ -932,6 +932,47 @@ function processDayData(dayData, config) {
   var punchCount = punches.length;
   var expectedPunches = isFriday ? 2 : 4;
 
+  // Check 1: Irregular punch count (too many punches)
+  // If there are MORE punches than expected, the alternating in/out pattern gets confused
+  // and produces incorrect time calculations. Flag for manual review.
+  if (punchCount > expectedPunches) {
+    warnings.push('Irregular punch pattern (' + punchCount + ' punches, expected ' + expectedPunches + ') - manual review required');
+    appliedRules.push('irregularPunchCount');
+
+    Logger.log('  ⚠️ IRREGULAR PUNCH COUNT: ' + punchCount + ' punches (expected ' + expectedPunches + ')');
+    Logger.log('  ⚠️ Cannot reliably calculate time with extra punches - returning 0 for manual review');
+
+    // Collect all punch times for display
+    var punchTimes = [];
+    for (var i = 0; i < dayData.clockInPunches.length; i++) {
+      punchTimes.push(formatTime(dayData.clockInPunches[i].time));
+    }
+
+    // Calculate bathroom time even though we're not counting work time
+    var bathroomResult = calculateBathroomTime(dayData.bathroomPunches, config, dayData.clockInPunches, isFriday);
+    if (bathroomResult.warnings.length > 0) {
+      warnings = warnings.concat(bathroomResult.warnings);
+    }
+
+    return {
+      date: dayData.date,
+      clockIn: punches.length > 0 ? formatTime(punches[0].time) : null,
+      clockOut: punches.length > 0 ? formatTime(punches[punches.length - 1].time) : null,
+      adjustedIn: null,
+      adjustedOut: null,
+      punchTimes: punchTimes,
+      lunchTaken: false,
+      lunchMinutes: 0,
+      bathroomMinutes: bathroomResult.totalMinutes,
+      bathroomBreaks: bathroomResult.breaks,
+      bathroomUnpairedEntries: bathroomResult.unpairedEntries,
+      bathroomUnpairedExits: bathroomResult.unpairedExits,
+      totalMinutes: 0,
+      warnings: warnings,
+      appliedRules: appliedRules
+    };
+  }
+
   // Helper: Get hour and minute from a punch
   function getTimeMinutes(punchTime) {
     return punchTime.getHours() * 60 + punchTime.getMinutes();
